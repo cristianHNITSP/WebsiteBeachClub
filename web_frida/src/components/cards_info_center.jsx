@@ -7,9 +7,6 @@ import {
 } from "@ant-design/icons";
 
 function CardsInfoCenter({ beachColors, cardsData }) {
-
-
-
     return (
         <Row gutter={[16, 16]} justify="center" style={{ width: "100%", margin: "15px 0 0 0" }}>
             {cardsData.map((c, i) => (
@@ -30,7 +27,6 @@ function CardsInfoCenter({ beachColors, cardsData }) {
                                     <Button
                                         type="text"
                                         icon={<HeartOutlined />}
-
                                         style={{
                                             position: "absolute",
                                             top: 140,
@@ -55,13 +51,11 @@ function CardsInfoCenter({ beachColors, cardsData }) {
                                         fontSize: 14,
                                         fontWeight: 600,
                                         boxShadow: "0 4px 8px rgba(0,0,0,0.1)"
-
                                     }}
                                 >
                                     Reservar ahora
                                 </Button>,
-
-                                <Button type="text" icon={<HeartOutlined />} style={{  width: 90,  height: 36, }}>Guardar</Button>
+                                <Button type="text" icon={<HeartOutlined />} style={{ width: 90, height: 36 }}>Guardar</Button>
                             ]}
                             style={{
                                 borderRadius: 16,
@@ -76,7 +70,6 @@ function CardsInfoCenter({ beachColors, cardsData }) {
                                 padding: 14
                             }}
                         >
-
                             <div>
                                 <Typography.Title level={5} style={{ color: beachColors.deepBlue, marginBottom: 4 }}>
                                     {c.title}
@@ -119,7 +112,7 @@ function CardsInfoCenter({ beachColors, cardsData }) {
                                 </Space>
                             </div>
 
-                            <Flex  align="center" style={{ marginTop: 12 }}>
+                            <Flex align="center" style={{ marginTop: 12 }}>
                                 <Typography.Text style={{ fontSize: 20, fontWeight: 700, color: beachColors.deepBlue }}>
                                     ${c.price}
                                 </Typography.Text>
