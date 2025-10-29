@@ -1,0 +1,14 @@
+/* Selecciona la etiqueta <body> para aplicar los estilos */
+body {
+  /* Propiedades para el fondo */
+  background-color: #f4f4f4; /* Un color de fondo gris claro */  
+  /* Elimina los márgenes predeterminados del navegador */
+  margin: 0;
+  
+  /* Elimina los rellenos predeterminados del navegador */
+  padding: 0; 
+}
+
+.ant-tree {
+  background-color: transparent;
+}
