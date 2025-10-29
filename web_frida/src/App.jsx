@@ -44,9 +44,6 @@ function App() {
 
   const menuItems = [{ key: "1", label: "Casa Frida" }, { key: "2", label: "Cabañas Frida" }];
 
-
-
-
   const panelStyles = {
     left: { background: '#f1f5f9', borderRight: `1px solid ${borderColor}` },
     center: { background: '#fff', padding: 4 },
@@ -150,7 +147,7 @@ function App() {
           {/* PANEL CENTRAL */}
           <Splitter.Panel defaultSize="55%" style={panelStyles.center}>
 
-            <Carousel autoplay effect="fade">
+            <Carousel arrows autoplay={{ dotDuration: true }} autoplaySpeed={5000}>
               <div><div style={carouselSlide("✨ Escápate al Paraíso en Casa Frida ✨", "https://images.unsplash.com/photo-1520250497591-112f2f40a3f4?w=1200")} /></div>
               <div><div style={carouselSlide("🌴 Vive la Magia de Cabañas Frida", "https://images.unsplash.com/photo-1564501049412-61c2a3083791?w=1200")} /></div>
               <div><div style={carouselSlide("🌅 Tu Sueño Vacacional Comienza Aquí", "https://images.unsplash.com/photo-1571896349842-33c89424de2d?w=1200")} /></div>
@@ -162,7 +159,7 @@ function App() {
 
           {/* PANEL DER */}
           <Splitter.Panel defaultSize="25%" style={panelStyles.right}>
-            <Flex vertical style={{ padding: 24 }}>
+            <Flex vertical style={{ padding: 20, }}>
               <Typography.Title level={4} style={{ color: beachColors.deepBlue }}>
                 <FireFilled style={{ color: beachColors.sunset }} /> Destinos Populares
               </Typography.Title>
