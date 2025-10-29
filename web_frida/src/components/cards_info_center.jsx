@@ -62,13 +62,7 @@ function CardsInfoCenter({ beachColors, cardsData }) {
                                 boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
                                 height: "100%"
                             }}
-                            bodyStyle={{
-                                minHeight: 240,
-                                display: "flex",
-                                flexDirection: "column",
-                                justifyContent: "space-between",
-                                padding: 14
-                            }}
+
                         >
                             <div>
                                 <Typography.Title level={5} style={{ color: beachColors.deepBlue, marginBottom: 4 }}>
