@@ -14,13 +14,12 @@ function CardsInfoCenter({ beachColors, cardsData }) {
                         <Card
                             hoverable
                             cover={<img alt={c.title} src={c.img} style={{ height: 180, objectFit: "cover" }} />}
-                            bodyStyle={{ padding: 12, display: "flex", flexDirection: "column", justifyContent: "space-between", minHeight: 250 }}
-                            actions={[
-                                <Flex justify="center" gap={10}>
+                            styles={{ body: { padding: 12, display: "flex", flexDirection: "column", justifyContent: "space-between", minHeight: 250 } }} actions={[
+                                <Flex justify="center" gap={5}>
                                     <Button color="cyan" variant="solid">
                                         Reservar
                                     </Button>
-                                    <Button type="default" icon={<HeartOutlined />}>Guardar</Button>
+                                    <Button type="default" danger icon={<HeartOutlined />}>Guardar</Button>
                                 </Flex>
 
                             ]}

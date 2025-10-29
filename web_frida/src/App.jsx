@@ -1,7 +1,7 @@
-import React from "react";
+import { useState, useEffect } from "react";
 import {
   Button, Card, Dropdown, Flex, Input, Space, Splitter, Typography, theme, Carousel,
-  Rate, Tag, Avatar, Tree, Select, Badge, DatePicker
+  Rate, Tag, Avatar, Tree, Select, Badge, DatePicker, Skeleton
 } from "antd";
 import {
   DownOutlined, SearchOutlined, UserOutlined, EnvironmentOutlined, HeartOutlined,
@@ -17,6 +17,15 @@ const { Option } = Select;
 
 function App() {
 
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    // Simula la carga de datos
+    const timer = setTimeout(() => setLoading(false), 2000);
+    return () => clearTimeout(timer);
+  }, []);
+
+
   const { token } = useToken();
 
   const beachColors = {
@@ -27,7 +36,7 @@ function App() {
   const backgroundColor = '#f8fafc', borderColor = '#e2e8f0';
 
   const headerStyle = {
-    padding: "14px 32px",
+    padding: "10px 10px",
     background: `linear-gradient(135deg, ${beachColors.deepBlue}, ${beachColors.oceanBlue})`,
     boxShadow: "0 4px 20px rgba(0,0,0,0.15)",
     position: "sticky", top: 0, zIndex: 100,
@@ -45,8 +54,8 @@ function App() {
   const menuItems = [{ key: "1", label: "Casa Frida" }, { key: "2", label: "Cabañas Frida" }];
 
   const panelStyles = {
-    left: { background: '#f1f5f9', borderRight: `1px solid ${borderColor}` },
-    center: { background: '#fff', padding: 4 },
+    left: { background: '#f1f5f9', bordeerRight: `1px solid ${borderColor}` },
+    center: { background: '#fff', padding: 16 },
     right: { background: '#f8fafc', borderLeft: `1px solid ${borderColor}` }
   };
 
@@ -83,6 +92,19 @@ function App() {
       amenities: ["WiFi", "Vista al mar", "Piscina", "Bar", "Desayuno"], badge: "LUJO"
     }
   ];
+  
+  const carruselImages = [
+    { text: "✨ Escápate al Paraíso en Casa Frida ✨", img: "https://images.unsplash.com/photo-1520250497591-112f2f40a3f4?w=1200" },
+    { text: "🌴 Vive la Magia de Cabañas Frida", img: "https://images.unsplash.com/photo-1564501049412-61c2a3083791?w=1200" }
+    , { text: "🌅 Tu Sueño Vacacional Comienza Aquí", img: "https://images.unsplash.com/photo-1571896349842-33c89424de2d?w=1200" }
+  ];
+
+  const recommendedDestinations = [
+    { name: "Tulum", desc: "Playas de ensueño", img: "unsplash.com/photo-1506929562872-bb421503ef21?w=300" },
+    { name: "Valle de Bravo", desc: "Naturaleza y aventura", img: "unsplash.com/photo-1597076876931-6d43ab0cc36c?w=300" },
+    { name: "Oaxaca", desc: "Cultura y tradición", img: "unsplash.com/photo-1583531352361-9eeae2cabee7?w=300" },
+    { name: "Playa del Carmen", desc: "Vida nocturna vibrante", img: "unsplash.com/photo-1571896349842-33c89424de2d?w=300" }
+  ];
 
   return (
     <div style={{
@@ -92,9 +114,24 @@ function App() {
       {/* HEADER */}
       <header style={headerStyle}>
         <Flex justify="space-between" align="center" wrap="wrap" gap={16} style={{ maxWidth: 1400, margin: "0 auto" }}>
-          <Dropdown menu={{ items: menuItems }}>
-            <Typography.Title level={3} style={{ color: '#fff', cursor: "pointer", fontWeight: 800, margin: 0 }}>
-              Beach Club <DownOutlined style={{ fontSize: 14, color: beachColors.turquoise }} />
+          <Dropdown menu={{ items: menuItems }} placement="bottomLeft">
+            <Typography.Title
+              level={3}
+              style={{
+                margin: 0,
+                color: '#ffffff',
+                cursor: "pointer",
+                fontWeight: 800,
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                textShadow: '0 2px 4px rgba(0,0,0,0.3)'
+              }}
+            >
+              {/* SVG Logo Beach Club */}
+              <img src="/beachclub.svg" alt="logo" style={{ width: 32, height: 32 }} />
+              Beach Club
+              <DownOutlined style={{ fontSize: 14, color: beachColors.turquoise }} />
             </Typography.Title>
           </Dropdown>
 
@@ -111,14 +148,17 @@ function App() {
               <Option value="1">1 adulto</Option><Option value="2">2 adultos</Option>
               <Option value="3">3 adultos</Option><Option value="4">Familia</Option>
             </Select>
-            <Button type="primary" icon={<SearchOutlined />} style={{
-              borderRadius: 12, background: beachColors.turquoise, fontWeight: 600,
+            <Button color="cyan" variant="solid" icon={<SearchOutlined />} style={{
+              borderRadius: 12, fontWeight: 600,
               boxShadow: '0 4px 12px rgba(45,212,191,0.4)', height: 40
             }}>Buscar</Button>
           </Flex>
 
-          <Flex align="center" gap={12}>
-            <Button type="text" style={{ color: '#fff', fontWeight: 500 }}>Iniciar sesión</Button>
+          <Flex align="center" gap={12} style={{
+            background: 'rgba(255,255,255,0.15)',
+            padding: '12px 16px', borderRadius: '16px', backdropFilter: 'blur(10px)'
+          }}>
+            <Button color="cyan" variant="dashed" style={{ height: 40, borderRadius: 20 }}>Iniciar sesión</Button>
             <Avatar size="large" icon={<UserOutlined />} style={{ background: beachColors.turquoise }} />
           </Flex>
         </Flex>
@@ -129,7 +169,7 @@ function App() {
         <Splitter style={{ height: "100%", border: "none" }}>
           {/* PANEL IZQ */}
           <Splitter.Panel defaultSize="20%" style={panelStyles.left}>
-            <Flex vertical style={{ padding: 20 }}>
+            <Flex vertical style={{ padding: 10 }}>
               <Flex align="center" gap={8}><FilterOutlined style={{ color: beachColors.deepBlue }} />
                 <Typography.Title level={4} style={{ margin: 0, color: beachColors.deepBlue }}>Filtros</Typography.Title>
               </Flex>
@@ -148,9 +188,14 @@ function App() {
           <Splitter.Panel defaultSize="55%" style={panelStyles.center}>
 
             <Carousel arrows autoplay={{ dotDuration: true }} autoplaySpeed={5000}>
-              <div><div style={carouselSlide("✨ Escápate al Paraíso en Casa Frida ✨", "https://images.unsplash.com/photo-1520250497591-112f2f40a3f4?w=1200")} /></div>
-              <div><div style={carouselSlide("🌴 Vive la Magia de Cabañas Frida", "https://images.unsplash.com/photo-1564501049412-61c2a3083791?w=1200")} /></div>
-              <div><div style={carouselSlide("🌅 Tu Sueño Vacacional Comienza Aquí", "https://images.unsplash.com/photo-1571896349842-33c89424de2d?w=1200")} /></div>
+              {carruselImages.map((slide, i) => (
+                <div key={i}>
+                  {loading ? (<Skeleton.Image active style={{ height: 300, width: 650, borderRadius: 16, margin: "0 8px" }} />
+                  ) : (
+                    <div style={carouselSlide(slide.text, slide.img)} />
+                  )}
+                </div>
+              ))}
             </Carousel>
 
             <CardsInfoCenter beachColors={beachColors} cardsData={cardsData} />
@@ -159,18 +204,18 @@ function App() {
 
           {/* PANEL DER */}
           <Splitter.Panel defaultSize="25%" style={panelStyles.right}>
-            <Flex vertical style={{ padding: 20, }}>
-              <Typography.Title level={4} style={{ color: beachColors.deepBlue }}>
+            <Flex vertical style={{ padding: 10, gap: 16 }}>
+              <Typography.Title level={4} style={{ color: beachColors.deepBlue, marginTop: 1 }}>
                 <FireFilled style={{ color: beachColors.sunset }} /> Destinos Populares
               </Typography.Title>
               <Space direction="vertical" style={{ width: "100%" }}>
-                {[
-                  { name: "Tulum", desc: "Playas de ensueño", img: "https://images.unsplash.com/photo-1506929562872-bb421503ef21?w=300" },
-                  { name: "Valle de Bravo", desc: "Naturaleza y aventura", img: "https://images.unsplash.com/photo-1597076876931-6d43ab0cc36c?w=300" },
-                  { name: "Oaxaca", desc: "Cultura y tradición", img: "https://images.unsplash.com/photo-1583531352361-9eeae2cabee7?w=300" },
-                  { name: "Playa del Carmen", desc: "Vida nocturna vibrante", img: "https://images.unsplash.com/photo-1571896349842-33c89424de2d?w=300" }
-                ].map((city, i) => (
-                  <Card key={i} hoverable cover={<img src={city.img} alt={city.name} style={{ height: 120, objectFit: "cover" }} />}
+                {recommendedDestinations.map((city, i) => (
+                  <Card key={i} hoverable
+                    cover=
+                    {
+                      loading ? <Skeleton.Image active alt={city.name} style={{ height: 120, width: 300, objectFit: "cover" }} />
+                        : <img src={city.img} alt={city.name} style={{ height: 120, objectFit: "cover" }} />
+                    }
                     style={{ borderRadius: 12, overflow: 'hidden' }}>
                     <Flex justify="space-between" align="center">
                       <div>
@@ -184,7 +229,7 @@ function App() {
               </Space>
 
               <div style={{
-                marginTop: 32, padding: 20, background: `linear-gradient(135deg, ${beachColors.deepBlue}15, ${beachColors.turquoise}15)`,
+                marginTop: 8, padding: 20, background: `linear-gradient(135deg, ${beachColors.deepBlue}15, ${beachColors.turquoise}15)`,
                 borderRadius: 16
               }}>
                 <Typography.Title level={5}>📧 Ofertas Exclusivas</Typography.Title>
@@ -197,6 +242,8 @@ function App() {
               </div>
             </Flex>
           </Splitter.Panel>
+
+
         </Splitter>
       </main>
 
@@ -206,7 +253,7 @@ function App() {
         background: `linear-gradient(135deg, ${beachColors.deepBlue}, ${beachColors.oceanBlue})`,
         color: 'white'
       }}>
-        <Typography.Text>© 2025 Casa Frida — Donde los sueños de playa se hacen realidad 🌊🌸</Typography.Text>
+        <Typography.Text style={{ color: "white" }}>© 2025 Casa Frida — Donde los sueños de playa se hacen realidad 🌊🌸</Typography.Text>
         <div style={{ marginTop: 8 }}>
           {['Términos', 'Privacidad', 'Contacto', 'Nosotros'].map((t, i) =>
             <Typography.Text key={i} style={{ margin: '0 12px', color: 'rgba(255,255,255,0.7)', cursor: 'pointer' }}>{t}</Typography.Text>
