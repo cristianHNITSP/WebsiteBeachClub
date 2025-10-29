@@ -8,7 +8,7 @@ import {
   FilterOutlined, HomeOutlined, GiftOutlined, CompassOutlined, StarFilled, FireFilled
 } from "@ant-design/icons";
 
-import CardsInfoCenter from '../src/components/cards_info_center.jsx';
+import CardsInfoCenter from './components/CardsInfoCenter.jsx';
 
 import dayjs from "dayjs";
 
@@ -21,7 +21,7 @@ function App() {
 
   useEffect(() => {
     // Simula la carga de datos
-    const timer = setTimeout(() => setLoading(false), 2000);
+    const timer = setTimeout(() => setLoading(false), 1000);
     return () => clearTimeout(timer);
   }, []);
 
@@ -82,7 +82,7 @@ function App() {
       badge: "MÁS POPULAR", featured: true
     },
     {
-      title: "Cabaña Frida - Bosque Encantado", location: "Valle de Bravo", rating: 4.6, price: 1850,
+      title: "Cabaña Frida - Bosque Encantado", location: "Valle de Bravo", rating: 3.6, price: 1850,
       img: "https://images.unsplash.com/photo-1582582621959-48d27397dc69?w=800",
       amenities: ["WiFi", "Cafetera", "Pet Friendly", "Terraza"], badge: "ECO-FRIENDLY"
     },
@@ -92,7 +92,7 @@ function App() {
       amenities: ["WiFi", "Vista al mar", "Piscina", "Bar", "Desayuno"], badge: "LUJO"
     }
   ];
-  
+
   const carruselImages = [
     { text: "✨ Escápate al Paraíso en Casa Frida ✨", img: "https://images.unsplash.com/photo-1520250497591-112f2f40a3f4?w=1200" },
     { text: "🌴 Vive la Magia de Cabañas Frida", img: "https://images.unsplash.com/photo-1564501049412-61c2a3083791?w=1200" }
@@ -100,11 +100,14 @@ function App() {
   ];
 
   const recommendedDestinations = [
-    { name: "Tulum", desc: "Playas de ensueño", img: "unsplash.com/photo-1506929562872-bb421503ef21?w=300" },
-    { name: "Valle de Bravo", desc: "Naturaleza y aventura", img: "unsplash.com/photo-1597076876931-6d43ab0cc36c?w=300" },
-    { name: "Oaxaca", desc: "Cultura y tradición", img: "unsplash.com/photo-1583531352361-9eeae2cabee7?w=300" },
-    { name: "Playa del Carmen", desc: "Vida nocturna vibrante", img: "unsplash.com/photo-1571896349842-33c89424de2d?w=300" }
+    {
+      name: "Tulum",
+      desc: "Playas de ensueño",
+      img: "https://lp-cms-production.imgix.net/2024-08/PlayaRuinasTulum.jpg?auto=format,compress&q=72&fit=crop&w=1200"
+    },
+
   ];
+
 
   return (
     <div style={{
@@ -154,21 +157,26 @@ function App() {
             }}>Buscar</Button>
           </Flex>
 
-          <Flex align="center" gap={12} style={{
-            background: 'rgba(255,255,255,0.15)',
-            padding: '12px 16px', borderRadius: '16px', backdropFilter: 'blur(10px)'
-          }}>
-            <Button color="cyan" variant="dashed" style={{ height: 40, borderRadius: 20 }}>Iniciar sesión</Button>
-            <Avatar size="large" icon={<UserOutlined />} style={{ background: beachColors.turquoise }} />
-          </Flex>
+          {
+            /*  
+              <Flex align="center" gap={12} style={{
+                background: 'rgba(255,255,255,0.15)',
+                padding: '12px 16px', borderRadius: '16px', backdropFilter: 'blur(10px)'
+              }}>
+                <Button color="cyan" variant="dashed" style={{ height: 40, borderRadius: 20 }}>Iniciar sesión</Button>
+                <Avatar size="large" icon={<UserOutlined />} style={{ background: beachColors.turquoise }} />
+              </Flex>
+            */
+          }
+
         </Flex>
       </header>
 
       {/* MAIN */}
-      <main style={{ flex: 1 }}>
+      <main style={{ flex: 1, height: "100vh" }}>
         <Splitter style={{ height: "100%", border: "none" }}>
           {/* PANEL IZQ */}
-          <Splitter.Panel defaultSize="20%" style={panelStyles.left}>
+          <Splitter.Panel defaultSize="20%" min="20%" max="20%" collapsible={{ start: true, end: true }} style={panelStyles.left}>
             <Flex vertical style={{ padding: 10 }}>
               <Flex align="center" gap={8}><FilterOutlined style={{ color: beachColors.deepBlue }} />
                 <Typography.Title level={4} style={{ margin: 0, color: beachColors.deepBlue }}>Filtros</Typography.Title>
@@ -185,7 +193,7 @@ function App() {
           </Splitter.Panel>
 
           {/* PANEL CENTRAL */}
-          <Splitter.Panel defaultSize="55%" style={panelStyles.center}>
+          <Splitter.Panel defaultSize="55%" min="55%" style={panelStyles.center}>
 
             <Carousel arrows autoplay={{ dotDuration: true }} autoplaySpeed={5000}>
               {carruselImages.map((slide, i) => (
@@ -198,12 +206,12 @@ function App() {
               ))}
             </Carousel>
 
-            <CardsInfoCenter beachColors={beachColors} cardsData={cardsData} />
+            <CardsInfoCenter beachColors={beachColors} cardsData={cardsData} loading={loading} />
 
           </Splitter.Panel>
 
           {/* PANEL DER */}
-          <Splitter.Panel defaultSize="25%" style={panelStyles.right}>
+          <Splitter.Panel defaultSize="25%" min="20%" max="40%" style={panelStyles.right}>
             <Flex vertical style={{ padding: 10, gap: 16 }}>
               <Typography.Title level={4} style={{ color: beachColors.deepBlue, marginTop: 1 }}>
                 <FireFilled style={{ color: beachColors.sunset }} /> Destinos Populares
@@ -251,7 +259,8 @@ function App() {
       <footer style={{
         textAlign: "center", padding: 24,
         background: `linear-gradient(135deg, ${beachColors.deepBlue}, ${beachColors.oceanBlue})`,
-        color: 'white'
+        color: 'white',
+
       }}>
         <Typography.Text style={{ color: "white" }}>© 2025 Casa Frida — Donde los sueños de playa se hacen realidad 🌊🌸</Typography.Text>
         <div style={{ marginTop: 8 }}>
