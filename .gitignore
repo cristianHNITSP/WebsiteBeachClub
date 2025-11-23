@@ -1,0 +1,121 @@
+### AL ###
+#Template for AL projects for Dynamics 365 Business Central
+#launch.json folder
+.vscode/
+#Cache folder
+.alcache/
+#Symbols folder
+.alpackages/
+#Snapshots folder
+.snapshots/
+#Testing Output folder
+.output/
+#Extension App-file
+*.app
+#Rapid Application Development File
+rad.json
+#Translation Base-file
+*.g.xlf
+#License-file
+*.flf
+#Test results file
+TestResults.xml
+
+# =========================
+# Node / JavaScript (global)
+# =========================
+
+# Dependencias
+node_modules/
+**/node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Builds
+dist/
+build/
+.cache/
+.temp/
+.tmp/
+.nyc_output/
+coverage/
+
+# Logs
+logs/
+*.log
+*.log.*
+log.txt
+
+# =========================
+# Configuración / Secretos
+# =========================
+
+# Entornos
+.env
+.env.local
+.env.*.local
+
+# Entornos por servicio
+users-service/.env
+reservas-service/.env
+**/.env
+
+# JWT u otras claves (si las dejas en archivos separados)
+*.secret
+*.key
+*.pem
+
+# =========================
+# Editor / IDE
+# =========================
+
+# VSCode
+.vscode/
+.history/
+
+# WebStorm / JetBrains
+.idea/
+
+# =========================
+# Sistema Operativo
+# =========================
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Linux
+*~
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# =========================
+# Docker
+# =========================
+
+# Archivos de entorno locales de Docker
+docker.env
+.docker/
+docker-compose.override.yml
+
+# =========================
+# Otros
+# =========================
+
+# Reports temporales
+*.pid
+*.seed
+*.tgz
+
+# Playwright / Cypress / tests UI (por si los agregas luego)
+playwright-report/
+test-results/
+cypress/videos/
+cypress/screenshots/

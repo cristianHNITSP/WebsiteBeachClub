@@ -1,0 +1,15 @@
+.view-transition-wrapper {
+  animation: viewFadeIn 0.26s ease-out;
+  will-change: opacity, transform;
+}
+
+@keyframes viewFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

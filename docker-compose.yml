@@ -1,0 +1,86 @@
+version: '3.9'
+
+# Comandos útiles BeachClub:
+# dev:    docker compose --profile dev up --build
+# dev -d: docker compose --profile dev up --build -d
+# down:   docker compose --profile dev down
+
+services:
+  #MongoDB BeachClub
+  beachclub-mongo:
+    image: mongo:6
+    container_name: beachclub-mongo
+    ports:
+      - "27019:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD}
+    volumes:
+      - beachclub-mongo-data:/data/db
+    restart: always
+    networks:
+      - beachclub-net
+
+  #Mongo Express BeachClub
+  beachclub-mongo-express:
+    image: mongo-express
+    container_name: beachclub-mongo-express
+    ports:
+      - "127.0.0.1:8082:8081"
+    environment:
+      ME_CONFIG_MONGODB_URL: mongodb://root:${MONGO_PASSWORD}@beachclub-mongo:27017/
+      ME_CONFIG_BASICAUTH_USERNAME: beachclubapp
+      ME_CONFIG_BASICAUTH_PASSWORD: admin1234
+      ME_CONFIG_SITE_BASEURL: "/"
+    depends_on:
+      - beachclub-mongo
+    restart: always
+    networks:
+      - beachclub-net
+    profiles: ["dev"]
+
+  #Microservicio de usuarios + auth
+  beachclub-users-service:
+    build:
+      context: ./users-service
+    container_name: beachclub-users-service
+    env_file:
+      - ./users-service/.env
+    environment:
+      MONGO_URI: "mongodb://root:${MONGO_PASSWORD}@beachclub-mongo:27017/beachclub_auth?authSource=admin"
+      JWT_SECRET: ${JWT_SECRET}
+    depends_on:
+      - beachclub-mongo
+    networks:
+      - beachclub-net
+    ports:
+      - "4001:4001"
+    restart: always
+    profiles: ["dev"]
+
+  #Microservicio de reservas + habitaciones
+  beachclub-reservas-service:
+    build:
+      context: ./reservas-service
+    container_name: beachclub-reservas-service
+    env_file:
+      - ./reservas-service/.env
+    environment:
+      MONGO_URI: "mongodb://root:${MONGO_PASSWORD}@beachclub-mongo:27017/beachclub_reservas?authSource=admin"
+      JWT_SECRET: ${JWT_SECRET}
+    depends_on:
+      - beachclub-mongo
+    networks:
+      - beachclub-net
+    ports:
+      - "4002:4002"
+    restart: always
+    profiles: ["dev"]
+
+networks:
+  beachclub-net:
+    driver: bridge
+
+volumes:
+  beachclub-mongo-data:
+    driver: local
