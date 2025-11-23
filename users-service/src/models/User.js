@@ -15,7 +15,7 @@ const UserSchema = new mongoose.Schema(
     role: { type: String, enum: ['admin', 'staff'], default: 'staff' },
     tokens: { type: [TokenSchema], default: [] },
     isActive: { type: Boolean, default: true },
-    lastLogin: { typetype: Date, default: null }
+    lastLogin: { type: Date, default: null }
   },
   { timestamps: true }
 );

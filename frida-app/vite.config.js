@@ -5,20 +5,29 @@ export default defineConfig({
   plugins: [react()],
   server: {
     proxy: {
+      //Backend de eventos (lo que ya tenías)
       '/api/events': {
         target: 'http://localhost:5050',
         changeOrigin: true,
         ws: false,
         selfHandleResponse: false,
       },
-      '/api': {
-        target: 'http://localhost:5050',
+
+      //Microservicio de reservas/habitaciones (puerto 4002)
+      '/api/reservas': {
+        target: 'http://localhost:4002',
         changeOrigin: true,
       },
-      '/unsplash': {
-        target: 'https://images.unsplash.com',
+      '/api/habitaciones': {
+        target: 'http://localhost:4002',
         changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/unsplash/, ''),
+      },
+
+      //Microservicio de auth + users (puerto 4001)
+      // /api/auth/...  y /api/users/... van acá
+      '/api': {
+        target: 'http://localhost:4001',
+        changeOrigin: true,
       },
     },
   },
