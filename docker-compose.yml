@@ -1,9 +1,14 @@
 version: '3.9'
 
 # Comandos útiles BeachClub:
-# dev:    docker compose --profile dev up --build
-# dev -d: docker compose --profile dev up --build -d
-# down:   docker compose --profile dev down
+# dev:    sudo docker compose --profile dev up --build
+# dev -d: sudo docker compose --profile dev up --build -d
+# down:   sudo docker compose --profile dev down
+
+#sudo docker compose --profile dev exec beachclub-users-service npm run seed
+#sudo docker compose --profile dev exec beachclub-reservas-service npm run seed
+
+#sudo docker compose logs -f beachclub-users-service
 
 services:
   #MongoDB BeachClub
@@ -11,7 +16,7 @@ services:
     image: mongo:6
     container_name: beachclub-mongo
     ports:
-      - "27019:27017"
+      - "27019:27017"  # host:contenedor → host usa 27019, contenedor 27017
     environment:
       MONGO_INITDB_ROOT_USERNAME: root
       MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD}
@@ -48,7 +53,7 @@ services:
       - ./users-service/.env
     environment:
       MONGO_URI: "mongodb://root:${MONGO_PASSWORD}@beachclub-mongo:27017/beachclub_auth?authSource=admin"
-      JWT_SECRET: ${JWT_SECRET}
+      NODE_ENV: development
     depends_on:
       - beachclub-mongo
     networks:
@@ -57,6 +62,10 @@ services:
       - "4001:4001"
     restart: always
     profiles: ["dev"]
+    volumes:
+      - ./users-service:/app       # monta el código del host
+      - /app/node_modules          # reserva node_modules del contenedor
+    command: ["npm", "run", "dev"] # usa nodemon (script "dev")
 
   #Microservicio de reservas + habitaciones
   beachclub-reservas-service:
@@ -67,7 +76,7 @@ services:
       - ./reservas-service/.env
     environment:
       MONGO_URI: "mongodb://root:${MONGO_PASSWORD}@beachclub-mongo:27017/beachclub_reservas?authSource=admin"
-      JWT_SECRET: ${JWT_SECRET}
+      NODE_ENV: development
     depends_on:
       - beachclub-mongo
     networks:
@@ -76,6 +85,10 @@ services:
       - "4002:4002"
     restart: always
     profiles: ["dev"]
+    volumes:
+      - ./reservas-service:/app     # monta código
+      - /app/node_modules           # node_modules interno
+    command: ["npm", "run", "dev"]  # usa nodemon
 
 networks:
   beachclub-net:

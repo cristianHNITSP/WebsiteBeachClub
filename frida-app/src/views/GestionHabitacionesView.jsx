@@ -1,200 +1,147 @@
 // src/views/GestionHabitacionesView.jsx
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import axios from "axios";
-import {
-  Card,
-  Row,
-  Col,
-  Space,
-  Typography,
-  Input,
-  Select,
-  Button,
-  Table,
-  Tag,
-  Modal,
-  Form,
-  Popconfirm,
-  Badge,
-  InputNumber,
-  message,
-} from "antd";
-import {
-  PlusOutlined,
-  EditOutlined,
-  DeleteOutlined,
-  HomeOutlined,
-} from "@ant-design/icons";
-import { beachColors, neutrals } from "../theme/beachTheme";
+import { Card, Form, message } from "antd";
+import { hasPromo } from "../components/habitaciones/helpers";
+import HabitacionesHeader from "../components/habitaciones/HabitacionesHeader";
+import HabitacionesFilters from "../components/habitaciones/HabitacionesFilters";
+import HabitacionesMetrics from "../components/habitaciones/HabitacionesMetrics";
+import HabitacionesTable from "../components/habitaciones/HabitacionesTable";
+import HabitacionFormModal from "../components/habitaciones/HabitacionFormModal";
 
-const { Text, Title } = Typography;
-const { Option } = Select;
+// 🔐 Importante: aseguramos que SIEMPRE se manden cookies (auth_token)
+axios.defaults.withCredentials = true;
 
-// Mapeo de hotelCode a etiquetas
-const SEDES = [
-  { label: "Casa Frida", value: "casa_frida" },
-  { label: "Cabañas Frida", value: "cabanas_fridas" },
-];
-
-// Opciones de capacidad (usando size del backend) + label semántico
-const CAPACITY_OPTIONS = [
-  { label: "1 adulto", value: 1 },
-  { label: "2 adultos", value: 2 },
-  { label: "3 adultos", value: 3 },
-  { label: "Familia", value: 4 },
-];
-
-const tiposHabitacion = [
-  "Suite",
-  "Suite Jardín",
-  "Cabaña",
-  "Loft",
-  "Doble",
-  "King",
-];
-
-const INVENTORY_STATES = [
-  "Activa",
-  "Mantenimiento",
-  "Fuera de servicio",
-  "Bloqueada",
-];
-
-const getCapacityLabel = (size) => {
-  const found = CAPACITY_OPTIONS.find((o) => o.value === size);
-  return found ? found.label : "-";
-};
-
-const getEstadoTag = (estado) => {
-  switch (estado) {
-    case "Activa":
-      return (
-        <Tag
-          color={beachColors.teal}
-          style={{
-            borderRadius: 999,
-            fontSize: 10,
-            color: "#064e3b",
-          }}
-        >
-          Activa
-        </Tag>
-      );
-    case "Mantenimiento":
-      return (
-        <Tag
-          color={beachColors.sunset}
-          style={{
-            borderRadius: 999,
-            fontSize: 10,
-            color: "#7c2d12",
-          }}
-        >
-          Mantenimiento
-        </Tag>
-      );
-    case "Fuera de servicio":
-      return (
-        <Tag
-          color={beachColors.coral}
-          style={{
-            borderRadius: 999,
-            fontSize: 10,
-            color: "#7f1d1d",
-          }}
-        >
-          Fuera de servicio
-        </Tag>
-      );
-    case "Bloqueada":
-      return (
-        <Tag
-          color="#9ca3af"
-          style={{
-            borderRadius: 999,
-            fontSize: 10,
-            color: "#111827",
-          }}
-        >
-          Bloqueada
-        </Tag>
-      );
-    default:
-      return (
-        <Tag
-          style={{
-            borderRadius: 999,
-            fontSize: 10,
-          }}
-        >
-          {estado || "-"}
-        </Tag>
-      );
-  }
-};
-
-const getSedeLabel = (hotelCode) => {
-  const found = SEDES.find((s) => s.value === hotelCode);
-  return found ? found.label : hotelCode || "-";
-};
-
-const getSedeTag = (hotelCode) => {
-  const label = getSedeLabel(hotelCode);
-  const color =
-    hotelCode === "casa_frida" ? beachColors.oceanBlue : beachColors.turquoise;
-  return (
-    <Tag
-      color={color}
-      style={{
-        borderRadius: 999,
-        fontSize: 10,
-        color: "#0f172a",
-      }}
-    >
-      {label}
-    </Tag>
-  );
-};
-
-const GestionHabitacionesView = ({ isMobile }) => {
+const GestionHabitacionesView = ({ isMobile, currentUser }) => {
   const [habitaciones, setHabitaciones] = useState([]);
   const [loading, setLoading] = useState(false);
+
+  const [pagination, setPagination] = useState({
+    current: 1,
+    pageSize: 5,
+    total: 0,
+  });
 
   const [busqueda, setBusqueda] = useState("");
   const [filtroSede, setFiltroSede] = useState("todas");
   const [filtroEstado, setFiltroEstado] = useState("todas");
+  const [filtroPromo, setFiltroPromo] = useState("todas");
+  const [filtroFavoritos, setFiltroFavoritos] = useState("todas");
+
   const [modalVisible, setModalVisible] = useState(false);
   const [editando, setEditando] = useState(null);
   const [form] = Form.useForm();
 
-  // ====== CARGA INICIAL ======
-  const fetchHabitaciones = async () => {
+  const [messageApi, contextHolder] = message.useMessage();
+
+  useEffect(() => {
+    console.log("currentUser en GestionHabitacionesView:", currentUser);
+  }, [currentUser]);
+
+  const canManageRooms = useMemo(
+    () =>
+      currentUser?.role === "administrador" ||
+      currentUser?.role === "admin" ||
+      currentUser?.isAdmin === true ||
+      currentUser?.permissions?.includes?.("manage_rooms"),
+    [currentUser]
+  );
+
+  useEffect(() => {
+    if (currentUser && !canManageRooms) {
+      messageApi.info(
+        "Estás en modo solo lectura: no puedes crear, editar ni eliminar habitaciones."
+      );
+    }
+  }, [currentUser, canManageRooms, messageApi]);
+
+  const fetchHabitaciones = async (page = 1) => {
     try {
       setLoading(true);
-      const res = await axios.get("/api/habitaciones");
-      setHabitaciones(res.data || []);
+      messageApi.open({
+        key: "loading-rooms",
+        type: "loading",
+        content: "Cargando habitaciones...",
+        duration: 0,
+      });
+
+      const res = await axios.get("/api/habitaciones/admin", {
+        withCredentials: true,
+        params: {
+          page,
+          limit: pagination.pageSize,
+        },
+      });
+
+      const api = res.data || {};
+      const items = Array.isArray(api) ? api : api.items || [];
+      const total = Array.isArray(api)
+        ? api.length
+        : typeof api.total === "number"
+        ? api.total
+        : items.length;
+      const serverPage = Array.isArray(api)
+        ? page
+        : typeof api.page === "number"
+        ? api.page
+        : page;
+
+      setHabitaciones(items);
+      setPagination((prev) => ({
+        ...prev,
+        current: serverPage,
+        total,
+      }));
+
+      messageApi.open({
+        key: "loading-rooms",
+        type: "success",
+        content: "Habitaciones cargadas correctamente.",
+        duration: 2,
+      });
     } catch (err) {
       console.error(err);
-      message.error("No se pudieron cargar las habitaciones");
+      messageApi.open({
+        key: "loading-rooms",
+        type: "error",
+        content:
+          "No se pudieron cargar las habitaciones. Intenta de nuevo más tarde.",
+        duration: 3,
+      });
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchHabitaciones();
+    fetchHabitaciones(1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const abrirCrear = () => {
+    if (!canManageRooms) {
+      messageApi.warning("No tienes permisos para crear habitaciones.");
+      return;
+    }
     setEditando(null);
     form.resetFields();
+    form.setFieldsValue({
+      offerIsSpecial: false,
+      offerDiscountPercent: null,
+      offerDescription: "",
+    });
     setModalVisible(true);
   };
 
   const abrirEditar = (registro) => {
+    if (!canManageRooms) {
+      messageApi.warning("No tienes permisos para editar habitaciones.");
+      return;
+    }
     setEditando(registro);
     form.setFieldsValue({
       codigo: registro.codigo,
+      roomNumber: registro.roomNumber,
       title: registro.title,
       location: registro.location,
       img: registro.img,
@@ -206,6 +153,12 @@ const GestionHabitacionesView = ({ isMobile }) => {
       badge: registro.badge,
       featured: registro.featured,
       amenities: registro.amenities || [],
+      offerIsSpecial: registro.offer?.isSpecial || false,
+      offerDiscountPercent:
+        typeof registro.offer?.discountPercent === "number"
+          ? registro.offer.discountPercent
+          : null,
+      offerDescription: registro.offer?.description || "",
     });
     setModalVisible(true);
   };
@@ -216,61 +169,180 @@ const GestionHabitacionesView = ({ isMobile }) => {
     form.resetFields();
   };
 
-  // ====== CREAR / EDITAR ======
   const guardarHabitacion = () => {
+    if (!canManageRooms) {
+      messageApi.warning("No tienes permisos para modificar habitaciones.");
+      return;
+    }
+
     form
       .validateFields()
       .then(async (values) => {
         try {
-          // Derivar capacityLabel desde size
-          const capOpt = CAPACITY_OPTIONS.find((o) => o.value === values.size);
+          const {
+            offerIsSpecial,
+            offerDiscountPercent,
+            offerDescription,
+            ...baseValues
+          } = values;
+
+          let discount = offerIsSpecial ? Number(offerDiscountPercent) : null;
+
+          let offer;
+          if (
+            !offerIsSpecial ||
+            !discount ||
+            discount <= 0 ||
+            discount >= 100
+          ) {
+            offer = {
+              isSpecial: false,
+              description: "",
+              discountPercent: null,
+            };
+          } else {
+            offer = {
+              isSpecial: true,
+              description: offerDescription || "",
+              discountPercent: discount,
+            };
+          }
+
           const payload = {
-            ...values,
-            capacityLabel: capOpt ? capOpt.label : undefined,
+            ...baseValues,
+            // capacityLabel se puede recalcular en backend si quieres
+            offer,
           };
 
-          if (editando) {
-            await axios.put(`/api/habitaciones/${editando.id}`, {
+          messageApi.open({
+            key: "saving-room",
+            type: "loading",
+            content: editando
+              ? "Guardando cambios..."
+              : "Creando nueva habitación...",
+            duration: 0,
+          });
+
+          if (editando && editando._id) {
+            await axios.put(`/api/habitaciones/${editando._id}`, {
               ...editando,
               ...payload,
             });
-            message.success("Habitación actualizada");
+            messageApi.open({
+              key: "saving-room",
+              type: "success",
+              content: "Habitación actualizada correctamente.",
+              duration: 2,
+            });
           } else {
             await axios.post("/api/habitaciones", payload);
-            message.success("Habitación creada");
+            messageApi.open({
+              key: "saving-room",
+              type: "success",
+              content: "Habitación creada correctamente.",
+              duration: 2,
+            });
           }
 
-          // Siempre recargar desde la BD para evitar datos en memoria desfasados
-          await fetchHabitaciones();
+          await fetchHabitaciones(pagination.current || 1);
           cerrarModal();
         } catch (err) {
           console.error(err);
-          message.error("Error al guardar la habitación");
+          if (err?.response?.status === 401) {
+            messageApi.open({
+              key: "saving-room",
+              type: "error",
+              content:
+                "No autorizado para modificar habitaciones. Revisa tu sesión o permisos.",
+              duration: 3,
+            });
+          } else {
+            messageApi.open({
+              key: "saving-room",
+              type: "error",
+              content: "Error al guardar la habitación.",
+              duration: 3,
+            });
+          }
         }
       })
       .catch(() => {});
   };
 
-  // ====== ELIMINAR ======
   const eliminarHabitacion = async (id) => {
+    if (!canManageRooms) {
+      messageApi.warning("No tienes permisos para eliminar habitaciones.");
+      return;
+    }
+
     try {
-      await axios.delete(`/api/habitaciones/${id}`);
-      message.success("Habitación eliminada del inventario");
-      await fetchHabitaciones();
+      messageApi.open({
+        key: `deleting-room-${id}`,
+        type: "loading",
+        content: "Eliminando habitación...",
+        duration: 0,
+      });
+
+      await axios.delete(`/api/habitaciones/${id}`, {
+        withCredentials: true,
+      });
+
+      messageApi.open({
+        key: `deleting-room-${id}`,
+        type: "success",
+        content: "Habitación eliminada del inventario.",
+        duration: 2,
+      });
+
+      await fetchHabitaciones(pagination.current || 1);
     } catch (err) {
       console.error(err);
-      message.error("No se pudo eliminar la habitación");
+      messageApi.open({
+        key: `deleting-room-${id}`,
+        type: "error",
+        content:
+          err?.response?.status === 401
+            ? "No autorizado para eliminar habitaciones. Revisa tu sesión o permisos."
+            : "No se pudo eliminar la habitación.",
+        duration: 3,
+      });
     }
   };
 
-  // ====== FILTROS / MÉTRICAS ======
+  // métricas globales
+  const totalActivas = habitaciones.filter(
+    (h) => h.inventoryStatus === "Activa"
+  ).length;
+  const totalMantenimiento = habitaciones.filter(
+    (h) => h.inventoryStatus === "Mantenimiento"
+  ).length;
+  const totalFuera = habitaciones.filter(
+    (h) =>
+      h.inventoryStatus === "Fuera de servicio" ||
+      h.inventoryStatus === "Bloqueada"
+  ).length;
+  const totalConPromo = habitaciones.filter((h) => hasPromo(h)).length;
+  const totalConFavoritos = habitaciones.filter(
+    (h) => (h.favoritesCount || 0) > 0
+  ).length;
+
+  // filtros sobre dataset cargado
   const habitacionesFiltradas = habitaciones
-    .filter((h) =>
-      filtroSede === "todas" ? true : h.hotelCode === filtroSede
-    )
+    .filter((h) => (filtroSede === "todas" ? true : h.hotelCode === filtroSede))
     .filter((h) =>
       filtroEstado === "todas" ? true : h.inventoryStatus === filtroEstado
     )
+    .filter((h) => {
+      if (filtroPromo === "con_promo") return hasPromo(h);
+      if (filtroPromo === "sin_promo") return !hasPromo(h);
+      return true;
+    })
+    .filter((h) => {
+      const favs = h.favoritesCount || 0;
+      if (filtroFavoritos === "con_favs") return favs > 0;
+      if (filtroFavoritos === "sin_favs") return favs === 0;
+      return true;
+    })
     .filter((h) => {
       const q = busqueda.toLowerCase().trim();
       if (!q) return true;
@@ -282,169 +354,10 @@ const GestionHabitacionesView = ({ isMobile }) => {
       );
     });
 
-  const totalActivas = habitaciones.filter(
-    (h) => h.inventoryStatus === "Activa"
-  ).length;
-  const totalMantenimiento = habitaciones.filter(
-    (h) => h.inventoryStatus === "Mantenimiento"
-  ).length;
-  const totalFuera = habitaciones.filter(
-    (h) => h.inventoryStatus === "Fuera de servicio"
-  ).length;
-
-  // ====== COLUMNAS ======
-  const columns = [
-    {
-      title: "Habitación",
-      dataIndex: "codigo",
-      key: "codigo",
-      render: (codigo, record) => (
-        <Space direction="vertical" size={0}>
-          <Space size={6}>
-            <HomeOutlined
-              style={{ fontSize: 13, color: beachColors.deepBlue }}
-            />
-            <Text
-              style={{
-                fontWeight: 600,
-                color: neutrals.textMain,
-                fontSize: 12,
-              }}
-            >
-              {codigo}
-            </Text>
-          </Space>
-          <Text
-            style={{
-              fontSize: 10,
-              color: neutrals.textMuted,
-            }}
-          >
-            {record.title}
-          </Text>
-        </Space>
-      ),
-    },
-    {
-      title: "Sede",
-      dataIndex: "hotelCode",
-      key: "hotelCode",
-      render: (hotelCode) => getSedeTag(hotelCode),
-      width: 130,
-    },
-    {
-      title: "Tipo",
-      dataIndex: "roomType",
-      key: "roomType",
-      render: (roomType) => (
-        <Text
-          style={{
-            fontSize: 11,
-            color: neutrals.textMuted,
-          }}
-        >
-          {roomType}
-        </Text>
-      ),
-      width: 150,
-    },
-    {
-      title: "Ubicación",
-      dataIndex: "location",
-      key: "location",
-      render: (location) => (
-        <Text
-          style={{
-            fontSize: 11,
-            color: neutrals.textMuted,
-          }}
-        >
-          {location}
-        </Text>
-      ),
-      width: 160,
-    },
-    {
-      title: "Capacidad",
-      dataIndex: "size",
-      key: "size",
-      align: "center",
-      width: 110,
-      render: (size) => (
-        <Badge
-          count={getCapacityLabel(size)}
-          style={{
-            backgroundColor: beachColors.turquoise,
-            color: "#064e3b",
-            fontSize: 9,
-          }}
-        />
-      ),
-    },
-    {
-      title: "Tarifa base",
-      dataIndex: "price",
-      key: "price",
-      align: "right",
-      width: 110,
-      render: (price) => (
-        <Text
-          style={{
-            fontSize: 11,
-            color: neutrals.textMain,
-            fontWeight: 500,
-          }}
-        >
-          ${Number(price || 0).toLocaleString("es-MX")}
-        </Text>
-      ),
-    },
-    {
-      title: "Estado",
-      dataIndex: "inventoryStatus",
-      key: "inventoryStatus",
-      width: 130,
-      render: (estado) => getEstadoTag(estado),
-    },
-    {
-      title: "Acciones",
-      key: "acciones",
-      align: "right",
-      width: 140,
-      render: (_, record) => (
-        <Space size={4}>
-          <Button
-            size="small"
-            type="text"
-            icon={<EditOutlined />}
-            onClick={() => abrirEditar(record)}
-            style={{ color: beachColors.deepBlue }}
-          >
-            Editar
-          </Button>
-          <Popconfirm
-            title="Eliminar habitación"
-            description="Esta acción no elimina reservas históricas, solo el registro del inventario."
-            okText="Eliminar"
-            cancelText="Cancelar"
-            onConfirm={() => eliminarHabitacion(record.id)}
-          >
-            <Button
-              size="small"
-              type="text"
-              icon={<DeleteOutlined />}
-              style={{ color: beachColors.coral }}
-            >
-              Eliminar
-            </Button>
-          </Popconfirm>
-        </Space>
-      ),
-    },
-  ];
-
   return (
     <>
+      {contextHolder}
+
       <Card
         bordered={false}
         style={{
@@ -455,352 +368,53 @@ const GestionHabitacionesView = ({ isMobile }) => {
           boxShadow: "0 8px 18px rgba(15,23,42,0.05)",
         }}
       >
-        <Row gutter={[12, 12]} align="middle" justify="space-between">
-          <Col xs={24} md={12}>
-            <Space direction="vertical" size={2}>
-              <Title
-                level={5}
-                style={{
-                  margin: 0,
-                  color: neutrals.textMain,
-                  fontWeight: 600,
-                }}
-              >
-                Configuración de habitaciones
-              </Title>
-              <Text
-                style={{
-                  fontSize: 11,
-                  color: neutrals.textMuted,
-                }}
-              >
-                Administra el inventario físico de habitaciones para Casa
-                Frida y Cabañas Frida. Esto no modifica reservas, solo la
-                estructura disponible.
-              </Text>
-            </Space>
-          </Col>
-          <Col xs={24} md={12}>
-            <Space
-              size={8}
-              style={{
-                width: "100%",
-                justifyContent: isMobile ? "flex-start" : "flex-end",
-                flexWrap: "wrap",
-              }}
-            >
-              <Button
-                type="primary"
-                size="small"
-                icon={<PlusOutlined />}
-                onClick={abrirCrear}
-                style={{
-                  borderRadius: 999,
-                  background: beachColors.oceanBlue,
-                  borderColor: beachColors.oceanBlue,
-                  fontSize: 11,
-                  fontWeight: 500,
-                }}
-              >
-                Nueva habitación
-              </Button>
-            </Space>
-          </Col>
-        </Row>
+        <HabitacionesHeader
+          isMobile={isMobile}
+          currentUser={currentUser}
+          canManageRooms={canManageRooms}
+          onNueva={abrirCrear}
+        />
 
-        <Row gutter={[10, 10]} style={{ marginTop: 10 }} align="middle">
-          <Col xs={24} md={10}>
-            <Input
-              size="small"
-              placeholder="Buscar por código, nombre, tipo o ubicación..."
-              value={busqueda}
-              onChange={(e) => setBusqueda(e.target.value)}
-              allowClear
-              style={{ fontSize: 11 }}
-            />
-          </Col>
-          <Col xs={12} md={7}>
-            <Select
-              size="small"
-              value={filtroSede}
-              onChange={setFiltroSede}
-              style={{ width: "100%", fontSize: 11 }}
-            >
-              <Option value="todas">Todas las sedes</Option>
-              {SEDES.map((s) => (
-                <Option key={s.value} value={s.value}>
-                  {s.label}
-                </Option>
-              ))}
-            </Select>
-          </Col>
-          <Col xs={12} md={7}>
-            <Select
-              size="small"
-              value={filtroEstado}
-              onChange={setFiltroEstado}
-              style={{ width: "100%", fontSize: 11 }}
-            >
-              <Option value="todas">Todos los estados</Option>
-              {INVENTORY_STATES.map((e) => (
-                <Option key={e} value={e}>
-                  {e}
-                </Option>
-              ))}
-            </Select>
-          </Col>
-        </Row>
+        <HabitacionesFilters
+          busqueda={busqueda}
+          setBusqueda={setBusqueda}
+          filtroSede={filtroSede}
+          setFiltroSede={setFiltroSede}
+          filtroEstado={filtroEstado}
+          setFiltroEstado={setFiltroEstado}
+          filtroPromo={filtroPromo}
+          setFiltroPromo={setFiltroPromo}
+          filtroFavoritos={filtroFavoritos}
+          setFiltroFavoritos={setFiltroFavoritos}
+        />
 
-        <Row gutter={12} style={{ marginTop: 10, marginBottom: 4 }}>
-          <Col xs={24} md={8}>
-            <Text
-              style={{
-                fontSize: 10,
-                color: neutrals.textMuted,
-              }}
-            >
-              Habitaciones activas:{" "}
-              <span
-                style={{
-                  fontWeight: 600,
-                  color: beachColors.teal,
-                }}
-              >
-                {totalActivas}
-              </span>
-            </Text>
-          </Col>
-          <Col xs={24} md={8}>
-            <Text
-              style={{
-                fontSize: 10,
-                color: neutrals.textMuted,
-              }}
-            >
-              En mantenimiento:{" "}
-              <span
-                style={{
-                  fontWeight: 600,
-                  color: beachColors.sunset,
-                }}
-              >
-                {totalMantenimiento}
-              </span>
-            </Text>
-          </Col>
-          <Col xs={24} md={8}>
-            <Text
-              style={{
-                fontSize: 10,
-                color: neutrals.textMuted,
-              }}
-            >
-              Fuera de servicio / bloqueadas:{" "}
-              <span
-                style={{
-                  fontWeight: 600,
-                  color: beachColors.coral,
-                }}
-              >
-                {totalFuera}
-              </span>
-            </Text>
-          </Col>
-        </Row>
+        <HabitacionesMetrics
+          totalActivas={totalActivas}
+          totalMantenimiento={totalMantenimiento}
+          totalFuera={totalFuera}
+          totalConPromo={totalConPromo}
+          totalConFavoritos={totalConFavoritos}
+        />
 
-        <Table
-          size="small"
-          columns={columns}
-          dataSource={habitacionesFiltradas}
-          rowKey="id"
+        <HabitacionesTable
           loading={loading}
-          pagination={{
-            pageSize: 6,
-            size: "small",
-            showSizeChanger: false,
-          }}
-          style={{ marginTop: 4 }}
+          habitaciones={habitacionesFiltradas}
+          pagination={pagination}
+          onChangePage={fetchHabitaciones}
+          canManageRooms={canManageRooms}
+          onEdit={abrirEditar}
+          onDelete={eliminarHabitacion}
         />
       </Card>
 
-      {/* Modal Crear / Editar */}
-      <Modal
-        open={modalVisible}
+      <HabitacionFormModal
+        visible={modalVisible}
+        isMobile={isMobile}
+        editando={editando}
+        form={form}
         onCancel={cerrarModal}
         onOk={guardarHabitacion}
-        okText={editando ? "Guardar cambios" : "Crear habitación"}
-        cancelText="Cancelar"
-        centered
-        width={isMobile ? 360 : 520}
-        bodyStyle={{ paddingTop: 12 }}
-      >
-        <Space
-          direction="vertical"
-          size={4}
-          style={{ width: "100%", marginBottom: 4 }}
-        >
-          <Title
-            level={5}
-            style={{
-              margin: 0,
-              color: neutrals.textMain,
-              fontWeight: 600,
-            }}
-          >
-            {editando ? "Editar habitación" : "Nueva habitación"}
-          </Title>
-          <Text
-            style={{
-              fontSize: 11,
-              color: neutrals.textMuted,
-            }}
-          >
-            Define datos base del inventario. No afecta reservas existentes,
-            solo la estructura disponible.
-          </Text>
-        </Space>
-
-        <Form form={form} layout="vertical" size="small">
-          <Form.Item
-            label="Código / Número"
-            name="codigo"
-            rules={[
-              {
-                required: true,
-                message: "Ingresa el código o número de habitación",
-              },
-            ]}
-          >
-            <Input placeholder="Ej. CF-103" />
-          </Form.Item>
-
-          <Form.Item label="Nombre interno / público" name="title">
-            <Input placeholder="Ej. Suite Patio Privado" />
-          </Form.Item>
-
-          <Form.Item label="Ubicación" name="location">
-            <Input placeholder="Ej. Tulum, frente al mar..." />
-          </Form.Item>
-
-          <Form.Item label="Imagen (URL)" name="img">
-            <Input placeholder="https://ejemplo.com/foto.jpg" />
-          </Form.Item>
-
-          <Row gutter={8}>
-            <Col span={12}>
-              <Form.Item
-                label="Sede"
-                name="hotelCode"
-                rules={[
-                  {
-                    required: true,
-                    message: "Selecciona la sede",
-                  },
-                ]}
-              >
-                <Select placeholder="Selecciona">
-                  {SEDES.map((s) => (
-                    <Option key={s.value} value={s.value}>
-                      {s.label}
-                    </Option>
-                  ))}
-                </Select>
-              </Form.Item>
-            </Col>
-            <Col span={12}>
-              <Form.Item label="Tipo de habitación" name="roomType">
-                <Select placeholder="Tipo de habitación">
-                  {tiposHabitacion.map((t) => (
-                    <Option key={t} value={t}>
-                      {t}
-                    </Option>
-                  ))}
-                </Select>
-              </Form.Item>
-            </Col>
-          </Row>
-
-          <Row gutter={8}>
-            <Col span={12}>
-              <Form.Item
-                label="Capacidad"
-                name="size"
-                rules={[
-                  {
-                    required: true,
-                    message: "Selecciona la capacidad",
-                  },
-                ]}
-              >
-                <Select placeholder="Capacidad">
-                  {CAPACITY_OPTIONS.map((opt) => (
-                    <Option key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </Option>
-                  ))}
-                </Select>
-              </Form.Item>
-            </Col>
-            <Col span={12}>
-              <Form.Item
-                label="Tarifa base por noche"
-                name="price"
-                rules={[
-                  {
-                    required: true,
-                    message: "Ingresa la tarifa base",
-                  },
-                ]}
-              >
-                <InputNumber
-                  min={0}
-                  step={50}
-                  style={{ width: "100%" }}
-                  prefix="$"
-                />
-              </Form.Item>
-            </Col>
-          </Row>
-
-          <Form.Item
-            label="Estado del inventario"
-            name="inventoryStatus"
-            rules={[
-              {
-                required: true,
-                message: "Selecciona el estado",
-              },
-            ]}
-          >
-            <Select placeholder="Selecciona el estado">
-              {INVENTORY_STATES.map((e) => (
-                <Option key={e} value={e}>
-                  {e}
-                </Option>
-              ))}
-            </Select>
-          </Form.Item>
-
-          <Form.Item label="Insignia (badge)" name="badge">
-            <Input placeholder="Ej. Vista al mar, Mejor precio..." />
-          </Form.Item>
-
-          <Form.Item label="Destacada" name="featured">
-            <Select placeholder="¿Destacada?">
-              <Option value={true}>Sí</Option>
-              <Option value={false}>No</Option>
-            </Select>
-          </Form.Item>
-
-          <Form.Item label="Amenidades" name="amenities">
-            <Select
-              mode="tags"
-              style={{ width: "100%" }}
-              placeholder="WiFi, Aire acondicionado, TV..."
-            />
-          </Form.Item>
-        </Form>
-      </Modal>
+      />
     </>
   );
 };

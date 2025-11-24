@@ -1,3 +1,4 @@
+// models/User.js
 const mongoose = require('mongoose');
 
 const TokenSchema = new mongoose.Schema(
@@ -12,7 +13,7 @@ const UserSchema = new mongoose.Schema(
     name: { type: String, required: true, trim: true },
     email: { type: String, required: true, unique: true, lowercase: true, trim: true },
     password: { type: String, required: true, select: false },
-    role: { type: String, enum: ['admin', 'staff'], default: 'staff' },
+    role: { type: String, enum: ['administrador', 'staff'], default: 'staff' }, // 👈 clave que matchea con Role.key
     tokens: { type: [TokenSchema], default: [] },
     isActive: { type: Boolean, default: true },
     lastLogin: { type: Date, default: null }

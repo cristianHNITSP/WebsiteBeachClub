@@ -15,7 +15,7 @@ import {
 } from "@ant-design/icons";
 import dayjs from "dayjs";
 import "dayjs/locale/es";
-import { beachColors } from "../theme/beachTheme";
+import { beachColors } from "../../theme/beachTheme";
 
 dayjs.locale("es");
 

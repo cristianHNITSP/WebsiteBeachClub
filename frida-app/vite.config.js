@@ -29,6 +29,13 @@ export default defineConfig({
         target: 'http://localhost:4001',
         changeOrigin: true,
       },
+      /*
+        '/unsplash': {
+        target: 'https://images.unsplash.com',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/unsplash/, ''),
+      },  
+      */
     },
   },
 })

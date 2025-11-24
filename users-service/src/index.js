@@ -12,13 +12,17 @@ const app = express();
 app.use(express.json());
 app.use(cookieParser());
 
-// CORS: ajusta origin a tu frontend
-app.use(
-  cors({
-    origin: ['http://localhost:5173'],
-    credentials: true
-  })
-);
+// 🌍 CORS abierto para cualquier origen (solo para desarrollo)
+const corsOptions = {
+  origin: (origin, callback) => {
+    // Acepta cualquier origen (incluye Postman, curl, etc.)
+    callback(null, true);
+  },
+  credentials: true,
+};
+
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));
 
 app.use('/api/auth', authRoutes);
 app.use('/api/users', usersRoutes);

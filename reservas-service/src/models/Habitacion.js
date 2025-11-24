@@ -1,10 +1,12 @@
-const mongoose = require('mongoose');
+// models/Habitacion.js
+const mongoose = require("mongoose");
 
 const OfferSchema = new mongoose.Schema(
   {
     isSpecial: { type: Boolean, default: false },
-    description: { type: String, default: '' },
-    specialPrice: { type: Number, default: null }
+    description: { type: String, default: "" },
+    // Porcentaje de descuento (ej. 10 = 10%)
+    discountPercent: { type: Number, default: null },
   },
   { _id: false }
 );
@@ -12,7 +14,7 @@ const OfferSchema = new mongoose.Schema(
 const AvailabilitySchema = new mongoose.Schema(
   {
     available: { type: Boolean, default: true },
-    nextAvailableDate: { type: Date, default: null }
+    nextAvailableDate: { type: Date, default: null },
   },
   { _id: false }
 );
@@ -21,31 +23,42 @@ const HabitacionSchema = new mongoose.Schema(
   {
     // Identificadores clave
     codigo: { type: String, required: true, unique: true }, // "CF-101"
-    hotelCode: { type: String, required: true },           // "casa_frida"
+    hotelCode: { type: String, required: true }, // "casa_frida"
     roomNumber: { type: String, required: true },
 
     // Info visual / marketing
     title: { type: String, required: true },
-    location: { type: String, default: '' },
-    img: { type: String, default: '' },
+    location: { type: String, default: "" },
+    img: { type: String, default: "" },
     price: { type: Number, required: true },
     rating: { type: Number, default: 0 },
     amenities: { type: [String], default: [] },
-    badge: { type: String, default: '' },
+    badge: { type: String, default: "" },
     featured: { type: Boolean, default: false },
-    size: { type: Number, default: null },
+    size: { type: Number, default: null }, // 1 a 4
 
     // Inventario interno
-    roomType: { type: String, default: '' },
-    capacityLabel: { type: String, default: '' },
-    inventoryStatus: { type: String, default: 'Activa' },
+    roomType: { type: String, default: "" },
+    capacityLabel: { type: String, default: "" },
+    inventoryStatus: { type: String, default: "Activa" },
 
     offer: { type: OfferSchema, default: () => ({}) },
-    availability: { type: AvailabilitySchema, default: () => ({ available: true }) },
+    availability: {
+      type: AvailabilitySchema,
+      default: () => ({ available: true }),
+    },
 
-    favoritesCount: { type: Number, default: 0 }
+    // Favoritos
+    favoritesCount: { type: Number, default: 0 },
+
+    // Hashes de IP que ya marcaron favorito esta habitación (no se devuelven)
+    favoriteIpHashes: {
+      type: [String],
+      default: [],
+      select: false,
+    },
   },
-  { timestamps: { createdAt: 'createdAt', updatedAt: 'updatedAt' } }
+  { timestamps: { createdAt: "createdAt", updatedAt: "updatedAt" } }
 );
 
-module.exports = mongoose.model('Habitacion', HabitacionSchema);
+module.exports = mongoose.model("Habitacion", HabitacionSchema);

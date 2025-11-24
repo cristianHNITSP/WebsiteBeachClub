@@ -1,7 +1,7 @@
 // src/App.jsx
 import axios from "axios";
 import { useMediaQuery } from "react-responsive";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 
 import {
   ConfigProvider,
@@ -40,10 +40,10 @@ import {
 
 import dayjs from "dayjs";
 
-import RoomCards from "./components/RoomCards.jsx";
-import Recommendcards from "./components/RecommendCards.jsx";
-import BuscadorMovil from "./components/BuscadorMovil.jsx";
-import ChatSoporte from "./components/ChatSoporte.jsx";
+import RoomCards from "./components/website/RoomCards.jsx";
+import Recommendcards from "./components/website/RecommendCards.jsx";
+import BuscadorMovil from "./components/website/BuscadorMovil.jsx";
+import ChatSoporte from "./components/website/ChatSoporte.jsx";
 import { beachColors } from "./theme/beachTheme";
 
 const { Title, Text } = Typography;
@@ -54,17 +54,17 @@ const borderColor = "#e2e8f0";
 
 const carruselImages = [
   {
-    img: "https://images.unsplash.com/photo-1520250497591-112f2f40a3f4?w=1200",
+    img: "https://scontent.fmid1-3.fna.fbcdn.net/v/t39.30808-6/487996831_1226933259437418_1477921974834808949_n.jpg?_nc_cat=103&ccb=1-7&_nc_sid=cc71e4&_nc_ohc=cQHYQExC3vwQ7kNvwFGHLbA&_nc_oc=AdlxWdChNxbYkumI2nH7QiON6SapBgC8KkjhN00wOL2N1mmLu0O6hOTd7E6VYswlwzRNHdiSUuxrnm3tA6Dn6FUo&_nc_zt=23&_nc_ht=scontent.fmid1-3.fna&_nc_gid=yhS2InLir0CyuUQMxBWDbA&oh=00_AfhZgogfliEuO5dyXGUIik3AkK05VkwJHPmctl7V8W5BqA&oe=6929ED41",
     title: "Escápate frente al mar",
     subtitle: "Alojamientos seleccionados para disfrutar como en casa.",
   },
   {
-    img: "https://images.unsplash.com/photo-1564501049412-61c2a3083791?w=1200",
+    img: "https://scontent.fmid1-3.fna.fbcdn.net/v/t39.30808-6/487996831_1226933259437418_1477921974834808949_n.jpg?_nc_cat=103&ccb=1-7&_nc_sid=cc71e4&_nc_ohc=cQHYQExC3vwQ7kNvwFGHLbA&_nc_oc=AdlxWdChNxbYkumI2nH7QiON6SapBgC8KkjhN00wOL2N1mmLu0O6hOTd7E6VYswlwzRNHdiSUuxrnm3tA6Dn6FUo&_nc_zt=23&_nc_ht=scontent.fmid1-3.fna&_nc_gid=yhS2InLir0CyuUQMxBWDbA&oh=00_AfhZgogfliEuO5dyXGUIik3AkK05VkwJHPmctl7V8W5BqA&oe=6929ED41",
     title: "Cabañas con encanto",
     subtitle: "Naturaleza, diseño y comodidad en un solo lugar.",
   },
   {
-    img: "https://images.unsplash.com/photo-1571896349842-33c89424de2d?w=1200",
+    img: "https://scontent.fmid1-3.fna.fbcdn.net/v/t39.30808-6/487996831_1226933259437418_1477921974834808949_n.jpg?_nc_cat=103&ccb=1-7&_nc_sid=cc71e4&_nc_ohc=cQHYQExC3vwQ7kNvwFGHLbA&_nc_oc=AdlxWdChNxbYkumI2nH7QiON6SapBgC8KkjhN00wOL2N1mmLu0O6hOTd7E6VYswlwzRNHdiSUuxrnm3tA6Dn6FUo&_nc_zt=23&_nc_ht=scontent.fmid1-3.fna&_nc_gid=yhS2InLir0CyuUQMxBWDbA&oh=00_AfhZgogfliEuO5dyXGUIik3AkK05VkwJHPmctl7V8W5BqA&oe=6929ED41",
     title: "Experiencias inolvidables",
     subtitle: "Reserva directo con quienes te atienden de verdad.",
   },
@@ -139,16 +139,6 @@ function App() {
   // HERO
   const [loadingHero, setLoadingHero] = useState(true);
 
-  // SSE reservado (si lo activas de nuevo)
-  const [sseConnected] = useState(false);
-  const [reconnectAttempts] = useState(0);
-  const eventSourceRef = useRef(null);
-  const reconnectTimeoutRef = useRef(null);
-
-  const MAX_RECONNECT_ATTEMPTS = 8;
-  const INITIAL_RECONNECT_DELAY = 1000;
-  const MAX_RECONNECT_DELAY = 30000;
-
   // Cargar habitaciones
   const cargarHabitaciones = async (showToast = false) => {
     try {
@@ -161,12 +151,14 @@ function App() {
       if (Array.isArray(data) && data.length > 0) {
         setHabitaciones(data);
         setLoadingHabitaciones(false);
+        setLoadingHero(false); // ✅ dejamos de mostrar skeleton del hero
         if (showToast) {
           messageApi.success("Habitaciones sincronizadas correctamente.");
         }
       } else {
         setHabitaciones([]);
         setLoadingHabitaciones(true);
+        setLoadingHero(false); // ✅ aunque no haya data, mostramos el carrusel
         if (showToast) {
           messageApi.warning(
             "No se recibieron habitaciones. Esperando datos del sistema..."
@@ -178,6 +170,7 @@ function App() {
       setHabitaciones([]);
       setError(err);
       setLoadingHabitaciones(true);
+      setLoadingHero(false); // ✅ en error también dejamos ver el hero
       if (showToast) {
         messageApi.error(
           "No se pudo sincronizar. Revisa la conexión o inténtalo de nuevo."
@@ -190,203 +183,6 @@ function App() {
     cargarHabitaciones(false);
   }, []);
 
-
-    /*
-    
-      const actualizarHabitaciones = useCallback((evento) => {
-        console.log("📥 Evento SSE procesado:", evento);
-    
-        setHabitaciones(prev => {
-          const { type, habitacion } = evento;
-    
-          // 🆔 OBTENER ID DE FORMA SEGURA
-          const habitacionId = habitacion?.id || habitacion?._id;
-          if (!habitacionId) {
-            console.error("❌ Evento sin ID válido:", evento);
-            return prev;
-          }
-    
-          switch (type) {
-            case 'CREATED':
-              // 🔍 VERIFICAR DUPLICADOS
-              const existe = prev.some(h =>
-                h.id === habitacionId || h._id === habitacionId
-              );
-              if (existe) {
-                console.log("⚠️ Habitación ya existe, actualizando:", habitacionId);
-                return prev.map(h =>
-                  (h.id === habitacionId || h._id === habitacionId) ? habitacion : h
-                );
-              }
-              console.log("🆕 Nueva habitación creada:", habitacionId);
-              return [...prev, habitacion];
-    
-            case 'UPDATED':
-              console.log("🔄 Habitación actualizada:", habitacionId);
-              return prev.map(h =>
-                (h.id === habitacionId || h._id === habitacionId) ? habitacion : h
-              );
-    
-            case 'DELETED':
-              console.log("🗑️ Habitación eliminada:", habitacionId);
-              return prev.filter(h =>
-                (h.id !== habitacionId) && (h._id !== habitacionId)
-              );
-    
-            default:
-              console.warn("❓ Tipo de evento no reconocido:", type);
-              return prev;
-          }
-        });
-      }, []);
-    
-      const conectarSSE = useCallback(() => {
-        try {
-          // Limpieza de conexiones existentes
-          if (eventSourceRef.current) {
-            console.log("🔌 Cerrando conexión SSE anterior");
-            eventSourceRef.current.close();
-            eventSourceRef.current = null;
-          }
-    
-          if (reconnectTimeoutRef.current) {
-            clearTimeout(reconnectTimeoutRef.current);
-            reconnectTimeoutRef.current = null;
-          }
-    
-          console.log(`🔗 Intento de conexión SSE #${reconnectAttempts + 1}`);
-    
-          // 🎯 CREAR NUEVA CONEXIÓN SSE
-          eventSourceRef.current = new EventSource('/api/events/habitaciones');
-    
-          // ✅ CONEXIÓN EXITOSA
-          eventSourceRef.current.onopen = () => {
-            console.log("✅ Conexión SSE establecida");
-            setSseConnected(true);
-            setReconnectAttempts(0); // Resetear contador al conectar
-            setError(null);
-    
-            // Mostrar mensaje de éxito solo en la primera conexión
-            if (reconnectAttempts === 0) {
-              messageApi.success({
-                content: "Conectado en tiempo real",
-                duration: 2,
-              });
-            } else {
-              messageApi.success({
-                content: `Conexión restaurada después de ${reconnectAttempts} intentos`,
-                duration: 2,
-              });
-            }
-          };
-    
-          // 📨 MANEJAR MENSAJES GENÉRICOS
-          eventSourceRef.current.onmessage = (event) => {
-            try {
-              const eventData = JSON.parse(event.data);
-              console.log("📨 Mensaje SSE recibido:", eventData);
-              actualizarHabitaciones(eventData);
-            } catch (parseError) {
-              console.error("❌ Error parseando mensaje SSE:", parseError);
-            }
-          };
-    
-          // 🎯 MANEJAR EVENTOS ESPECÍFICOS
-          const manejarEvento = (eventType) => (event) => {
-            try {
-              const eventData = JSON.parse(event.data);
-              console.log(`🎯 Evento ${eventType} recibido:`, eventData);
-              actualizarHabitaciones({ ...eventData, type: eventType.toUpperCase() });
-            } catch (parseError) {
-              console.error(`❌ Error parseando evento ${eventType}:`, parseError);
-            }
-          };
-    
-          eventSourceRef.current.addEventListener('created', manejarEvento('CREATED'));
-          eventSourceRef.current.addEventListener('updated', manejarEvento('UPDATED'));
-          eventSourceRef.current.addEventListener('deleted', manejarEvento('DELETED'));
-    
-          // ❌ MANEJAR ERRORES CON RECONEXIÓN INTELIGENTE
-          eventSourceRef.current.onerror = (error) => {
-            console.error("❌ Error en conexión SSE:", error);
-            setSseConnected(false);
-    
-            const nextAttempt = reconnectAttempts + 1;
-    
-            // 🚨 VERIFICAR SI SUPERAMOS EL LÍMITE DE INTENTOS
-            if (nextAttempt > MAX_RECONNECT_ATTEMPTS) {
-              console.error("🚫 Máximo de intentos de reconexión alcanzado");
-              setError(new Error("No se pudo establecer conexión en tiempo real"));
-              messageApi.warning({
-                content: "Modo sin conexión en tiempo real. Los cambios pueden no ser inmediatos.",
-                duration: 5,
-              });
-              return;
-            }
-    
-            // 🎰 CALCULAR DELAY CON BACKOFF EXPONENCIAL
-            const delay = Math.min(
-              INITIAL_RECONNECT_DELAY * Math.pow(1.8, nextAttempt), // Crecimiento exponencial
-              MAX_RECONNECT_DELAY // No superar el máximo
-            );
-    
-            console.log(`🔄 Reintento #${nextAttempt} en ${delay / 1000} segundos...`);
-    
-            // Mostrar mensaje informativo al usuario
-            if (nextAttempt <= 3) {
-              messageApi.info({
-                content: `Reconectando... Intento ${nextAttempt}/${MAX_RECONNECT_ATTEMPTS}`,
-                duration: 3,
-              });
-            }
-    
-            // ⏰ PROGRAMAR RECONEXIÓN
-            reconnectTimeoutRef.current = setTimeout(() => {
-              console.log(`🔄 Ejecutando reconexión #${nextAttempt}`);
-              setReconnectAttempts(nextAttempt);
-              conectarSSE();
-            }, delay);
-          };
-    
-        } catch (sseError) {
-          console.error("❌ Error crítico al crear EventSource:", sseError);
-          setSseConnected(false);
-    
-          // 🆘 RECONEXIÓN INMEDIATA PARA ERRORES CRÍTICOS
-          const nextAttempt = reconnectAttempts + 1;
-          if (nextAttempt <= MAX_RECONNECT_ATTEMPTS) {
-            reconnectTimeoutRef.current = setTimeout(() => {
-              setReconnectAttempts(nextAttempt);
-              conectarSSE();
-            }, 2000);
-          }
-        }
-      }, [actualizarHabitaciones, reconnectAttempts, messageApi]);
-    
-    
-      useEffect(() => {
-        console.log("🚀 Iniciando conexión SSE...");
-        conectarSSE();
-    
-        // 🧹 CLEANUP: Limpiar todo al desmontar el componente
-        return () => {
-          console.log("🧹 Limpiando recursos SSE");
-          if (eventSourceRef.current) {
-            eventSourceRef.current.close();
-            eventSourceRef.current = null;
-          }
-          if (reconnectTimeoutRef.current) {
-            clearTimeout(reconnectTimeoutRef.current);
-            reconnectTimeoutRef.current = null;
-          }
-          setSseConnected(false);
-          setReconnectAttempts(0);
-        };
-      }, [conectarSSE]);
-    
-    */
-
-
   useEffect(() => {
     if (error) {
       messageApi.open({
@@ -396,11 +192,6 @@ function App() {
       });
     }
   }, [error, messageApi]);
-
-  useEffect(() => {
-    const timer = setTimeout(() => setLoadingHero(false), 800);
-    return () => clearTimeout(timer);
-  }, []);
 
   const headerStyle = {
     padding: "10px 16px",
@@ -442,9 +233,7 @@ function App() {
   };
 
   const cardsToShow =
-    Array.isArray(habitaciones) && habitaciones.length > 0
-      ? habitaciones
-      : [];
+    Array.isArray(habitaciones) && habitaciones.length > 0 ? habitaciones : [];
 
   return (
     <ConfigProvider
@@ -692,10 +481,6 @@ function App() {
                 icon={<CustomerServiceOutlined />}
                 onClick={() => setOpenChat(true)}
               />
-              <FloatButton
-                tooltip="Favoritos"
-                icon={<HeartOutlined />}
-              />
             </FloatButton.Group>
           )}
 
@@ -874,16 +659,6 @@ function App() {
                     >
                       Alojamientos disponibles
                     </Title>
-                    <Tag
-                      color={beachColors.sand}
-                      style={{
-                        borderRadius: 999,
-                        fontSize: 9,
-                        color: beachColors.deepBlue,
-                      }}
-                    >
-                      Selección curada
-                    </Tag>
                   </Flex>
 
                   <Space size={6} align="center">
@@ -900,17 +675,6 @@ function App() {
                     </Button>
                     {!isMobile && (
                       <>
-                        <Button
-                          size="small"
-                          type="text"
-                          icon={
-                            <HeartOutlined
-                              style={{ color: beachColors.coral }}
-                            />
-                          }
-                        >
-                          Favoritos
-                        </Button>
                         <Button
                           size="small"
                           type="text"
@@ -960,10 +724,7 @@ function App() {
                     }}
                   >
                     <Flex vertical gap={6}>
-                      <Text
-                        strong
-                        style={{ fontSize: 13, color: "#0f172a" }}
-                      >
+                      <Text strong style={{ fontSize: 13, color: "#0f172a" }}>
                         ¿Por qué reservar aquí?
                       </Text>
                       <Text
@@ -1075,8 +836,8 @@ function App() {
                 fontSize: 12,
               }}
             >
-              © {new Date().getFullYear()} Beach Club · Plataforma de
-              reservas desarrollada a la medida.
+              © {new Date().getFullYear()} Beach Club · Plataforma de reservas
+              desarrollada a la medida.
             </Text>
             <Flex gap={10} wrap justify="center">
               {[

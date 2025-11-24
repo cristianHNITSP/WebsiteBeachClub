@@ -1,5 +1,7 @@
 // src/views/InicioSesionApp.jsx
-import React, { useState } from "react";
+import { useState, useEffect } from "react";
+import axios from "axios";
+import { useNavigate } from "react-router-dom";
 import {
   ConfigProvider,
   Layout,
@@ -16,6 +18,7 @@ import {
   Flex,
   Tag,
   Grid,
+  message,
 } from "antd";
 import {
   MailOutlined,
@@ -30,23 +33,130 @@ const { Content } = Layout;
 const { Title, Text } = Typography;
 const { useBreakpoint } = Grid;
 
-const InicioSesionApp = ({ onLogin }) => {
+const InicioSesionPanel = () => {
   const [loading, setLoading] = useState(false);
+
+  // 🔔 Mensajes y alertas
   const [errorMsg, setErrorMsg] = useState("");
+  const [errorType, setErrorType] = useState("error"); // 'error' | 'warning' | 'info'
+  const [messageApi, contextHolder] = message.useMessage();
+
+  const [form] = Form.useForm();
+  const [rememberEmailChecked, setRememberEmailChecked] = useState(false);
 
   const screens = useBreakpoint();
   const isMobile = !screens.md; // < md
   const isTablet = screens.md && !screens.lg;
 
-  const onFinish = (values) => {
+  const navigate = useNavigate();
+
+  // Leer correo guardado en localStorage al montar
+  useEffect(() => {
+    try {
+      const storedEmail = window.localStorage.getItem("hb_admin_email");
+      if (storedEmail) {
+        form.setFieldsValue({ email: storedEmail });
+        setRememberEmailChecked(true);
+      }
+    } catch (e) {
+      console.warn("No se pudo acceder a localStorage:", e);
+    }
+  }, [form]);
+
+  const onFinish = async (values) => {
     setErrorMsg("");
     setLoading(true);
 
-    // Aquí va tu lógica real de autenticación
-    setTimeout(() => {
+    try {
+      const response = await axios.post(
+        "/api/auth/login",
+        {
+          email: values.email,
+          password: values.password,
+        },
+        {
+          withCredentials: true,
+        }
+      );
+
+      const user = response.data;
+
+      // Guardar / borrar correo según el checkbox
+      try {
+        if (rememberEmailChecked) {
+          window.localStorage.setItem("hb_admin_email", values.email);
+        } else {
+          window.localStorage.removeItem("hb_admin_email");
+        }
+      } catch (e) {
+        console.warn("No se pudo escribir en localStorage:", e);
+      }
+
+      messageApi.success(`Bienvenido, ${user.name || "usuario"} 👋`, 2);
+
+      // Redirección directa al panel admin
+      navigate("/panel.web/panel.admin.web", { replace: true });
+    } catch (err) {
+      console.error("Error al iniciar sesión:", err);
+
+      const backendMsg =
+        err.response?.data?.message ||
+        err.response?.data?.error ||
+        "Revisa tus credenciales e inténtalo nuevamente.";
+
+      const errorCode = err.response?.data?.error;
+
+      // 🌐 Sin respuesta del servidor (caída, CORS, offline, etc.)
+      if (!err.response) {
+        setErrorType("error");
+        setErrorMsg(
+          "No se pudo contactar con el servidor. Verifica tu conexión o inténtalo de nuevo en unos momentos."
+        );
+        messageApi.error(
+          "No se pudo contactar con el servidor. Intenta de nuevo."
+        );
+      }
+      // 👤 Usuario inactivo
+      else if (errorCode === "USER_INACTIVE") {
+        setErrorType("warning");
+        setErrorMsg(
+          backendMsg ||
+            "Tu usuario está inactivo. Contacta al administrador del sistema para recuperar el acceso."
+        );
+        messageApi.warning(
+          "Tu usuario esta inactivo."
+        );
+      }
+      // ❌ Credenciales incorrectas
+      else if (errorCode === "INVALID_CREDENTIALS") {
+        setErrorType("error");
+        setErrorMsg(
+          backendMsg ||
+            "Usuario o contraseña incorrectos. Verifica la información e inténtalo de nuevo."
+        );
+        messageApi.error("Usuario o contraseña incorrectos.");
+      }
+      // Datos incompletos / mal formados
+      else if (errorCode === "VALIDATION_ERROR") {
+        setErrorType("error");
+        setErrorMsg(
+          backendMsg ||
+            "Algunos datos no son válidos. Revisa el correo y la contraseña."
+        );
+        messageApi.error("Datos inválidos. Revisa el formulario.");
+      }
+      // Cualquier otro error backend conocido
+      else {
+        setErrorType("error");
+        setErrorMsg(
+          backendMsg ||
+            "No se pudo iniciar sesión en este momento. Intenta nuevamente más tarde."
+        );
+        messageApi.error("Ocurrió un error al iniciar sesión.");
+      }
+    } finally {
       setLoading(false);
-      if (onLogin) onLogin(values);
-    }, 900);
+    }
   };
 
   return (
@@ -73,6 +183,9 @@ const InicioSesionApp = ({ onLogin }) => {
         },
       }}
     >
+      {/* Contexto de mensajes */}
+      {contextHolder}
+
       <Layout
         style={{
           minHeight: "100vh",
@@ -102,7 +215,7 @@ const InicioSesionApp = ({ onLogin }) => {
               background: "#ffffff",
             }}
           >
-            {/* PANEL IZQUIERDO: BRANDING / MENSAJE (solo md+) */}
+            {/* PANEL IZQUIERDO */}
             <Col
               xs={0}
               md={11}
@@ -116,7 +229,6 @@ const InicioSesionApp = ({ onLogin }) => {
               }}
             >
               <div>
-                {/* Logo + título */}
                 <Flex align="center" gap={12}>
                   <div
                     style={{
@@ -157,7 +269,6 @@ const InicioSesionApp = ({ onLogin }) => {
                   </div>
                 </Flex>
 
-                {/* Mensaje principal */}
                 <div style={{ marginTop: 32 }}>
                   <Title
                     level={3}
@@ -182,7 +293,6 @@ const InicioSesionApp = ({ onLogin }) => {
                   </Text>
                 </div>
 
-                {/* Bullets */}
                 <Space direction="vertical" size={8} style={{ marginTop: 22 }}>
                   <Space size={8}>
                     <CheckCircleTwoTone twoToneColor={beachColors.sand} />
@@ -220,7 +330,6 @@ const InicioSesionApp = ({ onLogin }) => {
                 </Space>
               </div>
 
-              {/* Pie: seguridad + soporte */}
               <div
                 style={{
                   marginTop: 24,
@@ -256,7 +365,7 @@ const InicioSesionApp = ({ onLogin }) => {
               </div>
             </Col>
 
-            {/* PANEL DERECHO: LOGIN (full width en mobile) */}
+            {/* PANEL DERECHO: LOGIN */}
             <Col
               xs={24}
               md={13}
@@ -390,9 +499,13 @@ const InicioSesionApp = ({ onLogin }) => {
 
                   {errorMsg && (
                     <Alert
-                      type="error"
+                      type={errorType}
                       showIcon
-                      message="No se pudo iniciar sesión"
+                      message={
+                        errorType === "warning"
+                          ? "Revisa tu acceso"
+                          : "No se pudo iniciar sesión"
+                      }
                       description={errorMsg}
                       style={{ marginTop: 4 }}
                     />
@@ -400,6 +513,7 @@ const InicioSesionApp = ({ onLogin }) => {
 
                   {/* FORM */}
                   <Form
+                    form={form}
                     layout="vertical"
                     style={{ width: "100%", marginTop: 8 }}
                     onFinish={onFinish}
@@ -445,9 +559,7 @@ const InicioSesionApp = ({ onLogin }) => {
                         size="large"
                         placeholder="••••••••"
                         prefix={
-                          <LockOutlined
-                            style={{ color: beachColors.teal }}
-                          />
+                          <LockOutlined style={{ color: beachColors.teal }} />
                         }
                       />
                     </Form.Item>
@@ -462,8 +574,13 @@ const InicioSesionApp = ({ onLogin }) => {
                         flexWrap: "wrap",
                       }}
                     >
-                      <Checkbox defaultChecked>
-                        Mantener sesión iniciada
+                      <Checkbox
+                        checked={rememberEmailChecked}
+                        onChange={(e) =>
+                          setRememberEmailChecked(e.target.checked)
+                        }
+                      >
+                        Recordar correo en este dispositivo
                       </Checkbox>
                       <Button type="link" size="small" style={{ padding: 0 }}>
                         Olvidé mi contraseña
@@ -526,4 +643,4 @@ const InicioSesionApp = ({ onLogin }) => {
   );
 };
 
-export default InicioSesionApp;
+export default InicioSesionPanel;

@@ -1,14 +1,6 @@
 // src/pages/PanelAdminWeb.jsx
 import React, { useState, useEffect } from "react";
-import {
-  Layout,
-  Card,
-  Tabs,
-  Alert,
-  Space,
-  Typography,
-  Grid,
-} from "antd";
+import { Layout, Card, Tabs, Alert, Space, Typography, Grid } from "antd";
 import {
   CheckCircleTwoTone,
   HomeOutlined,
@@ -51,7 +43,7 @@ const getInitialTab = () => {
   return "dashboard";
 };
 
-const PanelAdminWeb = () => {
+const PanelAdminWeb = ({ currentUser }) => {
   const screens = useBreakpoint();
   const isMobile = !screens.md;
   const isTablet = screens.md && !screens.lg;
@@ -130,24 +122,28 @@ const PanelAdminWeb = () => {
     switch (activeTab) {
       case "habitaciones":
         // Calendario / reservas / estancias
-        return <HabitacionesView isMobile={isMobile} />;
+        return (
+          <HabitacionesView isMobile={isMobile} currentUser={currentUser} />
+        );
 
       case "gestionHabitaciones":
         // CRUD de inventario físico
-        return <GestionHabitacionesView isMobile={isMobile} />;
-
-
+        return (
+          <GestionHabitacionesView
+            isMobile={isMobile}
+            currentUser={currentUser}
+          />
+        );
       //case "promociones":
       //  return (
-      //    <PromocionesView isMobile={isMobile} isTablet={isTablet} />
+      //    <PromocionesView isMobile={isMobile} isTablet={isTablet} currentUser={currentUser}  />
       //  );
-
       case "usuarios":
-        return <UsuariosView isMobile={isMobile} />;
+        return <UsuariosView isMobile={isMobile} currentUser={currentUser} />;
 
       case "dashboard":
       default:
-        return <DashboardView isMobile={isMobile} />;
+        return <DashboardView isMobile={isMobile} currentUser={currentUser} />;
     }
   };
 
@@ -158,7 +154,7 @@ const PanelAdminWeb = () => {
         background: neutrals.bg,
       }}
     >
-      <AdminHeader isMobile={isMobile} />
+      <AdminHeader isMobile={isMobile} currentUser={currentUser} />
 
       <Content
         style={{

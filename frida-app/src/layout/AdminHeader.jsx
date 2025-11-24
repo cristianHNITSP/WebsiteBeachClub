@@ -1,31 +1,73 @@
 // src/layout/AdminHeader.jsx
-
 import {
   Layout,
   Typography,
   Space,
-  Badge,
   Button,
   Dropdown,
   Flex,
+  message,
 } from "antd";
-import {
-  BellOutlined,
-  DownOutlined,
-  UserOutlined,
-} from "@ant-design/icons";
+
+import { DownOutlined, UserOutlined, HomeOutlined } from "@ant-design/icons";
+import { useNavigate } from "react-router-dom";
+import axios from "axios";
 import { beachColors } from "../theme/beachTheme";
 
 const { Header } = Layout;
 const { Text } = Typography;
 
-const AdminHeader = ({ isMobile }) => {
+const AdminHeader = ({ isMobile, currentUser }) => {
+  const navigate = useNavigate();
+
+  const handleMenuClick = async ({ key }) => {
+    switch (key) {
+      case "profile":
+        message.info("Vista de perfil en construcción.");
+        break;
+
+      case "settings":
+        message.info("Configuración en construcción.");
+        break;
+
+      case "logout":
+        try {
+          await axios.post("/api/auth/logout", {}, { withCredentials: true });
+
+          window.localStorage.removeItem("panelAdminActiveTab");
+
+          message.success("Sesión cerrada correctamente.");
+
+          navigate("/panel.web/login.panel.web", { replace: true });
+        } catch (err) {
+          console.error("[logout] Error:", err);
+          message.error("No se pudo cerrar la sesión. Intenta de nuevo.");
+        }
+        break;
+
+      default:
+        break;
+    }
+  };
+
   const managerMenu = {
     items: [
       { key: "profile", label: "Perfil" },
       { key: "settings", label: "Configuración" },
       { key: "logout", label: "Cerrar sesión" },
     ],
+    onClick: handleMenuClick,
+  };
+
+  const displayName = currentUser?.name || "Manager Admin";
+
+  const goToPublicSite = () => {
+    // Si hay currentUser, lo mandamos en el state; si no, navegamos limpio
+    if (currentUser) {
+      navigate("/", { state: { currentUser } });
+    } else {
+      navigate("/");
+    }
   };
 
   return (
@@ -96,9 +138,32 @@ const AdminHeader = ({ isMobile }) => {
           align="center"
           style={{ flexShrink: 0 }}
         >
-      
+          {/* 👇 Botón para ir al sitio público "/" heredando currentUser */}
+          <Button
+            size={isMobile ? "small" : "middle"}
+            icon={<HomeOutlined />}
+            onClick={goToPublicSite}
+            style={{
+              borderRadius: 999,
+              paddingInline: isMobile ? 10 : 16,
+              height: isMobile ? 30 : 36,
+              background: "rgba(255,255,255,0.12)",
+              borderColor: "rgba(255,255,255,0.45)",
+              color: "#ffffff",
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              backdropFilter: "blur(4px)",
+            }}
+          >
+            {!isMobile && "Ver sitio"}
+          </Button>
 
-          <Dropdown menu={managerMenu} placement="bottomRight">
+          <Dropdown
+            menu={managerMenu}
+            trigger={["click"]}
+            placement="bottomRight"
+          >
             <Button
               icon={<UserOutlined />}
               style={{
@@ -115,7 +180,7 @@ const AdminHeader = ({ isMobile }) => {
                 gap: 6,
               }}
             >
-              {!isMobile && "Manager Admin"}
+              {!isMobile && displayName}
               <DownOutlined style={{ fontSize: 10 }} />
             </Button>
           </Dropdown>
