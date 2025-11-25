@@ -29,7 +29,6 @@ export const getCapacityLabel = (size) => {
 };
 
 export const isInventoryActive = (room) => (room?.inventoryStatus || "Activa") === "Activa";
-export const isReserved = (room) => room?.isReserved === true;
 export const isTrashed = (room) => room?.isDeleted === true;
 
 export const getEstadoMeta = (estado) => {
@@ -81,15 +80,6 @@ export const getReservaMeta = (room) => {
     };
   }
 
-  if (isReserved(room)) {
-    return {
-      code: "reservada",
-      label: "Reservada",
-      color: "#f97373",
-      textColor: "#111827",
-      description: "Ya reservada, no disponible para nuevas reservas.",
-    };
-  }
 
   return {
     code: "disponible",

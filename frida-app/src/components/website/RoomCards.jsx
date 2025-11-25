@@ -114,24 +114,36 @@ function RoomCards({
   };
 
   // ✅ regla consistente
-// ✅ regla consistente SIN availability
+// ✅ regla consistente SIN availability y SIN isReserved
 const getDisponibilidadMeta = (room) => {
   if (room?.isDeleted) {
-    return { code: "papelera", label: "No disponible", description: "Esta habitación está en papelera.", color: "#9ca3af" };
+    return {
+      code: "papelera",
+      label: "No disponible",
+      description: "Esta habitación está en papelera.",
+      color: "#9ca3af",
+    };
   }
 
   const invOk = (room?.inventoryStatus || "Activa") === "Activa";
 
   if (!invOk) {
-    return { code: "no_disponible", label: "No disponible", description: `Estado: ${room.inventoryStatus}`, color: "#9ca3af" };
+    return {
+      code: "no_disponible",
+      label: "No disponible",
+      description: `Estado: ${room.inventoryStatus}`,
+      color: "#9ca3af",
+    };
   }
 
-  if (room?.isReserved === true) {
-    return { code: "reservada", label: "Reservada", description: "Ya reservada, no disponible para nuevas reservas.", color: "#f97373" };
-  }
-
-  return { code: "disponible", label: "Disponible", description: "Puedes solicitar una reserva o pedir más información.", color: beachColors.teal };
+  return {
+    code: "disponible",
+    label: "Disponible",
+    description: "Puedes solicitar una reserva o pedir más información.",
+    color: beachColors.teal,
+  };
 };
+
 
 
   return (

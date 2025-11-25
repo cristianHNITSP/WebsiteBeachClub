@@ -1,4 +1,3 @@
-// routes/habitaciones.routes.js
 const express = require("express");
 const crypto = require("crypto");
 const Habitacion = require("../models/Habitacion");
@@ -34,8 +33,6 @@ function normalizeOfferPayload(body) {
     discountPercent: discount,
   };
 }
-
-const hasOwn = (obj, key) => Object.prototype.hasOwnProperty.call(obj || {}, key);
 
 /**
  * papelera:
@@ -74,10 +71,11 @@ function buildHabitacionesFilterFromQuery(query, { forPublic = false } = {}) {
   }
 
   if (favorites === "con_favs") and.push({ favoritesCount: { $gt: 0 } });
-  else if (favorites === "sin_favs")
+  else if (favorites === "sin_favs") {
     and.push({
       $or: [{ favoritesCount: { $exists: false } }, { favoritesCount: 0 }],
     });
+  }
 
   if (q && typeof q === "string" && q.trim() !== "") {
     const regex = new RegExp(q.trim(), "i");
@@ -163,6 +161,7 @@ function createHabitacionesRouter(io) {
   /**
    * GET /api/habitaciones/recomendaciones
    * ✅ excluye papelera
+   * ✅ SIN isReserved
    */
   router.get("/recomendaciones", async (req, res) => {
     try {
@@ -285,7 +284,6 @@ function createHabitacionesRouter(io) {
 
   /**
    * POST /api/habitaciones
-   * ✅ ya no toca availability
    */
   router.post(
     "/",
@@ -330,7 +328,7 @@ function createHabitacionesRouter(io) {
 
   /**
    * PUT /api/habitaciones/:id
-   * ✅ whitelist + no availability + no papelera editable aquí
+   * ✅ whitelist + no papelera editable aquí
    */
   router.put(
     "/:id",
@@ -367,7 +365,6 @@ function createHabitacionesRouter(io) {
 
         const offer = normalizeOfferPayload(req.body);
 
-        // limpia campos protegidos
         const merged = {
           ...room.toObject(),
           ...allowed,
@@ -409,7 +406,6 @@ function createHabitacionesRouter(io) {
 
         room.isDeleted = true;
         room.deletedAt = new Date();
-        room.isReserved = false; // opcional: neutraliza estado espejo
 
         await room.save();
 
@@ -495,7 +491,6 @@ function createHabitacionesRouter(io) {
         if (!room.isDeleted) {
           room.isDeleted = true;
           room.deletedAt = new Date();
-          room.isReserved = false;
           await room.save();
           if (io) io.emit("habitaciones:trashed", { _id: room._id.toString() });
         }

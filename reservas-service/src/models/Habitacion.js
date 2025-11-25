@@ -1,4 +1,3 @@
-// models/Habitacion.js
 const mongoose = require("mongoose");
 
 const OfferSchema = new mongoose.Schema(
@@ -37,10 +36,6 @@ const HabitacionSchema = new mongoose.Schema(
     },
 
     offer: { type: OfferSchema, default: () => ({}) },
-
-    // ✅ “isReserved” se deja como bandera opcional (si reservas-service la sincroniza),
-    // pero ESTE servicio ya no la gestiona ni impone reglas.
-    isReserved: { type: Boolean, default: false, index: true },
 
     favoritesCount: { type: Number, default: 0, min: 0 },
 

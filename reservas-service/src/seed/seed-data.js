@@ -14,7 +14,6 @@ function enforceSeedConsistency(room) {
   return {
     ...room,
     offer: room.offer ? room.offer : defaultOffer(),
-    isReserved: room.isReserved === true ? true : false,
     isDeleted: room.isDeleted === true ? true : false,
     deletedAt: room.isDeleted ? room.deletedAt || new Date() : null,
   };
