@@ -1,4 +1,4 @@
-// src/components/RoomCards.jsx
+// src/components/website/RoomCards.jsx
 import {
   Card,
   Rate,
@@ -13,20 +13,57 @@ import {
   Skeleton,
   Tooltip,
   message,
+  Dropdown,
+  Popover,
+  Pagination,
 } from "antd";
 import {
   EnvironmentOutlined,
   HeartOutlined,
   FireFilled,
+  DownOutlined,
 } from "@ant-design/icons";
 import axios from "axios";
 import { useState } from "react";
 
-function RoomCards({ beachColors, cardsData, loading }) {
+function WhatsappChip() {
+  return (
+    <span
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        width: 16,
+        height: 16,
+        borderRadius: "50%",
+        backgroundColor: "#22c55e",
+        color: "#fff",
+        fontSize: 11,
+        fontWeight: 700,
+        marginRight: 4,
+      }}
+    >
+      W
+    </span>
+  );
+}
+
+function RoomCards({
+  beachColors,
+  cardsData,
+  loading,
+  onReservaExpress,
+  onInfoWhatsapp,
+  pagination, // 👈 viene del App (page, limit, total, totalPages, hasMore)
+  onPageChange, // 👈 handler del App para cambiar de página
+}) {
   const [messageApi, contextHolder] = message.useMessage();
   const [favLoadingId, setFavLoadingId] = useState(null);
 
   const placeholderImg = "https://via.placeholder.com/400x250?text=Sin+imagen";
+
+  const safeCards = Array.isArray(cardsData) ? cardsData : [];
+  // const totalCards = safeCards.length; // por si lo necesitas después
 
   const getSedeLabel = (hotelCode) => {
     if (!hotelCode) return "Sede no definida";
@@ -93,14 +130,56 @@ function RoomCards({ beachColors, cardsData, loading }) {
     }
   };
 
+  const getEstadoReservaMeta = (room) => {
+    const estado =
+      typeof room.estadoDeReserva === "number" ? room.estadoDeReserva : 0;
+    const disponible = room.availability?.available !== false;
+
+    // 0 = no reservada, 1 = reservada, 3 = en espera
+    if (!disponible) {
+      return {
+        code: "no_disponible",
+        label: "No disponible",
+        description: "Esta habitación no está disponible en estas fechas.",
+        color: "#9ca3af",
+      };
+    }
+
+    if (estado === 1) {
+      return {
+        code: "reservada",
+        label: "Reservada",
+        description: "Ya reservada, no disponible para nuevas reservas.",
+        color: "#f97373",
+      };
+    }
+
+    if (estado === 3) {
+      return {
+        code: "en_espera",
+        label: "En espera",
+        description: "Reserva en proceso de confirmación.",
+        color: beachColors.sunset,
+      };
+    }
+
+    return {
+      code: "disponible",
+      label: "Disponible para reservar",
+      description: "Puedes iniciar una reserva express o pedir más información.",
+      color: beachColors.teal,
+    };
+  };
+
   return (
     <>
       {contextHolder}
 
       <Row gutter={[16, 16]} style={{ marginTop: 15 }}>
         {loading
-          ? Array.from({ length: 4 }).map((_, i) => (
-              <Col key={i} xs={12} sm={12} md={12} lg={8}>
+          ? // 🔄 Skeletons (5 para coincidir con el limit del backend)
+            Array.from({ length: 5 }).map((_, i) => (
+              <Col key={i} xs={24} sm={12} md={12} lg={8}>
                 <Flex
                   justify="start"
                   align="center"
@@ -139,7 +218,7 @@ function RoomCards({ beachColors, cardsData, loading }) {
                 </Flex>
               </Col>
             ))
-          : cardsData.map((raw, i) => {
+          : safeCards.map((raw, i) => {
               const c = {
                 ...raw,
                 amenities: Array.isArray(raw.amenities) ? raw.amenities : [],
@@ -159,6 +238,32 @@ function RoomCards({ beachColors, cardsData, loading }) {
               const discountedPrice = hasDiscount
                 ? Math.round(c.price * (1 - discountPercent / 100))
                 : null;
+
+              const estadoMeta = getEstadoReservaMeta(c);
+
+              // 🔒 Para el website: solo se puede hacer reserva express si está "disponible"
+              const isNoDisponible = estadoMeta.code !== "disponible";
+
+              const menuItems = [
+                {
+                  key: "reserva",
+                  label: "Reserva express",
+                  disabled: isNoDisponible,
+                },
+                {
+                  key: "whatsapp",
+                  label: (
+                    <span>
+                      <WhatsappChip />
+                      Obtener información
+                    </span>
+                  ),
+                },
+              ];
+
+              const visibleAmenities = c.amenities.slice(0, 3);
+              const extraAmenitiesCount =
+                c.amenities.length > 3 ? c.amenities.length - 3 : 0;
 
               return (
                 <Col key={c._id || i} xs={24} sm={12} md={12} lg={8}>
@@ -182,14 +287,15 @@ function RoomCards({ beachColors, cardsData, loading }) {
                           padding: 10,
                           display: "flex",
                           flexDirection: "column",
-                          justifyContent: "space-between",
-                          minHeight: 250,
+                          gap: 8,
+                          minHeight: 230,
                         },
                       }}
                       actions={[
                         <Flex
                           justify="space-between"
                           style={{ padding: "0 8px" }}
+                          key="actions"
                         >
                           <Tooltip
                             title={`${c.favoritesCount} personas marcaron esta habitación como favorita`}
@@ -207,116 +313,213 @@ function RoomCards({ beachColors, cardsData, loading }) {
                             </Button>
                           </Tooltip>
 
-                          <Button
-                            color="cyan"
-                            variant="solid"
-                            size="small"
-                            style={{ height: 30 }}
+                          <Dropdown
+                            trigger={["click"]}
+                            menu={{
+                              items: menuItems,
+                              onClick: ({ key }) => {
+                                if (key === "reserva") {
+                                  if (!isNoDisponible && onReservaExpress) {
+                                    onReservaExpress(c);
+                                  }
+                                } else if (key === "whatsapp") {
+                                  if (onInfoWhatsapp) onInfoWhatsapp(c);
+                                }
+                              },
+                            }}
                           >
-                            {c.availability?.available
-                              ? "Reservar"
-                              : "No disponible"}
-                          </Button>
+                            <Button
+                              size="small"
+                              type="primary"
+                              style={{
+                                height: 30,
+                                borderRadius: 999,
+                                fontSize: 11,
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: 4,
+                              }}
+                            >
+                              Opciones
+                              <DownOutlined style={{ fontSize: 10 }} />
+                            </Button>
+                          </Dropdown>
                         </Flex>,
                       ]}
                     >
-                      {/* Título + sede */}
-                      <Space
-                        direction="vertical"
-                        size={2}
-                        style={{ width: "100%" }}
+                      <Flex justify="space-between" align="flex-start" gap={8}>
+                        <Space
+                          direction="vertical"
+                          size={2}
+                          style={{ width: "100%" }}
+                        >
+                          <Typography.Title
+                            level={5}
+                            style={{
+                              color: beachColors.deepBlue,
+                              marginBottom: 0,
+                              fontSize: 15,
+                            }}
+                          >
+                            {c.title}
+                          </Typography.Title>
+                          {getSedeTag(c.hotelCode)}
+                        </Space>
+
+                        <Tooltip title={estadoMeta.description}>
+                          <Tag
+                            color={estadoMeta.color}
+                            style={{
+                              borderRadius: 999,
+                              fontSize: 10,
+                              marginTop: 2,
+                              color:
+                                estadoMeta.code === "disponible"
+                                  ? "#064e3b"
+                                  : "#111827",
+                            }}
+                          >
+                            {estadoMeta.label}
+                          </Tag>
+                        </Tooltip>
+                      </Flex>
+
+                      <Flex
+                        justify="space-between"
+                        align="center"
+                        wrap
+                        gap={4}
+                        style={{ marginTop: 2 }}
                       >
-                        <Typography.Title
-                          level={5}
+                        <Typography.Text
+                          type="secondary"
                           style={{
-                            color: beachColors.deepBlue,
-                            marginBottom: 0,
+                            fontSize: 12,
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 4,
                           }}
                         >
-                          {c.title}
-                        </Typography.Title>
+                          <EnvironmentOutlined
+                            style={{ color: beachColors.turquoise }}
+                          />
+                          {c.location}
+                        </Typography.Text>
 
-                        {getSedeTag(c.hotelCode)}
-                      </Space>
-
-                      {/* Ubicación */}
-                      <Typography.Text
-                        type="secondary"
-                        style={{
-                          fontSize: 13,
-                          marginTop: 4,
-                          display: "block",
-                        }}
-                      >
-                        <EnvironmentOutlined
-                          style={{ color: beachColors.turquoise }}
-                        />{" "}
-                        {c.location}
-                      </Typography.Text>
-
-                      {/* Rating + oferta */}
-                      <Flex vertical>
                         <Tooltip
                           placement="top"
                           title={`Puntuación: ${c.rating}`}
                         >
-                          <div style={{ display: "inline-block" }}>
-                            <Rate allowHalf disabled defaultValue={c.rating} />
+                          <div style={{ display: "inline-flex" }}>
+                            <Rate
+                              allowHalf
+                              disabled
+                              defaultValue={c.rating}
+                              style={{ fontSize: 14 }}
+                            />
                           </div>
                         </Tooltip>
-
-                        {c.offer?.isSpecial && (
-                          <Typography.Text
-                            style={{
-                              color: beachColors.turquoise,
-                              fontWeight: 600,
-                              fontSize: 12,
-                            }}
-                          >
-                            <FireFilled /> Oferta Especial{" "}
-                            {hasDiscount && (
-                              <Tag
-                                color={beachColors.turquoise}
-                                style={{
-                                  borderRadius: 999,
-                                  marginLeft: 4,
-                                  fontSize: 10,
-                                  color: "#064e3b",
-                                }}
-                              >
-                                -{discountPercent}%
-                              </Tag>
-                            )}
-                          </Typography.Text>
-                        )}
                       </Flex>
 
-                      {/* Amenidades */}
-                      <Space wrap size={[4, 4]} style={{ marginTop: 8 }}>
-                        {c.amenities.map((a, j) => (
-                          <Tag
-                            key={j}
-                            color={beachColors.coral}
-                            style={{
-                              borderRadius: 12,
-                              fontSize: 11,
-                            }}
-                          >
-                            {a}
-                          </Tag>
-                        ))}
-                      </Space>
+                      {c.offer?.isSpecial && (
+                        <Typography.Text
+                          style={{
+                            color: beachColors.turquoise,
+                            fontWeight: 600,
+                            fontSize: 11,
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 4,
+                            marginTop: 2,
+                          }}
+                        >
+                          <FireFilled /> Oferta Especial
+                          {hasDiscount && (
+                            <Tag
+                              color={beachColors.turquoise}
+                              style={{
+                                borderRadius: 999,
+                                fontSize: 10,
+                                color: "#064e3b",
+                              }}
+                            >
+                              -{discountPercent}%
+                            </Tag>
+                          )}
+                        </Typography.Text>
+                      )}
 
-                      {/* Precio */}
-                      <Space
-                        style={{ marginTop: 12, justifyContent: "flex-start" }}
+                      {/* ⭐⭐⭐ AMENIDADES (con Popover) ⭐⭐⭐ */}
+                      {visibleAmenities.length > 0 && (
+                        <Space
+                          wrap
+                          size={[4, 4]}
+                          style={{ marginTop: 6, maxWidth: "100%" }}
+                        >
+                          {/* Primeras 3 amenidades */}
+                          {visibleAmenities.map((a, j) => (
+                            <Tag
+                              key={j}
+                              color={beachColors.coral}
+                              style={{
+                                borderRadius: 12,
+                                fontSize: 10,
+                              }}
+                            >
+                              {a}
+                            </Tag>
+                          ))}
+
+                          {/* Popover para extras */}
+                          {extraAmenitiesCount > 0 && (
+                            <Popover
+                              title="Amenidades"
+                              trigger="click"
+                              content={
+                                <Space wrap size={[4, 4]}>
+                                  {c.amenities.slice(3).map((a, j) => (
+                                    <Tag
+                                      key={j}
+                                      color={beachColors.turquoise}
+                                      style={{
+                                        borderRadius: 12,
+                                        fontSize: 11,
+                                        padding: "2px 8px",
+                                      }}
+                                    >
+                                      {a}
+                                    </Tag>
+                                  ))}
+                                </Space>
+                              }
+                            >
+                              <Tag
+                                style={{
+                                  borderRadius: 12,
+                                  fontSize: 10,
+                                  borderStyle: "dashed",
+                                  cursor: "pointer",
+                                }}
+                              >
+                                +{extraAmenitiesCount} más
+                              </Tag>
+                            </Popover>
+                          )}
+                        </Space>
+                      )}
+
+                      <Flex
+                        justify="flex-start"
+                        align="baseline"
+                        gap={6}
+                        style={{ marginTop: 10 }}
                       >
                         {hasDiscount && discountedPrice != null ? (
                           <>
                             <Typography.Text
                               delete
                               type="secondary"
-                              style={{ fontSize: 13, marginRight: 4 }}
+                              style={{ fontSize: 12 }}
                             >
                               ${c.price.toLocaleString("es-MX")}
                             </Typography.Text>
@@ -349,19 +552,38 @@ function RoomCards({ beachColors, cardsData, loading }) {
                             </Typography.Text>
                           </>
                         )}
-                      </Space>
+                      </Flex>
                     </Card>
                   </Badge.Ribbon>
                 </Col>
               );
             })}
       </Row>
+
+      {/* 🔢 PAGINADOR: usa los datos que manda el backend */}
+      {!loading &&
+        pagination &&
+        pagination.total > pagination.limit &&
+        typeof onPageChange === "function" && (
+          <Flex justify="center" style={{ marginTop: 18 }}>
+            <Pagination
+              current={pagination.page}
+              pageSize={pagination.limit}
+              total={pagination.total}
+              onChange={onPageChange}
+              showSizeChanger={false}
+              hideOnSinglePage
+            />
+          </Flex>
+        )}
     </>
   );
 }
 
 RoomCards.defaultProps = {
   cardsData: [],
+  pagination: null,
+  onPageChange: null,
 };
 
 export default RoomCards;

@@ -161,32 +161,7 @@ const PanelAdminWeb = ({ currentUser }) => {
           padding: isMobile ? "12px 10px 20px" : "18px 40px 32px",
         }}
       >
-        {/* Aviso superior */}
-        <Alert
-          type="success"
-          showIcon
-          style={{
-            marginBottom: 14,
-            borderRadius: 10,
-            borderColor: "transparent",
-            boxShadow: "0 4px 10px rgba(15,23,42,0.06)",
-            background: "linear-gradient(to right, #ecfdf5, #eff6ff)",
-          }}
-          message={
-            <Space>
-              <CheckCircleTwoTone twoToneColor={beachColors.teal} />
-              <span style={{ fontWeight: 500 }}>
-                Sistema operativo sin incidencias
-              </span>
-            </Space>
-          }
-          description={
-            <Text style={{ fontSize: 11, color: neutrals.textMuted }}>
-              PMS, recepción, motor de reservas, WhatsApp Business y campañas
-              sincronizados correctamente.
-            </Text>
-          }
-        />
+
 
         {/* Tabs contenedor */}
         <Card

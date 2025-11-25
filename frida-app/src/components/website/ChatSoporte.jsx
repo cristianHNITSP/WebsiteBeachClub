@@ -1,4 +1,4 @@
-// src/components/ChatSoporte.jsx
+// src/components/website/ChatSoporte.jsx
 import React, { useState } from "react";
 import {
   Drawer,
@@ -7,11 +7,13 @@ import {
   Input,
   Typography,
   Space,
+  Popconfirm,
 } from "antd";
 import {
   CustomerServiceOutlined,
   SendOutlined,
   UserOutlined,
+  CloseOutlined,
 } from "@ant-design/icons";
 import dayjs from "dayjs";
 import "dayjs/locale/es";
@@ -21,15 +23,29 @@ dayjs.locale("es");
 
 const { Text } = Typography;
 
-const ChatSoporte = ({ open, onClose, isMobile }) => {
-  const [messages, setMessages] = useState([
-    {
-      from: "agent",
-      text: "Hola 👋, somos el equipo de reservas. ¿En qué podemos ayudarte?",
-      time: dayjs().format("HH:mm"),
-    },
-  ]);
+// Mensaje de bienvenida por defecto
+const getInitialMessages = () => [
+  {
+    from: "agent",
+    text: "Hola 👋, somos el equipo de reservas. ¿En qué podemos ayudarte?",
+    time: dayjs().format("HH:mm"),
+  },
+];
+
+const ChatSoporte = ({
+  open,
+  onClose,
+  isMobile,
+  habitacionSeleccionada, // habitación en contexto (puede ser null)
+  onFinalizarReserva, // callback para liberar habitación + reset estado
+}) => {
+  const [messages, setMessages] = useState(getInitialMessages);
   const [value, setValue] = useState("");
+
+  const resetChat = () => {
+    setMessages(getInitialMessages());
+    setValue("");
+  };
 
   const handleSend = () => {
     const text = value.trim();
@@ -38,13 +54,10 @@ const ChatSoporte = ({ open, onClose, isMobile }) => {
     const now = dayjs().format("HH:mm");
 
     // Mensaje del usuario
-    setMessages((prev) => [
-      ...prev,
-      { from: "user", text, time: now },
-    ]);
+    setMessages((prev) => [...prev, { from: "user", text, time: now }]);
     setValue("");
 
-    // Respuesta automática simulada (remplaza con tu backend cuando quieras)
+    // Respuesta automática simulada
     setTimeout(() => {
       setMessages((prev) => [
         ...prev,
@@ -65,26 +78,46 @@ const ChatSoporte = ({ open, onClose, isMobile }) => {
     }
   };
 
+  // Cierre simple (por máscara / gesto / X sin habitación en contexto)
+  const handleDrawerClose = () => {
+    if (onClose) onClose();
+  };
+
+  // Confirmar cierre cuando hay habitación en espera
+  const handleCerrarConfirmado = async () => {
+    // Liberar habitación + lógica de App
+    if (onFinalizarReserva) {
+      await onFinalizarReserva();
+    }
+    // Reset chat local
+    resetChat();
+  };
+
+  const tituloHabitacion =
+    habitacionSeleccionada &&
+    `${habitacionSeleccionada.codigo || ""} · ${
+      habitacionSeleccionada.title || ""
+    }`;
+
   return (
     <Drawer
       open={open}
-      onClose={onClose}
+      onClose={handleDrawerClose}
       placement={isMobile ? "bottom" : "right"}
       height={isMobile ? "70%" : undefined}
       width={isMobile ? "100%" : 360}
-      closeIcon={null}
-      destroyOnClose={false}
+      closeIcon={null} // usamos nuestra propia X personalizada
+      destroyOnClose={false} // conservar mensajes
+      maskClosable={true} // tocar fuera solo cierra visualmente
       title={
         <Flex align="center" justify="space-between">
+          {/* Lado izquierdo: info del chat */}
           <Flex align="center" gap={8}>
             <CustomerServiceOutlined
               style={{ color: beachColors.teal, fontSize: 18 }}
             />
             <div>
-              <Text
-                strong
-                style={{ fontSize: 13, display: "block" }}
-              >
+              <Text strong style={{ fontSize: 13, display: "block" }}>
                 Chat con el equipo
               </Text>
               <Text
@@ -95,8 +128,54 @@ const ChatSoporte = ({ open, onClose, isMobile }) => {
               >
                 Resolvemos dudas sobre reservas, disponibilidad y estancias.
               </Text>
+
+              {/* Subtítulo con habitación en contexto */}
+              {tituloHabitacion && (
+                <Text
+                  style={{
+                    fontSize: 10,
+                    color: "#0f766e",
+                    display: "block",
+                    marginTop: 2,
+                  }}
+                >
+                  Hablando sobre: {tituloHabitacion}
+                </Text>
+              )}
             </div>
           </Flex>
+
+          {/* Lado derecho: botón X con Popconfirm si hay habitación */}
+          {habitacionSeleccionada ? (
+            <Popconfirm
+              title="Cerrar chat y liberar habitación"
+              description="Si cierras el chat, la habitación volverá a estar disponible y se borrará esta conversación. ¿Seguro que quieres salir?"
+              okText="Sí, cerrar"
+              cancelText="Seguir en el chat"
+              onConfirm={handleCerrarConfirmado}
+            >
+              <Button
+                shape="circle"
+                size="small"
+                type="text"
+                icon={<CloseOutlined />}
+                style={{
+                  color: "#6b7280",
+                }}
+              />
+            </Popconfirm>
+          ) : (
+            <Button
+              shape="circle"
+              size="small"
+              type="text"
+              icon={<CloseOutlined />}
+              onClick={handleDrawerClose}
+              style={{
+                color: "#6b7280",
+              }}
+            />
+          )}
         </Flex>
       }
       styles={{
@@ -143,9 +222,7 @@ const ChatSoporte = ({ open, onClose, isMobile }) => {
                     boxShadow: isUser
                       ? "0 4px 10px rgba(14,165,233,0.35)"
                       : "0 2px 6px rgba(148,163,253,0.16)",
-                    border: isUser
-                      ? "none"
-                      : "1px solid #e5e7eb",
+                    border: isUser ? "none" : "1px solid #e5e7eb",
                   }}
                 >
                   <Text
@@ -167,9 +244,7 @@ const ChatSoporte = ({ open, onClose, isMobile }) => {
                       style={{
                         fontSize: 8.5,
                         opacity: 0.7,
-                        color: isUser
-                          ? "#eff6ff"
-                          : "#9ca3af",
+                        color: isUser ? "#eff6ff" : "#9ca3af",
                       }}
                     >
                       {msg.time}
@@ -233,11 +308,7 @@ const ChatSoporte = ({ open, onClose, isMobile }) => {
         </Flex>
 
         {/* Pie */}
-        <Flex
-          justify="space-between"
-          align="center"
-          style={{ marginTop: 2 }}
-        >
+        <Flex justify="flex-start" align="center" style={{ marginTop: 2 }}>
           <Flex gap={4} align="center">
             <UserOutlined
               style={{
@@ -254,18 +325,6 @@ const ChatSoporte = ({ open, onClose, isMobile }) => {
               Operador disponible · Respuesta rápida
             </Text>
           </Flex>
-          <Button
-            type="link"
-            size="small"
-            onClick={onClose}
-            style={{
-              fontSize: 9,
-              padding: 0,
-              color: "#6b7280",
-            }}
-          >
-            Cerrar
-          </Button>
         </Flex>
       </Flex>
     </Drawer>

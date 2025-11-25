@@ -108,9 +108,7 @@ const buildFechasTexto = (evento) => {
   const inicio = evento.startDate
     ? dayjs(evento.startDate).format("DD/MM/YYYY")
     : "";
-  const fin = evento.endDate
-    ? dayjs(evento.endDate).format("DD/MM/YYYY")
-    : "";
+  const fin = evento.endDate ? dayjs(evento.endDate).format("DD/MM/YYYY") : "";
 
   if (evento.type === "stay" && inicio && fin) {
     return `${inicio} al ${fin}`;
@@ -482,8 +480,7 @@ const PanelProgramacionManual = ({
 
         const inicio = rango[0].startOf("day").format("YYYY-MM-DD");
         const fin = rango[1].startOf("day").format("YYYY-MM-DD");
-        const etiquetaBase =
-          `Reserva${nombreHuesped}`.trim() || "Reserva";
+        const etiquetaBase = `Reserva${nombreHuesped}`.trim() || "Reserva";
         const etiquetaFinal = `${etiquetaBase}${notasTexto}`;
 
         onCrearEvento({
@@ -512,8 +509,7 @@ const PanelProgramacionManual = ({
 
         const inicio = fechaInicio.startOf("day").format("YYYY-MM-DD");
         const etiquetaBase =
-          `Estancia abierta${nombreHuesped}`.trim() ||
-          "Estancia abierta";
+          `Estancia abierta${nombreHuesped}`.trim() || "Estancia abierta";
         const etiquetaFinal = `${etiquetaBase}${notasTexto}`;
 
         onCrearEvento({
@@ -612,9 +608,9 @@ const PanelProgramacionManual = ({
             color: neutrals.textMuted,
           }}
         >
-          Registra <b>entradas</b>, <b>salidas</b>, <b>reservas (1 o varios días)</b>,
-          estancias abiertas, limpiezas y bloqueos para Casa Frida y Cabañas
-          Fridas.
+          Registra <b>entradas</b>, <b>salidas</b>,{" "}
+          <b>reservas (1 o varios días)</b>, estancias abiertas, limpiezas y
+          bloqueos para Casa Frida y Cabañas Fridas.
         </Text>
 
         <Form
@@ -652,9 +648,7 @@ const PanelProgramacionManual = ({
             <Select
               size="small"
               placeholder={
-                loadingHabitaciones
-                  ? "Cargando habitaciones..."
-                  : "Habitación"
+                loadingHabitaciones ? "Cargando habitaciones..." : "Habitación"
               }
               style={{ width: esMobile ? "100%" : 260 }}
               loading={loadingHabitaciones}
@@ -842,8 +836,20 @@ const HabitacionesReservaView = ({ isMobile: forzarMobile }) => {
     const fetchHabitaciones = async () => {
       try {
         setLoadingHabitaciones(true);
-        const res = await axios.get("/api/habitaciones");
-        setHabitaciones(res.data || []);
+        const res = await axios.get("/api/habitaciones/name.habitaciones");
+
+        const raw = Array.isArray(res.data) ? res.data : [];
+
+        // Normalizamos por si acaso
+        const rooms = raw.map((h) => ({
+          id: h.id || h._id, // por si alguna vez viene _id
+          codigo: h.codigo || "",
+          roomNumber: h.roomNumber || "",
+          title: h.title || "",
+          hotelCode: h.hotelCode || "",
+        }));
+
+        setHabitaciones(rooms);
       } catch (err) {
         console.error(err);
         message.error("No se pudieron cargar las habitaciones");
@@ -937,9 +943,9 @@ const HabitacionesReservaView = ({ isMobile: forzarMobile }) => {
         {visibles.map((item, indice) => {
           const meta = metaTipo(item.type);
           const shortHotel = getHotelShort(item.hotel);
-          const etiquetaCorta = `${
-            shortHotel ? `${shortHotel} · ` : ""
-          }Hab ${item.room} · ${meta.labelCorto}`.trim();
+          const etiquetaCorta = `${shortHotel ? `${shortHotel} · ` : ""}Hab ${
+            item.room
+          } · ${meta.labelCorto}`.trim();
 
           return (
             <Tooltip
@@ -1041,11 +1047,7 @@ const HabitacionesReservaView = ({ isMobile: forzarMobile }) => {
           '"SF Pro Text", "Inter", -apple-system, BlinkMacSystemFont, system-ui, sans-serif',
       }}
       title={
-        <Space
-          size={6}
-          direction={compacto ? "vertical" : "horizontal"}
-          wrap
-        >
+        <Space size={6} direction={compacto ? "vertical" : "horizontal"} wrap>
           <Text
             style={{
               fontWeight: 600,
@@ -1063,8 +1065,7 @@ const HabitacionesReservaView = ({ isMobile: forzarMobile }) => {
               color: "#0f172a",
             }}
           >
-            Casa Frida & Cabañas Fridas · Reservas, entradas, salidas y
-            bloqueos
+            Casa Frida & Cabañas Fridas · Reservas, entradas, salidas y bloqueos
           </Tag>
           {compacto && (
             <Space size={8} wrap>

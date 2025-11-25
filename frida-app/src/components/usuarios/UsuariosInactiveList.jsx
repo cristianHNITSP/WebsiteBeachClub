@@ -178,7 +178,11 @@ const UsuariosInactiveList = ({
                       description="El usuario volverá a poder iniciar sesión en el panel."
                       okText="Restaurar"
                       cancelText="Cancelar"
-                      placement="left"
+                      placement={isMobile ? "top" : "left"}
+                      overlayStyle={{
+                        maxWidth: 320,
+                        whiteSpace: "normal",
+                      }}
                       onConfirm={() => cambiarEstado(user)}
                     >
                       <Button

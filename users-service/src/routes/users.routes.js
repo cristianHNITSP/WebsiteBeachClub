@@ -1,4 +1,3 @@
-// users-service/src/routes/users.routes.js
 const express = require('express');
 const bcrypt = require('bcrypt');
 const { body, param, validationResult } = require('express-validator');
@@ -14,13 +13,13 @@ const router = express.Router();
  *
  * Solo quien tenga manage_users puede ver la lista.
  *
- * Soporta paginación por índice:
- *   - ?offset=0&limit=20
+ * Paginación por índice (máx. 5 por página en backend):
+ *   - ?offset=0&limit=5   // aunque envíen más, el backend limitará a 5
  *
- * Filtros opcionales:
+ * Filtros opcionales (se ejecutan SIEMPRE en backend):
  *   - ?role=administrador | staff
  *   - ?state=active | inactive
- *   - ?q=texto   (busca por nombre o email)
+ *   - ?q=texto   (busca por nombre, email o rol)
  *
  * Respuesta:
  * {
@@ -42,8 +41,9 @@ router.get(
 
       const skip = Math.max(parseInt(offset, 10) || 0, 0);
       const pageSizeRaw = parseInt(limit, 10);
-      // 👇 default 5 en vez de 20
-      const pageSize = Math.min(Math.max(pageSizeRaw || 5, 1), 100);
+
+      // ✅ Máximo 5 registros por página sin importar lo que mande el cliente
+      const pageSize = Math.min(Math.max(pageSizeRaw || 5, 1), 5);
 
       const filter = {};
 
@@ -59,7 +59,11 @@ router.get(
 
       if (q && typeof q === 'string' && q.trim() !== '') {
         const regex = new RegExp(q.trim(), 'i');
-        filter.$or = [{ name: regex }, { email: regex }];
+        filter.$or = [
+          { name: regex },
+          { email: regex },
+          { role: regex }, // 🔎 también permite buscar por texto del rol
+        ];
       }
 
       const [total, users] = await Promise.all([
@@ -91,6 +95,7 @@ router.get(
     }
   }
 );
+
 /**
  * POST /api/users
  *

@@ -1,9 +1,9 @@
 // routes/reservas.routes.js
-const express = require("express");
-const Reserva = require("../models/Reserva");
-const Habitacion = require("../models/Habitacion");
-const authMiddleware = require("../middlewares/auth.middleware");
-const { requirePermissions } = require("../middlewares/require.Permissions");
+const express = require('express');
+const Reserva = require('../models/Reserva');
+const Habitacion = require('../models/Habitacion');
+const authMiddleware = require('../middlewares/auth.middleware');
+const { requirePermissions } = require('../middlewares/require.Permissions');
 
 const router = express.Router();
 
@@ -21,16 +21,16 @@ function diffNights(checkIn, checkOut) {
  * Permiso requerido: view_reservations
  */
 router.get(
-  "/",
+  '/',
   authMiddleware,
-  requirePermissions(["view_reservations"]),
+  requirePermissions(['view_reservations']),
   async (req, res) => {
     try {
-      const reservas = await Reserva.find().populate("habitacionId");
+      const reservas = await Reserva.find().populate('habitacionId');
       res.json(reservas);
     } catch (err) {
-      console.error("[GET /reservas] Error:", err);
-      res.status(500).json({ error: "INTERNAL_ERROR" });
+      console.error('[GET /reservas] Error:', err);
+      res.status(500).json({ error: 'INTERNAL_ERROR' });
     }
   }
 );
@@ -41,9 +41,9 @@ router.get(
  * Permiso requerido: manage_reservations
  */
 router.post(
-  "/",
+  '/',
   authMiddleware,
-  requirePermissions(["manage_reservations"]),
+  requirePermissions(['manage_reservations']),
   async (req, res) => {
     try {
       const {
@@ -61,9 +61,9 @@ router.post(
       // Validaciones básicas
       if (!habitacionId || !checkIn || !checkOut || !guestName) {
         return res.status(400).json({
-          error: "VALIDATION_ERROR",
+          error: 'VALIDATION_ERROR',
           message:
-            "habitacionId, checkIn, checkOut y guestName son obligatorios.",
+            'habitacionId, checkIn, checkOut y guestName son obligatorios.',
         });
       }
 
@@ -71,10 +71,7 @@ router.post(
       if (!habitacion) {
         return res
           .status(400)
-          .json({
-            error: "INVALID_ROOM",
-            message: "Habitación no encontrada.",
-          });
+          .json({ error: 'INVALID_ROOM', message: 'Habitación no encontrada.' });
       }
 
       const ci = new Date(checkIn);
@@ -82,8 +79,8 @@ router.post(
 
       if (isNaN(ci.getTime()) || isNaN(co.getTime())) {
         return res.status(400).json({
-          error: "INVALID_DATES",
-          message: "Fechas de check-in/check-out inválidas.",
+          error: 'INVALID_DATES',
+          message: 'Fechas de check-in/check-out inválidas.',
         });
       }
 
@@ -94,9 +91,7 @@ router.post(
       // Usamos el campo "codigo" de la habitación (no roomNumber)
       const codigoHab = habitacion.codigo || habitacion._id.toString();
 
-      const codigoReserva = `${
-        habitacion.hotelCode || "HOTEL"
-      }-${codigoHab}-${Date.now()}`;
+      const codigoReserva = `${habitacion.hotelCode || 'HOTEL'}-${codigoHab}-${Date.now()}`;
 
       const reserva = await Reserva.create({
         codigoReserva,
@@ -109,9 +104,9 @@ router.post(
         guests,
         checkIn: ci,
         checkOut: co,
-        status: "CONFIRMADA",
-        source: source || "panel",
-        notes: notes || "",
+        status: 'CONFIRMADA',
+        source: source || 'panel',
+        notes: notes || '',
         nightlyRate,
         totalNights,
         totalAmount,
@@ -120,8 +115,8 @@ router.post(
 
       res.status(201).json(reserva);
     } catch (err) {
-      console.error("[POST /reservas] Error:", err);
-      res.status(400).json({ error: "BAD_REQUEST", details: err.message });
+      console.error('[POST /reservas] Error:', err);
+      res.status(400).json({ error: 'BAD_REQUEST', details: err.message });
     }
   }
 );
@@ -132,21 +127,21 @@ router.post(
  * Permiso requerido: view_reservations
  */
 router.get(
-  "/:id",
+  '/:id',
   authMiddleware,
-  requirePermissions(["view_reservations"]),
+  requirePermissions(['view_reservations']),
   async (req, res) => {
     try {
       const reserva = await Reserva.findById(req.params.id).populate(
-        "habitacionId"
+        'habitacionId'
       );
       if (!reserva) {
-        return res.status(404).json({ error: "NOT_FOUND" });
+        return res.status(404).json({ error: 'NOT_FOUND' });
       }
       res.json(reserva);
     } catch (err) {
-      console.error("[GET /reservas/:id] Error:", err);
-      res.status(400).json({ error: "BAD_REQUEST", details: err.message });
+      console.error('[GET /reservas/:id] Error:', err);
+      res.status(400).json({ error: 'BAD_REQUEST', details: err.message });
     }
   }
 );
@@ -157,17 +152,17 @@ router.get(
  * Permiso requerido: manage_reservations
  */
 router.patch(
-  "/:id/status",
+  '/:id/status',
   authMiddleware,
-  requirePermissions(["manage_reservations"]),
+  requirePermissions(['manage_reservations']),
   async (req, res) => {
     try {
       const { status } = req.body;
 
       if (!status) {
         return res.status(400).json({
-          error: "VALIDATION_ERROR",
-          message: "El campo status es obligatorio.",
+          error: 'VALIDATION_ERROR',
+          message: 'El campo status es obligatorio.',
         });
       }
 
@@ -178,13 +173,13 @@ router.patch(
       );
 
       if (!reserva) {
-        return res.status(404).json({ error: "NOT_FOUND" });
+        return res.status(404).json({ error: 'NOT_FOUND' });
       }
 
       res.json(reserva);
     } catch (err) {
-      console.error("[PATCH /reservas/:id/status] Error:", err);
-      res.status(400).json({ error: "BAD_REQUEST", details: err.message });
+      console.error('[PATCH /reservas/:id/status] Error:', err);
+      res.status(400).json({ error: 'BAD_REQUEST', details: err.message });
     }
   }
 );

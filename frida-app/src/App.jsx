@@ -2,6 +2,7 @@
 import axios from "axios";
 import { useMediaQuery } from "react-responsive";
 import { useState, useEffect } from "react";
+import { io } from "socket.io-client";
 
 import {
   ConfigProvider,
@@ -12,7 +13,6 @@ import {
   Space,
   Splitter,
   Typography,
-  Carousel,
   Tree,
   Select,
   message,
@@ -20,7 +20,6 @@ import {
   DatePicker,
   Drawer,
   Tag,
-  Skeleton,
 } from "antd";
 
 import {
@@ -32,8 +31,6 @@ import {
   FilterOutlined,
   MenuOutlined,
   CommentOutlined,
-  StarFilled,
-  HeartOutlined,
   CustomerServiceOutlined,
   ReloadOutlined,
 } from "@ant-design/icons";
@@ -44,6 +41,7 @@ import RoomCards from "./components/website/RoomCards.jsx";
 import Recommendcards from "./components/website/RecommendCards.jsx";
 import BuscadorMovil from "./components/website/BuscadorMovil.jsx";
 import ChatSoporte from "./components/website/ChatSoporte.jsx";
+import HeroCarousel from "./components/website/HeroCarousel.jsx";
 import { beachColors } from "./theme/beachTheme";
 
 const { Title, Text } = Typography;
@@ -52,23 +50,8 @@ const { Option } = Select;
 const backgroundColor = "#f8fafc";
 const borderColor = "#e2e8f0";
 
-const carruselImages = [
-  {
-    img: "https://scontent.fmid1-3.fna.fbcdn.net/v/t39.30808-6/487996831_1226933259437418_1477921974834808949_n.jpg?_nc_cat=103&ccb=1-7&_nc_sid=cc71e4&_nc_ohc=cQHYQExC3vwQ7kNvwFGHLbA&_nc_oc=AdlxWdChNxbYkumI2nH7QiON6SapBgC8KkjhN00wOL2N1mmLu0O6hOTd7E6VYswlwzRNHdiSUuxrnm3tA6Dn6FUo&_nc_zt=23&_nc_ht=scontent.fmid1-3.fna&_nc_gid=yhS2InLir0CyuUQMxBWDbA&oh=00_AfhZgogfliEuO5dyXGUIik3AkK05VkwJHPmctl7V8W5BqA&oe=6929ED41",
-    title: "Escápate frente al mar",
-    subtitle: "Alojamientos seleccionados para disfrutar como en casa.",
-  },
-  {
-    img: "https://scontent.fmid1-3.fna.fbcdn.net/v/t39.30808-6/487996831_1226933259437418_1477921974834808949_n.jpg?_nc_cat=103&ccb=1-7&_nc_sid=cc71e4&_nc_ohc=cQHYQExC3vwQ7kNvwFGHLbA&_nc_oc=AdlxWdChNxbYkumI2nH7QiON6SapBgC8KkjhN00wOL2N1mmLu0O6hOTd7E6VYswlwzRNHdiSUuxrnm3tA6Dn6FUo&_nc_zt=23&_nc_ht=scontent.fmid1-3.fna&_nc_gid=yhS2InLir0CyuUQMxBWDbA&oh=00_AfhZgogfliEuO5dyXGUIik3AkK05VkwJHPmctl7V8W5BqA&oe=6929ED41",
-    title: "Cabañas con encanto",
-    subtitle: "Naturaleza, diseño y comodidad en un solo lugar.",
-  },
-  {
-    img: "https://scontent.fmid1-3.fna.fbcdn.net/v/t39.30808-6/487996831_1226933259437418_1477921974834808949_n.jpg?_nc_cat=103&ccb=1-7&_nc_sid=cc71e4&_nc_ohc=cQHYQExC3vwQ7kNvwFGHLbA&_nc_oc=AdlxWdChNxbYkumI2nH7QiON6SapBgC8KkjhN00wOL2N1mmLu0O6hOTd7E6VYswlwzRNHdiSUuxrnm3tA6Dn6FUo&_nc_zt=23&_nc_ht=scontent.fmid1-3.fna&_nc_gid=yhS2InLir0CyuUQMxBWDbA&oh=00_AfhZgogfliEuO5dyXGUIik3AkK05VkwJHPmctl7V8W5BqA&oe=6929ED41",
-    title: "Experiencias inolvidables",
-    subtitle: "Reserva directo con quienes te atienden de verdad.",
-  },
-];
+// 🌐 URL del servidor de reservas con WebSocket (puedes moverlo a .env de Vite)
+const WS_URL = import.meta.env.VITE_RESERVAS_WS_URL || "http://localhost:4002";
 
 const treeData = [
   {
@@ -110,7 +93,6 @@ const treeData = [
     children: ["Playa", "Centro", "Montaña", "Selva"].map((t, i) => ({
       title: t,
       key: `3-${i + 1}`,
-      // aquí podrías luego mapear filtros reales
     })),
   },
 ];
@@ -123,43 +105,128 @@ const recommendedDestinations = [
   },
 ];
 
-function App() {
+function App({ currentUser }) {
   const [openBuscadorMovil, setOpenBuscadorMovil] = useState(false);
   const [openFiltrosMovil, setOpenFiltrosMovil] = useState(false);
   const [openChat, setOpenChat] = useState(false);
 
   const isMobile = useMediaQuery({ maxWidth: 1024 });
 
-  // HABITACIONES / API
+  // HABITACIONES / API + tiempo real
   const [habitaciones, setHabitaciones] = useState([]);
   const [loadingHabitaciones, setLoadingHabitaciones] = useState(true);
   const [error, setError] = useState(null);
   const [messageApi, contextHolder] = message.useMessage();
 
-  // HERO
-  const [loadingHero, setLoadingHero] = useState(true);
+  // límite de habitaciones por paginación
+  const [pagination, setPagination] = useState({
+    page: 1,
+    limit: 5,
+    total: 0,
+    totalPages: 0,
+    hasMore: false,
+  });
 
-  // Cargar habitaciones
-  const cargarHabitaciones = async (showToast = false) => {
+  // Habitación activa (para el chat / reserva express)
+  const [habitacionSeleccionada, setHabitacionSeleccionada] = useState(null);
+
+  // 🔌 WebSocket: suscripción en tiempo real a habitaciones
+  useEffect(() => {
+    const socket = io(WS_URL, {
+      transports: ["websocket"],
+      withCredentials: true,
+    });
+
+    socket.on("connect", () => {
+      console.log("✅ Conectado a WebSocket reservas-service:", socket.id);
+    });
+
+    socket.on("disconnect", () => {
+      console.log("🔌 Desconectado de WebSocket reservas-service");
+    });
+
+    // Listado inicial que envía el backend al conectar (normalmente primeras 5)
+    socket.on("habitaciones:init", (data) => {
+      if (Array.isArray(data)) {
+        setHabitaciones(data);
+        setLoadingHabitaciones(false);
+      }
+    });
+
+    // Nueva habitación creada
+    socket.on("habitaciones:created", (room) => {
+      if (!room || !room._id) return;
+      setHabitaciones((prev) => {
+        const exists = prev.some((h) => h._id === room._id);
+        if (exists) return prev;
+        return [...prev, room];
+      });
+    });
+
+    // Actualización de una habitación (estado, datos, etc.)
+    socket.on("habitaciones:updated", (room) => {
+      if (!room || !room._id) return;
+      setHabitaciones((prev) =>
+        prev.map((h) => (h._id === room._id ? { ...h, ...room } : h))
+      );
+    });
+
+    // Eliminación de habitación
+    socket.on("habitaciones:deleted", (payload) => {
+      const deleteId = payload?._id || payload?.id;
+      if (!deleteId) return;
+      setHabitaciones((prev) => prev.filter((h) => h._id !== deleteId));
+    });
+
+    // Error desde el servidor de WS
+    socket.on("habitaciones:error", (payload) => {
+      console.error("WS habitaciones:error", payload);
+      messageApi.error(
+        payload?.message ||
+          "Ocurrió un error en las actualizaciones en tiempo real."
+      );
+    });
+
+    return () => {
+      socket.disconnect();
+    };
+  }, [messageApi]);
+
+  // Cargar habitaciones vía HTTP (paginado desde el backend)
+  const cargarHabitaciones = async (page = 1, showToast = false) => {
     try {
       setLoadingHabitaciones(true);
       setError(null);
 
-      const response = await axios.get("/api/habitaciones");
-      const data = response.data || [];
+      const limit = pagination.limit || 5;
 
-      if (Array.isArray(data) && data.length > 0) {
-        setHabitaciones(data);
-        setLoadingHabitaciones(false);
-        setLoadingHero(false); // ✅ dejamos de mostrar skeleton del hero
-        if (showToast) {
+      const response = await axios.get("/api/habitaciones/public", {
+        params: { page, limit },
+      });
+
+      const payload = response.data || {};
+      const items = Array.isArray(payload.items)
+        ? payload.items
+        : Array.isArray(payload)
+        ? payload
+        : [];
+
+      setHabitaciones(items);
+
+      setPagination({
+        page: payload.page || page,
+        limit: payload.limit || limit,
+        total: payload.total || items.length,
+        totalPages: payload.totalPages || 1,
+        hasMore: !!payload.hasMore,
+      });
+
+      setLoadingHabitaciones(false);
+
+      if (showToast) {
+        if (items.length > 0) {
           messageApi.success("Habitaciones sincronizadas correctamente.");
-        }
-      } else {
-        setHabitaciones([]);
-        setLoadingHabitaciones(true);
-        setLoadingHero(false); // ✅ aunque no haya data, mostramos el carrusel
-        if (showToast) {
+        } else {
           messageApi.warning(
             "No se recibieron habitaciones. Esperando datos del sistema..."
           );
@@ -169,8 +236,13 @@ function App() {
       console.error("Error al cargar las habitaciones:", err);
       setHabitaciones([]);
       setError(err);
-      setLoadingHabitaciones(true);
-      setLoadingHero(false); // ✅ en error también dejamos ver el hero
+      setLoadingHabitaciones(false);
+      setPagination((prev) => ({
+        ...prev,
+        total: 0,
+        totalPages: 0,
+        hasMore: false,
+      }));
       if (showToast) {
         messageApi.error(
           "No se pudo sincronizar. Revisa la conexión o inténtalo de nuevo."
@@ -179,8 +251,10 @@ function App() {
     }
   };
 
+  // Primer carga vía HTTP (por si el WS tarda o falla)
   useEffect(() => {
-    cargarHabitaciones(false);
+    cargarHabitaciones(1, false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -193,6 +267,102 @@ function App() {
     }
   }, [error, messageApi]);
 
+  // handler para cambiar de página en la paginación
+  const handleChangePageHabitaciones = (page) => {
+    cargarHabitaciones(page, false);
+  };
+
+  // 🔹 Reserva express: cambia estado a "EN ESPERA" (3) en backend (público) + abre chat
+  const handleReservaExpress = async (room) => {
+    try {
+      messageApi.open({
+        key: `reserva-express-${room._id}`,
+        type: "loading",
+        content: "Iniciando reserva express...",
+        duration: 0,
+      });
+
+      // 👉 ruta pública que usa req.clientIpHash y pone estadoDeReserva = 3
+      const res = await axios.post(
+        `/api/habitaciones/${room._id}/reserva-express`
+      );
+
+      const updatedRoom = res?.data?.room || res?.data || room;
+
+      setHabitacionSeleccionada(updatedRoom);
+      setOpenChat(true);
+
+      messageApi.open({
+        key: `reserva-express-${room._id}`,
+        type: "success",
+        content:
+          "Hemos iniciado una reserva express para esta habitación. Nuestro equipo te atenderá en el chat.",
+        duration: 3,
+      });
+      // El estado visual se actualizará por Socket.IO (habitaciones:updated)
+    } catch (err) {
+      console.error("Error al iniciar reserva express:", err);
+      const backendMsg =
+        err?.response?.data?.message ||
+        "No se pudo iniciar la reserva express. Intenta de nuevo.";
+      messageApi.open({
+        key: `reserva-express-${room._id}`,
+        type: "error",
+        content: backendMsg,
+        duration: 3,
+      });
+
+      // Re-sync por si quedó algo raro
+      cargarHabitaciones(pagination.page, false);
+    }
+  };
+
+  // 🔹 Info por WhatsApp (no toca estado ni IP)
+  const handleInfoWhatsapp = (room) => {
+    setHabitacionSeleccionada(room);
+
+    const numero = "9993676541"; // <--- Cambia a tu número real de WhatsApp
+    const texto = `Hola, me interesa la habitación ${room.codigo || ""} - ${
+      room.title || ""
+    } en ${room.location || "su propiedad"}. ¿Podrían darme más información?`;
+
+    const url = `https://wa.me/${numero}?text=${encodeURIComponent(texto)}`;
+    window.open(url, "_blank", "noopener,noreferrer");
+  };
+
+  // 🔹 Cierre de chat de reserva express:
+  //    - POST /reserva-express/cancel → libera y borra hash IP en backend
+  const handleChatClosedForReserva = async () => {
+    if (!habitacionSeleccionada) {
+      setOpenChat(false);
+      return;
+    }
+
+    const roomId = habitacionSeleccionada._id;
+
+    try {
+      await axios.post(
+        `/api/habitaciones/${roomId}/reserva-express/cancel`
+      );
+
+      messageApi.success(
+        "Se liberó la habitación. Está disponible nuevamente para reservar."
+      );
+      // El cambio nos llegará por `habitaciones:updated` vía socket
+    } catch (err) {
+      console.error("Error al liberar habitación:", err);
+      messageApi.error(
+        err?.response?.data?.message ||
+          "No se pudo actualizar el estado de la habitación. Inténtalo de nuevo."
+      );
+    } finally {
+      setHabitacionSeleccionada(null);
+      setOpenChat(false);
+      // Pequeño sync extra por si el socket se pierde
+      cargarHabitaciones(pagination.page, false);
+    }
+  };
+
   const headerStyle = {
     padding: "10px 16px",
     background: `linear-gradient(120deg, ${beachColors.teal}, ${beachColors.oceanBlue})`,
@@ -202,19 +372,6 @@ function App() {
     zIndex: 100,
     borderBottom: `2px solid ${beachColors.turquoise}`,
   };
-
-  const carouselSlide = (slide) => ({
-    height: "320px",
-    width: "100%",
-    display: "flex",
-    alignItems: "flex-end",
-    padding: 24,
-    color: "#ffffff",
-    backgroundImage: `linear-gradient(to top, rgba(15,23,42,0.82), rgba(15,23,42,0.08)), url(${slide.img})`,
-    backgroundSize: "cover",
-    backgroundPosition: "center",
-    boxShadow: "0 14px 40px rgba(15,23,42,0.35)",
-  });
 
   const panelStyles = {
     left: {
@@ -390,17 +547,37 @@ function App() {
 
             {/* Mobile: botones */}
             {isMobile && (
-              <Space size={8}>
+              <Space size={8} align="center">
                 <Button
                   type="text"
                   icon={<SearchOutlined style={{ color: "#ffffff" }} />}
                   onClick={() => setOpenBuscadorMovil(true)}
                 />
+
                 <Button
                   type="text"
                   icon={<MenuOutlined style={{ color: "#ffffff" }} />}
                   onClick={() => setOpenFiltrosMovil(true)}
                 />
+
+                {/* Botón Acceso staff en móvil */}
+                <Button
+                  size="small"
+                  href="/panel.web/login.panel.web"
+                  style={{
+                    borderRadius: 999,
+                    paddingInline: 12,
+                    height: 30,
+                    fontSize: 11,
+                    background: "rgba(15,23,42,0.65)",
+                    color: "#ffffff",
+                    border: "1px solid rgba(248,250,252,0.45)",
+                    display: "flex",
+                    alignItems: "center",
+                  }}
+                >
+                  Staff
+                </Button>
               </Space>
             )}
           </Flex>
@@ -477,7 +654,6 @@ function App() {
               icon={<CommentOutlined />}
             >
               <FloatButton
-                tooltip="Chat"
                 icon={<CustomerServiceOutlined />}
                 onClick={() => setOpenChat(true)}
               />
@@ -566,78 +742,8 @@ function App() {
                 gap={18}
                 style={{ maxWidth: 900, margin: "0 auto" }}
               >
-                {/* Hero */}
-                <Carousel
-                  autoplay
-                  dots
-                  style={{ width: "100%" }}
-                  autoplaySpeed={5500}
-                >
-                  {carruselImages.map((slide, i) => (
-                    <div key={i}>
-                      {loadingHero ? (
-                        <Card
-                          style={{
-                            height: 320,
-                            background: "#e5e7eb",
-                          }}
-                        >
-                          <Skeleton active paragraph={false} />
-                        </Card>
-                      ) : (
-                        <div style={carouselSlide(slide)}>
-                          <div>
-                            <Tag
-                              color={beachColors.turquoise}
-                              style={{
-                                borderRadius: 999,
-                                fontSize: 10,
-                                color: "#065f46",
-                                marginBottom: 4,
-                              }}
-                            >
-                              Reservas directas · Mejor atención
-                            </Tag>
-                            <Title
-                              level={3}
-                              style={{
-                                margin: 0,
-                                color: "#ffffff",
-                                fontWeight: 600,
-                              }}
-                            >
-                              {slide.title}
-                            </Title>
-                            <Text
-                              style={{
-                                fontSize: 12,
-                                color: "rgba(241,245,249,0.9)",
-                              }}
-                            >
-                              {slide.subtitle}
-                            </Text>
-                            <Flex gap={8} style={{ marginTop: 10 }}>
-                              <StarFilled
-                                style={{
-                                  color: beachColors.sunset,
-                                  fontSize: 14,
-                                }}
-                              />
-                              <Text
-                                style={{
-                                  fontSize: 11,
-                                  color: "#e5e7eb",
-                                }}
-                              >
-                                Opiniones reales, sin intermediarios.
-                              </Text>
-                            </Flex>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </Carousel>
+                {/* Hero (carrusel desacoplado) */}
+                <HeroCarousel currentUser={currentUser} />
 
                 {/* Header resultados + Re-sincronizar */}
                 <Flex
@@ -665,7 +771,7 @@ function App() {
                     <Button
                       size="small"
                       icon={<ReloadOutlined />}
-                      onClick={() => cargarHabitaciones(true)}
+                      onClick={() => cargarHabitaciones(pagination.page, true)}
                       style={{
                         borderRadius: 999,
                         fontSize: 10,
@@ -697,6 +803,10 @@ function App() {
                   beachColors={beachColors}
                   cardsData={cardsToShow}
                   loading={loadingHabitaciones}
+                  onReservaExpress={handleReservaExpress}
+                  onInfoWhatsapp={handleInfoWhatsapp}
+                  pagination={pagination}
+                  onPageChange={handleChangePageHabitaciones}
                 />
               </Flex>
             </Splitter.Panel>
@@ -713,7 +823,7 @@ function App() {
                   <Recommendcards
                     recommendedDestinations={recommendedDestinations}
                     beachColors={beachColors}
-                    loading={loadingHero}
+                    loading={false}
                   />
                   <Card
                     bordered={false}
@@ -864,8 +974,10 @@ function App() {
         {/* CHAT (componente desacoplado) */}
         <ChatSoporte
           open={openChat}
-          onClose={() => setOpenChat(false)}
+          onClose={() => setOpenChat(false)} // caso 2: chat abierto desde "Ayuda", sin cambiar estado
           isMobile={isMobile}
+          habitacionSeleccionada={habitacionSeleccionada}
+          onFinalizarReserva={handleChatClosedForReserva} // solo se usa si hay habitacionSeleccionada
         />
       </div>
     </ConfigProvider>

@@ -1,4 +1,3 @@
-// src/components/habitaciones/HabitacionFormModal.jsx
 import React from "react";
 import {
   Modal,
@@ -29,6 +28,7 @@ const HabitacionFormModal = ({
   form,
   onCancel,
   onOk,
+  saving,
 }) => {
   return (
     <Modal
@@ -40,6 +40,7 @@ const HabitacionFormModal = ({
       centered
       width={isMobile ? 360 : 520}
       bodyStyle={{ paddingTop: 12 }}
+      confirmLoading={saving}
     >
       <Space
         direction="vertical"
@@ -229,7 +230,6 @@ const HabitacionFormModal = ({
           />
         </Form.Item>
 
-        {/* BLOQUE OFERTA ESPECIAL */}
         <Card
           size="small"
           style={{

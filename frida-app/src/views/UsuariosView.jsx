@@ -3,12 +3,8 @@ import React, { useState, useEffect } from "react";
 import axios from "axios";
 import {
   Card,
-  Row,
-  Col,
   Alert,
   Space,
-  Input,
-  Select,
   Tag,
   Typography,
   Button,
@@ -16,12 +12,9 @@ import {
   Modal,
   message,
   Divider,
+  Spin, // 👈 spinner
 } from "antd";
-import {
-  SearchOutlined,
-  TeamOutlined,
-  PlusOutlined,
-} from "@ant-design/icons";
+import { TeamOutlined, PlusOutlined } from "@ant-design/icons";
 import { beachColors, neutrals } from "../theme/beachTheme";
 
 import UsuariosCreatePanel from "../components/usuarios/UsuariosCreatePanel";
@@ -32,7 +25,6 @@ import UsuariosInactiveList from "../components/usuarios/UsuariosInactiveList";
 import UsuarioEditModal from "../components/usuarios/UsuarioEditModal";
 
 const { Text } = Typography;
-const { Option } = Select;
 
 /* =========================================================
    ROLES DISPONIBLES (BACKEND: administrador | staff)
@@ -98,11 +90,11 @@ const mapUserFromApi = (apiUser, currentUser) => {
    ========================================================= */
 
 const UsuariosView = ({ isMobile, currentUser }) => {
-  // Hook de mensajes globales
   const [messageApi, contextHolder] = message.useMessage();
 
   const [users, setUsers] = useState([]);
 
+  // 🔎 Filtros que ahora se aplican en el BACKEND
   const [userRoleFilter, setUserRoleFilter] = useState("all");
   const [userSearch, setUserSearch] = useState("");
 
@@ -124,17 +116,21 @@ const UsuariosView = ({ isMobile, currentUser }) => {
   const [errorMsg, setErrorMsg] = useState("");
 
   const [offset, setOffset] = useState(0);
-  const [limit] = useState(5); // 5 en 5
+  const [limit] = useState(5); // 5 en 5, alineado con backend
   const [hasMore, setHasMore] = useState(true);
 
   const [savingUser, setSavingUser] = useState(false);
 
-  /* ========== CARGAR LISTA DESDE API (paginada) ========== */
-
+  // Debounce para el buscador
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   useEffect(() => {
-    fetchUsers({ reset: true });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    const handler = setTimeout(() => {
+      setDebouncedSearch(userSearch.trim());
+    }, 400);
+    return () => clearTimeout(handler);
+  }, [userSearch]);
+
+  /* ========== CARGAR LISTA DESDE API (paginada + filtros backend) ========== */
 
   const fetchUsers = async ({ reset = false } = {}) => {
     if (reset) {
@@ -154,12 +150,22 @@ const UsuariosView = ({ isMobile, currentUser }) => {
     try {
       const currentOffset = reset ? 0 : offset;
 
+      const params = {
+        offset: currentOffset,
+        limit,
+      };
+
+      if (userRoleFilter !== "all") {
+        params.role = userRoleFilter;
+      }
+
+      if (debouncedSearch) {
+        params.q = debouncedSearch;
+      }
+
       const res = await axios.get("/api/users", {
         withCredentials: true,
-        params: {
-          offset: currentOffset,
-          limit,
-        },
+        params,
       });
 
       const api = res.data;
@@ -200,21 +206,21 @@ const UsuariosView = ({ isMobile, currentUser }) => {
     }
   };
 
+  // Carga inicial
+  useEffect(() => {
+    fetchUsers({ reset: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Cuando cambian filtros -> recargar desde 0
+  useEffect(() => {
+    fetchUsers({ reset: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userRoleFilter, debouncedSearch]);
+
   /* ========== DERIVADOS ========== */
 
-  const baseFiltered = users
-    .filter(
-      (u) => userRoleFilter === "all" || u.role === userRoleFilter
-    )
-    .filter((u) => {
-      const q = userSearch.trim().toLowerCase();
-      if (!q) return true;
-      return (
-        (u.name || "").toLowerCase().includes(q) ||
-        (u.email || "").toLowerCase().includes(q) ||
-        (u.roleLabel || "").toLowerCase().includes(q)
-      );
-    });
+  const baseFiltered = users; // ya viene filtrado desde backend
 
   const filteredActiveUsers = baseFiltered.filter((u) => u.isActive);
   const filteredInactiveUsers = baseFiltered.filter((u) => !u.isActive);
@@ -225,6 +231,7 @@ const UsuariosView = ({ isMobile, currentUser }) => {
   const adminsCount = users.filter((u) => u.role === "administrador").length;
   const staffCount = users.filter((u) => u.role === "staff").length;
 
+  // 🔄 loading de lista principal (para skeletons)
   const loadingActiveList = loadingUsers && users.length === 0;
 
   /* ========== CREAR NUEVO USUARIO (panel dinámico) ========== */
@@ -273,7 +280,7 @@ const UsuariosView = ({ isMobile, currentUser }) => {
           name,
           email,
           role,
-          password, // el backend la encripta
+          password,
         },
         { withCredentials: true }
       );
@@ -281,10 +288,8 @@ const UsuariosView = ({ isMobile, currentUser }) => {
       const apiUser = res.data?.user || res.data;
       const mapped = mapUserFromApi(apiUser, currentUser);
 
-      // Añadimos el nuevo usuario a la lista
       setUsers((prev) => [mapped, ...prev]);
 
-      // Cerramos el panel de creación y limpiamos formulario/estado
       setCreatePanelOpen(false);
       createForm.resetFields();
       setLastTempPassword(null);
@@ -294,7 +299,6 @@ const UsuariosView = ({ isMobile, currentUser }) => {
         key: "creatingUser",
       });
 
-      // Feedback visual con credenciales
       Modal.success({
         title: "Usuario creado correctamente",
         content: (
@@ -352,7 +356,6 @@ const UsuariosView = ({ isMobile, currentUser }) => {
       } else if (err.response?.data?.message) {
         messageApi.error(err.response.data.message);
       } else if (err.name === "Error") {
-        // validación de AntD ya muestra sus mensajes
       } else {
         messageApi.error("No se pudo crear el usuario.");
       }
@@ -361,7 +364,7 @@ const UsuariosView = ({ isMobile, currentUser }) => {
     }
   };
 
-  /* ========== MODAL EDITAR (sin estado) ========== */
+  /* ========== MODAL EDITAR ========== */
 
   const abrirModalEditar = (user) => {
     if (user.isSelf) {
@@ -441,7 +444,7 @@ const UsuariosView = ({ isMobile, currentUser }) => {
     }
   };
 
-  /* ========== ACCIÓN RÁPIDA: ACTIVAR / DESACTIVAR ========== */
+  /* ========== ACTIVAR / DESACTIVAR ========== */
 
   const hacerToggleEstado = async (user, nextIsActive) => {
     setTogglingId(user.id);
@@ -584,6 +587,20 @@ const UsuariosView = ({ isMobile, currentUser }) => {
           />
         )}
 
+        {/* 🔄 Spinner global en carga inicial / cambio de filtros con lista vacía */}
+        {loadingUsers && users.length === 0 && (
+          <div
+            style={{
+              width: "100%",
+              display: "flex",
+              justifyContent: "center",
+              marginBottom: 10,
+            }}
+          >
+            <Spin size="small" tip="Cargando usuarios..." />
+          </div>
+        )}
+
         {/* Panel de creación */}
         <UsuariosCreatePanel
           createPanelOpen={createPanelOpen}
@@ -602,7 +619,7 @@ const UsuariosView = ({ isMobile, currentUser }) => {
           isMobile={isMobile}
         />
 
-        {/* Filtros */}
+        {/* Filtros (aplicados en backend) */}
         <UsuariosFiltersBar
           isMobile={isMobile}
           userSearch={userSearch}
@@ -627,7 +644,7 @@ const UsuariosView = ({ isMobile, currentUser }) => {
 
         <UsuariosActiveList
           filteredActiveUsers={filteredActiveUsers}
-          loading={loadingActiveList}
+          loading={loadingActiveList} // 🦴 skeletons + loading
           isMobile={isMobile}
           fadingId={fadingId}
           togglingId={togglingId}
@@ -635,13 +652,13 @@ const UsuariosView = ({ isMobile, currentUser }) => {
           cambiarEstado={cambiarEstado}
         />
 
-        {/* Botón “Cargar más” */}
+        {/* Botón “Cargar más” con spinner */}
         {hasMore && (
           <div style={{ textAlign: "center", marginTop: 10 }}>
             <Button
               size="small"
               onClick={() => fetchUsers({ reset: false })}
-              loading={loadingMore}
+              loading={loadingMore} // 🔄 spinner en botón
             >
               Cargar más usuarios
             </Button>

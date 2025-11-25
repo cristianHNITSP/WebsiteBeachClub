@@ -1,5 +1,14 @@
 // src/components/usuarios/UsuariosActiveList.jsx
-import { List, Avatar, Tag, Typography, Space, Button, Popconfirm } from "antd";
+import {
+  List,
+  Avatar,
+  Tag,
+  Typography,
+  Space,
+  Button,
+  Popconfirm,
+  Skeleton,
+} from "antd";
 import { beachColors, neutrals } from "../../theme/beachTheme";
 
 const { Text } = Typography;
@@ -13,11 +22,78 @@ const UsuariosActiveList = ({
   abrirModalEditar,
   cambiarEstado,
 }) => {
+  // 🦴 Skeletons cuando está cargando (inicio o cambio de filtros)
+  if (loading) {
+    const skeletonItems = [1, 2, 3, 4, 5]; // máximo 5 por backend
+
+    return (
+      <List
+        dataSource={skeletonItems}
+        split={false}
+        renderItem={(item) => (
+          <List.Item
+            key={item}
+            style={{
+              padding: "8px 6px",
+              marginBottom: 4,
+              borderRadius: 10,
+              border: "1px solid #f1f5f9",
+              display: "flex",
+              flexWrap: "wrap",
+              gap: 8,
+              alignItems: "flex-start",
+              justifyContent: "space-between",
+            }}
+          >
+            <List.Item.Meta
+              avatar={<Skeleton.Avatar active size="default" shape="circle" />}
+              title={
+                <Skeleton.Input
+                  active
+                  size="small"
+                  style={{ width: 160, maxWidth: "60%" }}
+                />
+              }
+              description={
+                <Space direction="vertical" size={4}>
+                  <Skeleton.Input
+                    active
+                    size="small"
+                    style={{ width: 220, maxWidth: "80%" }}
+                  />
+                  <Skeleton.Input
+                    active
+                    size="small"
+                    style={{ width: 180, maxWidth: "70%" }}
+                  />
+                </Space>
+              }
+            />
+
+            <div
+              style={{
+                minWidth: isMobile ? "100%" : 190,
+                textAlign: "right",
+              }}
+            >
+              <Skeleton.Input
+                active
+                size="small"
+                style={{ width: 120, maxWidth: "80%" }}
+              />
+            </div>
+          </List.Item>
+        )}
+      />
+    );
+  }
+
+  // ✅ Lista normal cuando ya cargó
   return (
     <List
       dataSource={filteredActiveUsers}
       split={false}
-      loading={loading}
+      loading={false}
       locale={{
         emptyText: "No hay usuarios activos que coincidan con el filtro.",
       }}
@@ -34,11 +110,11 @@ const UsuariosActiveList = ({
               display: "flex",
               flexWrap: "wrap",
               gap: 8,
-              alignItems: "center",
+              alignItems: "flex-start",
               justifyContent: "space-between",
               opacity: isFading ? 0 : 1,
-              maxHeight: isFading ? 0 : 80,
-              overflow: "hidden",
+              maxHeight: isFading ? 0 : "none",
+              overflow: isFading ? "hidden" : "visible",
               transform: isFading ? "translateX(12px)" : "translateX(0)",
               transition: "all 0.22s ease",
             }}
@@ -135,7 +211,7 @@ const UsuariosActiveList = ({
                   size={4}
                   wrap
                   style={{
-                    justifyContent: isMobile ? "flex-end" : "flex-end",
+                    justifyContent: "flex-end",
                   }}
                 >
                   <Button
@@ -152,13 +228,17 @@ const UsuariosActiveList = ({
                     description="Este usuario no podrá iniciar sesión hasta que lo restaures."
                     okText="Sí, enviar"
                     cancelText="Cancelar"
-                    placement="left"
+                    placement={isMobile ? "top" : "left"}
+                    overlayStyle={{
+                      maxWidth: 320,
+                      whiteSpace: "normal",
+                    }}
                     onConfirm={() => cambiarEstado(user)}
                   >
                     <Button
                       type="link"
                       size="small"
-                      loading={togglingId === user.id}
+                      loading={togglingId === user.id} // 🔄 spinner en botón
                       style={{ paddingInline: 4, fontSize: 10 }}
                     >
                       Enviar a papelera

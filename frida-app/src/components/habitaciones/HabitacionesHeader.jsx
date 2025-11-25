@@ -1,12 +1,18 @@
-// src/components/habitaciones/HabitacionesHeader.jsx
 import React from "react";
 import { Row, Col, Space, Typography, Button } from "antd";
-import { PlusOutlined } from "@ant-design/icons";
+import { PlusOutlined, ReloadOutlined } from "@ant-design/icons";
 import { beachTheme, neutralsTheme as neutrals } from "./helpers";
 
 const { Text, Title } = Typography;
 
-const HabitacionesHeader = ({ isMobile, currentUser, canManageRooms, onNueva }) => {
+const HabitacionesHeader = ({
+  isMobile,
+  currentUser,
+  canManageRooms,
+  onNueva,
+  onRecargar,
+  loading,
+}) => {
   return (
     <Row gutter={[12, 12]} align="middle" justify="space-between">
       <Col xs={24} md={12}>
@@ -54,11 +60,24 @@ const HabitacionesHeader = ({ isMobile, currentUser, canManageRooms, onNueva }) 
           }}
         >
           <Button
+            size="small"
+            icon={<ReloadOutlined spin={loading} />}
+            onClick={onRecargar}
+            loading={loading}
+            style={{
+              borderRadius: 999,
+              fontSize: 11,
+            }}
+          >
+            Recargar
+          </Button>
+
+          <Button
             type="primary"
             size="small"
             icon={<PlusOutlined />}
             onClick={onNueva}
-            disabled={!canManageRooms}
+            disabled={!canManageRooms || loading}
             style={{
               borderRadius: 999,
               background: canManageRooms ? beachTheme.oceanBlue : "#9ca3af",

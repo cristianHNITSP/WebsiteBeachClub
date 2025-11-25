@@ -311,21 +311,15 @@ const DashboardView = ({ isMobile }) => {
                   <div
                     style={{
                       width: isMobile ? 22 : 32,
-                      height:
-                        (item.porcentaje / 100) *
-                        (isMobile ? 90 : 120),
+                      height: (item.porcentaje / 100) * (isMobile ? 90 : 120),
                       borderRadius: 10,
                       background: item.color,
                     }}
                   />
-                  <Text
-                    style={{ fontSize: 10, color: neutrals.textMuted }}
-                  >
+                  <Text style={{ fontSize: 10, color: neutrals.textMuted }}>
                     {item.label}
                   </Text>
-                  <Text
-                    style={{ fontSize: 9, color: neutrals.textMuted }}
-                  >
+                  <Text style={{ fontSize: 9, color: neutrals.textMuted }}>
                     {item.porcentaje}%
                   </Text>
                 </div>

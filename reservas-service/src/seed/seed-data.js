@@ -1,17 +1,19 @@
-// seed/seed-habitaciones.js (por ejemplo)
+// seed/seed-habitaciones.js
 require("dotenv").config();
 const mongoose = require("mongoose");
 const { connectDB } = require("../config/db");
 const Habitacion = require("../models/Habitacion");
 const Reserva = require("../models/Reserva");
+const HeroSlide = require("../models/HeroSlide"); // 👈 NUEVO
 
 async function seed() {
   try {
     await connectDB();
 
-    console.log("🧹 Borrando colecciones...");
+    console.log("🧹 Borrando colecciones de reservas, habitaciones y heroSlides...");
     await Reserva.deleteMany({});
     await Habitacion.deleteMany({});
+    await HeroSlide.deleteMany({}); // 👈 limpiamos carrusel
 
     console.log("🛏 Creando habitaciones demo...");
 
@@ -251,6 +253,47 @@ async function seed() {
     ]);
 
     console.log("✅ Habitaciones creadas:", rooms.map((r) => r.codigo));
+
+    // ===============================
+    // 🎡 Semilla del carrusel (Hero)
+    // ===============================
+
+    const heroImg =
+      "https://scontent.fmid1-3.fna.fbcdn.net/v/t39.30808-6/487996831_1226933259437418_1477921974834808949_n.jpg?_nc_cat=103&ccb=1-7&_nc_sid=cc71e4&_nc_ohc=cQHYQExC3vwQ7kNvwFGHLbA&_nc_oc=AdlxWdChNxbYkumI2nH7QiON6SapBgC8KkjhN00wOL2N1mmLu0O6hOTd7E6VYswlwzRNHdiSUuxrnm3tA6Dn6FUo&_nc_zt=23&_nc_ht=scontent.fmid1-3.fna&_nc_gid=yhS2InLir0CyuUQMxBWDbA&oh=00_AfhZgogfliEuO5dyXGUIik3AkK05VkwJHPmctl7V8W5BqA&oe=6929ED41";
+
+    console.log("🎠 Creando slides del hero...");
+
+    const heroSlides = await HeroSlide.insertMany([
+      {
+        title: "Escápate frente al mar",
+        subtitle: "Alojamientos seleccionados para disfrutar como en casa.",
+        img: heroImg,
+        badgeText: "Reservas directas · Mejor atención",
+        order: 1,
+        isActive: true,
+      },
+      {
+        title: "Cabañas con encanto",
+        subtitle: "Naturaleza, diseño y comodidad en un solo lugar.",
+        img: heroImg,
+        badgeText: "Relájate en medio de la naturaleza",
+        order: 2,
+        isActive: true,
+      },
+      {
+        title: "Experiencias inolvidables",
+        subtitle: "Reserva directo con quienes te atienden de verdad.",
+        img: heroImg,
+        badgeText: "Atención cercana y humana",
+        order: 3,
+        isActive: true,
+      },
+    ]);
+
+    console.log(
+      "✅ HeroSlides creados:",
+      heroSlides.map((s) => s.title)
+    );
   } catch (err) {
     console.error("❌ Error seed-data:", err);
   } finally {

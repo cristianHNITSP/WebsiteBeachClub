@@ -28,8 +28,11 @@ async function seed() {
           'manage_rooms',
           'view_rooms',
           'manage_reservations',
-          'view_reservations'
-        ]
+          'view_reservations',
+          //nuevos permisos para el carrusel
+          'view_hero_slides',
+          'manage_hero_slides',
+        ],
       },
       {
         key: 'staff',
@@ -39,9 +42,11 @@ async function seed() {
           'view_dashboard',
           'view_rooms',
           'manage_reservations',
-          'view_reservations'
-        ]
-      }
+          'view_reservations',
+          // 🔽 staff puede ver el carrusel pero no editarlo
+          'view_hero_slides',
+        ],
+      },
     ]);
 
     console.log('✅ Roles creados:', [adminRole.key, staffRole.key]);
@@ -55,15 +60,15 @@ async function seed() {
         email: 'admin@beachclub.com',
         password: passwordAdmin,
         role: 'administrador',
-        isActive: true
+        isActive: true,
       },
       {
         name: 'Recepcionista',
         email: 'recepcion@beachclub.com',
         password: passwordStaff,
         role: 'staff',
-        isActive: true
-      }
+        isActive: true,
+      },
     ]);
 
     console.log('✅ Usuarios creados:', users.map(u => `${u.email} (${u.role})`));

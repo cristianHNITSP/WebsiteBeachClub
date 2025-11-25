@@ -7,8 +7,10 @@ import {
   Badge,
   Button,
   Popconfirm,
-  Spin,
   Tag,
+  Select,
+  Grid,
+  Skeleton,
 } from "antd";
 import {
   EditOutlined,
@@ -26,6 +28,8 @@ import {
 } from "./helpers";
 
 const { Text } = Typography;
+const { Option } = Select;
+const { useBreakpoint } = Grid;
 
 const HabitacionesTable = ({
   loading,
@@ -35,7 +39,13 @@ const HabitacionesTable = ({
   canManageRooms,
   onEdit,
   onDelete,
+  onChangeEstadoReserva,
+  changingEstadoReservaId,
+  deletingRoomId,
 }) => {
+  const screens = useBreakpoint();
+  const isMobile = !screens.md; // md hacia arriba = escritorio
+
   const columns = [
     {
       title: "Habitación",
@@ -73,6 +83,7 @@ const HabitacionesTable = ({
       dataIndex: "hotelCode",
       key: "hotelCode",
       width: 130,
+      responsive: ["md"], // solo >= md
       render: (hotelCode) => {
         const meta = getSedeMeta(hotelCode);
         return (
@@ -94,6 +105,7 @@ const HabitacionesTable = ({
       dataIndex: "roomType",
       key: "roomType",
       width: 150,
+      responsive: ["md"],
       render: (roomType) => (
         <Text
           style={{
@@ -110,6 +122,7 @@ const HabitacionesTable = ({
       dataIndex: "location",
       key: "location",
       width: 160,
+      responsive: ["lg"], // solo pantallas grandes
       render: (location) => (
         <Text
           style={{
@@ -161,6 +174,7 @@ const HabitacionesTable = ({
       dataIndex: "offer",
       key: "offer",
       width: 120,
+      responsive: ["md"],
       render: (_, record) => {
         if (!hasPromo(record)) {
           return (
@@ -197,6 +211,7 @@ const HabitacionesTable = ({
       key: "favoritesCount",
       align: "center",
       width: 110,
+      responsive: ["md"],
       render: (favoritesCount) => {
         const favs = favoritesCount || 0;
         return (
@@ -217,6 +232,89 @@ const HabitacionesTable = ({
               {favs}
             </Text>
           </Space>
+        );
+      },
+    },
+    {
+      title: "Estado reserva",
+      dataIndex: "estadoDeReserva",
+      key: "estadoDeReserva",
+      width: 150,
+      render: (estadoDeReserva, record) => {
+        const value =
+          typeof estadoDeReserva === "number" ? estadoDeReserva : 0;
+
+        const options = [
+          {
+            value: 0,
+            label: "No reservada",
+            color: "#e5e7eb",
+            text: neutrals.textMain,
+          },
+          {
+            value: 1,
+            label: "Reservada",
+            color: beachColors.teal,
+            text: "#064e3b",
+          },
+          {
+            value: 3, // 🔁 En espera ahora es 3
+            label: "En espera",
+            color: beachColors.sunset,
+            text: "#7c2d12",
+          },
+        ];
+
+        const current =
+          options.find((o) => o.value === value) || options[0];
+
+        if (!canManageRooms) {
+          return (
+            <Tag
+              color={current.color}
+              style={{
+                borderRadius: 999,
+                fontSize: 10,
+                color: current.text,
+              }}
+            >
+              {current.label}
+            </Tag>
+          );
+        }
+
+        const isChanging = changingEstadoReservaId === record._id;
+
+        return (
+          <div style={{ position: "relative" }}>
+            {isChanging && (
+              <div
+                style={{
+                  position: "absolute",
+                  inset: 0,
+                  borderRadius: 6,
+                  background: "rgba(255,255,255,0.6)",
+                  zIndex: 1,
+                }}
+              />
+            )}
+            <Select
+              size="small"
+              value={value}
+              disabled={isChanging}
+              onChange={(val) =>
+                onChangeEstadoReserva &&
+                onChangeEstadoReserva(record._id, val)
+              }
+              style={{ width: "100%", fontSize: 11 }}
+            >
+              {options.map((opt) => (
+                <Option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </Option>
+              ))}
+            </Select>
+          </div>
         );
       },
     },
@@ -245,7 +343,7 @@ const HabitacionesTable = ({
       title: "Acciones",
       key: "acciones",
       align: "right",
-      width: 160,
+      width: isMobile ? 130 : 160,
       render: (_, record) =>
         canManageRooms ? (
           <Space size={4}>
@@ -254,6 +352,7 @@ const HabitacionesTable = ({
               type="text"
               icon={<EditOutlined />}
               onClick={() => onEdit(record)}
+              disabled={loading}
               style={{ color: beachColors.deepBlue }}
             >
               Editar
@@ -270,6 +369,7 @@ const HabitacionesTable = ({
                 size="small"
                 type="text"
                 icon={<DeleteOutlined />}
+                loading={deletingRoomId === record._id}
                 style={{ color: beachColors.coral }}
               >
                 Eliminar
@@ -284,23 +384,71 @@ const HabitacionesTable = ({
     },
   ];
 
+  const showSkeleton =
+    loading && (!habitaciones || habitaciones.length === 0);
+
+  if (showSkeleton) {
+    const skeletonRows = [1, 2, 3, 4, 5];
+    return (
+      <div style={{ marginTop: 8 }}>
+        {skeletonRows.map((row) => (
+          <div
+            key={row}
+            style={{
+              padding: "10px 8px",
+              marginBottom: 6,
+              borderRadius: 10,
+              border: "1px solid #e5e7eb",
+              display: "flex",
+              justifyContent: "space-between",
+              gap: 12,
+            }}
+          >
+            <Skeleton.Avatar active size="small" shape="circle" />
+            <div style={{ flex: 1 }}>
+              <Skeleton.Input
+                active
+                size="small"
+                style={{ width: "60%", marginBottom: 4 }}
+              />
+              <Skeleton.Input
+                active
+                size="small"
+                style={{ width: "40%" }}
+              />
+            </div>
+            {!isMobile && (
+              <div style={{ width: 140 }}>
+                <Skeleton.Input
+                  active
+                  size="small"
+                  style={{ width: "100%" }}
+                />
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    );
+  }
+
   return (
-    <div style={{ marginTop: 4 }}>
-      <Spin spinning={loading} tip="Cargando habitaciones...">
-        <Table
-          size="small"
-          columns={columns}
-          dataSource={habitaciones}
-          rowKey="_id"
-          pagination={{
-            ...pagination,
-            pageSize: 5,
-            showSizeChanger: false,
-          }}
-          onChange={(pag) => onChangePage(pag.current || 1)}
-          style={{ marginTop: 4 }}
-        />
-      </Spin>
+    <div style={{ marginTop: 4, overflowX: "auto" }}>
+      <Table
+        size="small"
+        columns={columns}
+        dataSource={habitaciones}
+        rowKey="_id"
+        loading={loading}
+        pagination={{
+          ...pagination,
+          pageSize: 5,
+          showSizeChanger: false,
+        }}
+        onChange={(pag) => onChangePage(pag.current || 1)}
+        style={{ marginTop: 4 }}
+        scroll={{ x: "max-content" }}
+      />
     </div>
   );
 };

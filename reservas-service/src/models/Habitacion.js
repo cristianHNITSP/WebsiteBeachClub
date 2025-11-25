@@ -1,4 +1,3 @@
-// models/Habitacion.js
 const mongoose = require("mongoose");
 
 const OfferSchema = new mongoose.Schema(
@@ -37,10 +36,20 @@ const HabitacionSchema = new mongoose.Schema(
     featured: { type: Boolean, default: false },
     size: { type: Number, default: null }, // 1 a 4
 
-    // Inventario interno
-    roomType: { type: String, default: "" },
-    capacityLabel: { type: String, default: "" },
-    inventoryStatus: { type: String, default: "Activa" },
+    // Inventario / estado de reserva
+    /**
+     * Convención de estados:
+     * 0 = No reservada / disponible
+     * 1 = Reservada (confirmada)
+     * 3 = En espera (reserva express en proceso mediante chat desde el website)
+     *
+     * (El valor 2 queda libre por si en el futuro quieres "bloqueada" o similar)
+     */
+    estadoDeReserva: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
 
     offer: { type: OfferSchema, default: () => ({}) },
     availability: {
@@ -53,6 +62,15 @@ const HabitacionSchema = new mongoose.Schema(
 
     // Hashes de IP que ya marcaron favorito esta habitación (no se devuelven)
     favoriteIpHashes: {
+      type: [String],
+      default: [],
+      select: false,
+    },
+
+    // 🔐 Hashes de IP que tienen esta habitación en "en espera" (estadoDeReserva = 3)
+    // Solo los flujos públicos del website los manipulan (reserva express).
+    // Cuando el admin cambia estado a 0/1, se limpian.
+    reservaIpHashes: {
       type: [String],
       default: [],
       select: false,

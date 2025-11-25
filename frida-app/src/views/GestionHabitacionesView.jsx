@@ -27,6 +27,7 @@ const GestionHabitacionesView = ({ isMobile, currentUser }) => {
   const [filtroEstado, setFiltroEstado] = useState("todas");
   const [filtroPromo, setFiltroPromo] = useState("todas");
   const [filtroFavoritos, setFiltroFavoritos] = useState("todas");
+  const [filtroEstadoReserva, setFiltroEstadoReserva] = useState("todos");
 
   const [modalVisible, setModalVisible] = useState(false);
   const [editando, setEditando] = useState(null);
@@ -55,6 +56,18 @@ const GestionHabitacionesView = ({ isMobile, currentUser }) => {
     }
   }, [currentUser, canManageRooms, messageApi]);
 
+  const buildQueryParams = (page) => ({
+    page,
+    limit: pagination.pageSize,
+    // mismos nombres que espera el backend (buildHabitacionesFilterFromQuery)
+    q: busqueda || undefined,
+    hotelCode: filtroSede, // el backend trata "todas" como sin filtro
+    inventoryStatus: filtroEstado, // igual
+    promo: filtroPromo,
+    favorites: filtroFavoritos,
+    estadoReserva: filtroEstadoReserva, // "todos" | "no_reservada" | "reservada" | "en_espera"
+  });
+
   const fetchHabitaciones = async (page = 1) => {
     try {
       setLoading(true);
@@ -65,12 +78,9 @@ const GestionHabitacionesView = ({ isMobile, currentUser }) => {
         duration: 0,
       });
 
-      const res = await axios.get("/api/habitaciones/admin", {
+      const res = await axios.get("/api/habitaciones/gestor.admin", {
         withCredentials: true,
-        params: {
-          page,
-          limit: pagination.pageSize,
-        },
+        params: buildQueryParams(page),
       });
 
       const api = res.data || {};
@@ -113,10 +123,18 @@ const GestionHabitacionesView = ({ isMobile, currentUser }) => {
     }
   };
 
+  // Carga inicial + recarga cuando cambian filtros
   useEffect(() => {
     fetchHabitaciones(1);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [
+    busqueda,
+    filtroSede,
+    filtroEstado,
+    filtroPromo,
+    filtroFavoritos,
+    filtroEstadoReserva,
+  ]);
 
   const abrirCrear = () => {
     if (!canManageRooms) {
@@ -210,7 +228,6 @@ const GestionHabitacionesView = ({ isMobile, currentUser }) => {
 
           const payload = {
             ...baseValues,
-            // capacityLabel se puede recalcular en backend si quieres
             offer,
           };
 
@@ -309,7 +326,34 @@ const GestionHabitacionesView = ({ isMobile, currentUser }) => {
     }
   };
 
-  // métricas globales
+  const cambiarEstadoDeReserva = async (id, nuevoEstado) => {
+    if (!canManageRooms) {
+      messageApi.warning(
+        "No tienes permisos para cambiar el estado de reserva."
+      );
+      return;
+    }
+
+    // Actualización optimista
+    setHabitaciones((prev) =>
+      prev.map((h) =>
+        h._id === id ? { ...h, estadoDeReserva: nuevoEstado } : h
+      )
+    );
+
+    try {
+      await axios.patch(`/api/habitaciones/${id}/estado-reserva`, {
+        estadoDeReserva: nuevoEstado,
+      });
+      messageApi.success("Estado de reserva actualizado.");
+    } catch (err) {
+      console.error(err);
+      messageApi.error("No se pudo actualizar el estado de reserva.");
+      await fetchHabitaciones(pagination.current || 1);
+    }
+  };
+
+  // métricas globales (sobre el dataset cargado en esta página)
   const totalActivas = habitaciones.filter(
     (h) => h.inventoryStatus === "Activa"
   ).length;
@@ -326,33 +370,15 @@ const GestionHabitacionesView = ({ isMobile, currentUser }) => {
     (h) => (h.favoritesCount || 0) > 0
   ).length;
 
-  // filtros sobre dataset cargado
-  const habitacionesFiltradas = habitaciones
-    .filter((h) => (filtroSede === "todas" ? true : h.hotelCode === filtroSede))
-    .filter((h) =>
-      filtroEstado === "todas" ? true : h.inventoryStatus === filtroEstado
-    )
-    .filter((h) => {
-      if (filtroPromo === "con_promo") return hasPromo(h);
-      if (filtroPromo === "sin_promo") return !hasPromo(h);
-      return true;
-    })
-    .filter((h) => {
-      const favs = h.favoritesCount || 0;
-      if (filtroFavoritos === "con_favs") return favs > 0;
-      if (filtroFavoritos === "sin_favs") return favs === 0;
-      return true;
-    })
-    .filter((h) => {
-      const q = busqueda.toLowerCase().trim();
-      if (!q) return true;
-      return (
-        (h.codigo || "").toLowerCase().includes(q) ||
-        (h.title || "").toLowerCase().includes(q) ||
-        (h.roomType || "").toLowerCase().includes(q) ||
-        (h.location || "").toLowerCase().includes(q)
-      );
-    });
+  // 🔄 limpiar filtros rápidamente
+  const limpiarFiltros = () => {
+    setBusqueda("");
+    setFiltroSede("todas");
+    setFiltroEstado("todas");
+    setFiltroPromo("todas");
+    setFiltroFavoritos("todas");
+    setFiltroEstadoReserva("todos");
+  };
 
   return (
     <>
@@ -373,6 +399,10 @@ const GestionHabitacionesView = ({ isMobile, currentUser }) => {
           currentUser={currentUser}
           canManageRooms={canManageRooms}
           onNueva={abrirCrear}
+          onRecargar={() =>
+            fetchHabitaciones(pagination.current || 1)
+          }
+          loading={loading}
         />
 
         <HabitacionesFilters
@@ -386,6 +416,9 @@ const GestionHabitacionesView = ({ isMobile, currentUser }) => {
           setFiltroPromo={setFiltroPromo}
           filtroFavoritos={filtroFavoritos}
           setFiltroFavoritos={setFiltroFavoritos}
+          filtroEstadoReserva={filtroEstadoReserva}
+          setFiltroEstadoReserva={setFiltroEstadoReserva}
+          onClearFilters={limpiarFiltros}
         />
 
         <HabitacionesMetrics
@@ -394,16 +427,18 @@ const GestionHabitacionesView = ({ isMobile, currentUser }) => {
           totalFuera={totalFuera}
           totalConPromo={totalConPromo}
           totalConFavoritos={totalConFavoritos}
+          loading={loading}
         />
 
         <HabitacionesTable
           loading={loading}
-          habitaciones={habitacionesFiltradas}
+          habitaciones={habitaciones}
           pagination={pagination}
           onChangePage={fetchHabitaciones}
           canManageRooms={canManageRooms}
           onEdit={abrirEditar}
           onDelete={eliminarHabitacion}
+          onChangeEstadoReserva={cambiarEstadoDeReserva}
         />
       </Card>
 
