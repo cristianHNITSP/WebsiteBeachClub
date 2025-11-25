@@ -1,4 +1,3 @@
-// src/App.jsx
 import axios from "axios";
 import { useMediaQuery } from "react-responsive";
 import { useState, useEffect } from "react";
@@ -50,7 +49,6 @@ const { Option } = Select;
 const backgroundColor = "#f8fafc";
 const borderColor = "#e2e8f0";
 
-// 🌐 URL del servidor de reservas con WebSocket (puedes moverlo a .env de Vite)
 const WS_URL = import.meta.env.VITE_RESERVAS_WS_URL || "http://localhost:4002";
 
 const treeData = [
@@ -75,12 +73,10 @@ const treeData = [
       </Flex>
     ),
     key: "2",
-    children: ["WiFi", "Piscina", "Estacionamiento", "Spa", "Pet Friendly"].map(
-      (t, i) => ({
-        title: t,
-        key: `2-${i + 1}`,
-      })
-    ),
+    children: ["WiFi", "Piscina", "Estacionamiento", "Spa", "Pet Friendly"].map((t, i) => ({
+      title: t,
+      key: `2-${i + 1}`,
+    })),
   },
   {
     title: (
@@ -112,13 +108,11 @@ function App({ currentUser }) {
 
   const isMobile = useMediaQuery({ maxWidth: 1024 });
 
-  // HABITACIONES / API + tiempo real
   const [habitaciones, setHabitaciones] = useState([]);
   const [loadingHabitaciones, setLoadingHabitaciones] = useState(true);
   const [error, setError] = useState(null);
   const [messageApi, contextHolder] = message.useMessage();
 
-  // límite de habitaciones por paginación
   const [pagination, setPagination] = useState({
     page: 1,
     limit: 5,
@@ -127,10 +121,10 @@ function App({ currentUser }) {
     hasMore: false,
   });
 
-  // Habitación activa (para el chat / reserva express)
+  // Habitación activa (solo para contexto del chat)
   const [habitacionSeleccionada, setHabitacionSeleccionada] = useState(null);
 
-  // 🔌 WebSocket: suscripción en tiempo real a habitaciones
+  // 🔌 WebSocket
   useEffect(() => {
     const socket = io(WS_URL, {
       transports: ["websocket"],
@@ -145,7 +139,6 @@ function App({ currentUser }) {
       console.log("🔌 Desconectado de WebSocket reservas-service");
     });
 
-    // Listado inicial que envía el backend al conectar (normalmente primeras 5)
     socket.on("habitaciones:init", (data) => {
       if (Array.isArray(data)) {
         setHabitaciones(data);
@@ -153,46 +146,54 @@ function App({ currentUser }) {
       }
     });
 
-    // Nueva habitación creada
     socket.on("habitaciones:created", (room) => {
       if (!room || !room._id) return;
       setHabitaciones((prev) => {
         const exists = prev.some((h) => h._id === room._id);
         if (exists) return prev;
-        return [...prev, room];
+        return [room, ...prev];
       });
     });
 
-    // Actualización de una habitación (estado, datos, etc.)
     socket.on("habitaciones:updated", (room) => {
       if (!room || !room._id) return;
-      setHabitaciones((prev) =>
-        prev.map((h) => (h._id === room._id ? { ...h, ...room } : h))
-      );
+      setHabitaciones((prev) => prev.map((h) => (h._id === room._id ? { ...h, ...room } : h)));
     });
 
-    // Eliminación de habitación
     socket.on("habitaciones:deleted", (payload) => {
       const deleteId = payload?._id || payload?.id;
       if (!deleteId) return;
       setHabitaciones((prev) => prev.filter((h) => h._id !== deleteId));
     });
 
-    // Error desde el servidor de WS
     socket.on("habitaciones:error", (payload) => {
       console.error("WS habitaciones:error", payload);
-      messageApi.error(
-        payload?.message ||
-          "Ocurrió un error en las actualizaciones en tiempo real."
-      );
+      messageApi.error(payload?.message || "Ocurrió un error en tiempo real.");
     });
 
-    return () => {
-      socket.disconnect();
-    };
+    socket.on("habitaciones:trashed", (payload) => {
+  const id = payload?._id || payload?.id;
+  if (!id) return;
+  setHabitaciones((prev) => prev.filter((h) => h._id !== id));
+});
+
+socket.on("habitaciones:deleted_permanent", (payload) => {
+  const id = payload?._id || payload?.id;
+  if (!id) return;
+  setHabitaciones((prev) => prev.filter((h) => h._id !== id));
+});
+
+// opcional: si llega restored, puedes refrescar o insertar si cabe
+socket.on("habitaciones:restored", (room) => {
+  // en público, mejor re-sync con HTTP si quieres exactitud:
+  // cargarHabitaciones(pagination.page, false);  // si lo haces, cuida dependencias del useEffect
+});
+
+
+    return () => socket.disconnect();
   }, [messageApi]);
 
-  // Cargar habitaciones vía HTTP (paginado desde el backend)
+  // HTTP paginado
   const cargarHabitaciones = async (page = 1, showToast = false) => {
     try {
       setLoadingHabitaciones(true);
@@ -205,14 +206,9 @@ function App({ currentUser }) {
       });
 
       const payload = response.data || {};
-      const items = Array.isArray(payload.items)
-        ? payload.items
-        : Array.isArray(payload)
-        ? payload
-        : [];
+      const items = Array.isArray(payload.items) ? payload.items : [];
 
       setHabitaciones(items);
-
       setPagination({
         page: payload.page || page,
         limit: payload.limit || limit,
@@ -224,34 +220,21 @@ function App({ currentUser }) {
       setLoadingHabitaciones(false);
 
       if (showToast) {
-        if (items.length > 0) {
-          messageApi.success("Habitaciones sincronizadas correctamente.");
-        } else {
-          messageApi.warning(
-            "No se recibieron habitaciones. Esperando datos del sistema..."
-          );
-        }
+        messageApi.success("Habitaciones sincronizadas correctamente.");
       }
     } catch (err) {
       console.error("Error al cargar las habitaciones:", err);
       setHabitaciones([]);
       setError(err);
       setLoadingHabitaciones(false);
-      setPagination((prev) => ({
-        ...prev,
-        total: 0,
-        totalPages: 0,
-        hasMore: false,
-      }));
+      setPagination((prev) => ({ ...prev, total: 0, totalPages: 0, hasMore: false }));
+
       if (showToast) {
-        messageApi.error(
-          "No se pudo sincronizar. Revisa la conexión o inténtalo de nuevo."
-        );
+        messageApi.error("No se pudo sincronizar. Revisa la conexión.");
       }
     }
   };
 
-  // Primer carga vía HTTP (por si el WS tarda o falla)
   useEffect(() => {
     cargarHabitaciones(1, false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -261,106 +244,38 @@ function App({ currentUser }) {
     if (error) {
       messageApi.open({
         type: "error",
-        content:
-          "Error al cargar las habitaciones. Por favor, intenta de nuevo más tarde.",
+        content: "Error al cargar las habitaciones. Intenta más tarde.",
       });
     }
   }, [error, messageApi]);
 
-  // handler para cambiar de página en la paginación
   const handleChangePageHabitaciones = (page) => {
     cargarHabitaciones(page, false);
   };
 
-  // 🔹 Reserva express: cambia estado a "EN ESPERA" (3) en backend (público) + abre chat
+  // ✅ NUEVO: “Solicitar reserva” solo abre chat (no toca backend)
   const handleReservaExpress = async (room) => {
-    try {
-      messageApi.open({
-        key: `reserva-express-${room._id}`,
-        type: "loading",
-        content: "Iniciando reserva express...",
-        duration: 0,
-      });
-
-      // 👉 ruta pública que usa req.clientIpHash y pone estadoDeReserva = 3
-      const res = await axios.post(
-        `/api/habitaciones/${room._id}/reserva-express`
-      );
-
-      const updatedRoom = res?.data?.room || res?.data || room;
-
-      setHabitacionSeleccionada(updatedRoom);
-      setOpenChat(true);
-
-      messageApi.open({
-        key: `reserva-express-${room._id}`,
-        type: "success",
-        content:
-          "Hemos iniciado una reserva express para esta habitación. Nuestro equipo te atenderá en el chat.",
-        duration: 3,
-      });
-      // El estado visual se actualizará por Socket.IO (habitaciones:updated)
-    } catch (err) {
-      console.error("Error al iniciar reserva express:", err);
-      const backendMsg =
-        err?.response?.data?.message ||
-        "No se pudo iniciar la reserva express. Intenta de nuevo.";
-      messageApi.open({
-        key: `reserva-express-${room._id}`,
-        type: "error",
-        content: backendMsg,
-        duration: 3,
-      });
-
-      // Re-sync por si quedó algo raro
-      cargarHabitaciones(pagination.page, false);
-    }
+    setHabitacionSeleccionada(room);
+    setOpenChat(true);
+    messageApi.info("Listo ✅ Abriendo chat para solicitar tu reserva.");
   };
 
-  // 🔹 Info por WhatsApp (no toca estado ni IP)
   const handleInfoWhatsapp = (room) => {
     setHabitacionSeleccionada(room);
 
-    const numero = "9993676541"; // <--- Cambia a tu número real de WhatsApp
-    const texto = `Hola, me interesa la habitación ${room.codigo || ""} - ${
-      room.title || ""
-    } en ${room.location || "su propiedad"}. ¿Podrían darme más información?`;
+    const numero = "9993676541";
+    const texto = `Hola, me interesa la habitación ${room.codigo || ""} - ${room.title || ""} en ${
+      room.location || "su propiedad"
+    }. ¿Podrían darme más información?`;
 
     const url = `https://wa.me/${numero}?text=${encodeURIComponent(texto)}`;
     window.open(url, "_blank", "noopener,noreferrer");
   };
 
-  // 🔹 Cierre de chat de reserva express:
-  //    - POST /reserva-express/cancel → libera y borra hash IP en backend
+  // ✅ Cierre de chat con habitación: ahora solo limpia UI
   const handleChatClosedForReserva = async () => {
-    if (!habitacionSeleccionada) {
-      setOpenChat(false);
-      return;
-    }
-
-    const roomId = habitacionSeleccionada._id;
-
-    try {
-      await axios.post(
-        `/api/habitaciones/${roomId}/reserva-express/cancel`
-      );
-
-      messageApi.success(
-        "Se liberó la habitación. Está disponible nuevamente para reservar."
-      );
-      // El cambio nos llegará por `habitaciones:updated` vía socket
-    } catch (err) {
-      console.error("Error al liberar habitación:", err);
-      messageApi.error(
-        err?.response?.data?.message ||
-          "No se pudo actualizar el estado de la habitación. Inténtalo de nuevo."
-      );
-    } finally {
-      setHabitacionSeleccionada(null);
-      setOpenChat(false);
-      // Pequeño sync extra por si el socket se pierde
-      cargarHabitaciones(pagination.page, false);
-    }
+    setHabitacionSeleccionada(null);
+    setOpenChat(false);
   };
 
   const headerStyle = {
@@ -374,23 +289,12 @@ function App({ currentUser }) {
   };
 
   const panelStyles = {
-    left: {
-      background: "#f1f5f9",
-      borderRight: `1px solid ${borderColor}`,
-    },
-    center: {
-      background: "#ffffff",
-      padding: 16,
-    },
-    right: {
-      background: "#f8fafc",
-      borderLeft: `1px solid ${borderColor}`,
-      padding: 12,
-    },
+    left: { background: "#f1f5f9", borderRight: `1px solid ${borderColor}` },
+    center: { background: "#ffffff", padding: 16 },
+    right: { background: "#f8fafc", borderLeft: `1px solid ${borderColor}`, padding: 12 },
   };
 
-  const cardsToShow =
-    Array.isArray(habitaciones) && habitaciones.length > 0 ? habitaciones : [];
+  const cardsToShow = Array.isArray(habitaciones) ? habitaciones : [];
 
   return (
     <ConfigProvider
@@ -399,8 +303,7 @@ function App({ currentUser }) {
           colorPrimary: beachColors.oceanBlue,
           colorLink: beachColors.oceanBlue,
           borderRadius: 10,
-          fontFamily:
-            '-apple-system, BlinkMacSystemFont, system-ui, "SF Pro Text", sans-serif',
+          fontFamily: '-apple-system, BlinkMacSystemFont, system-ui, "SF Pro Text", sans-serif',
         },
       }}
     >
@@ -414,13 +317,7 @@ function App({ currentUser }) {
 
         {/* HEADER */}
         <header style={headerStyle}>
-          <Flex
-            justify="space-between"
-            align="center"
-            gap={16}
-            style={{ maxWidth: 1400, margin: "0 auto" }}
-          >
-            {/* Branding */}
+          <Flex justify="space-between" align="center" gap={16} style={{ maxWidth: 1400, margin: "0 auto" }}>
             <Flex align="center" gap={10}>
               <img
                 src="/beachclub.svg"
@@ -433,29 +330,15 @@ function App({ currentUser }) {
                 }}
               />
               <div style={{ lineHeight: 1.1 }}>
-                <Title
-                  level={4}
-                  style={{
-                    margin: 0,
-                    color: "#ffffff",
-                    fontWeight: 700,
-                    letterSpacing: 0.3,
-                  }}
-                >
+                <Title level={4} style={{ margin: 0, color: "#ffffff", fontWeight: 700, letterSpacing: 0.3 }}>
                   Beach Club
                 </Title>
-                <Text
-                  style={{
-                    fontSize: 10,
-                    color: "rgba(241,245,249,0.9)",
-                  }}
-                >
+                <Text style={{ fontSize: 10, color: "rgba(241,245,249,0.9)" }}>
                   Reservas directas con un solo clic
                 </Text>
               </div>
             </Flex>
 
-            {/* Buscador Desktop */}
             {!isMobile && (
               <Flex
                 align="center"
@@ -473,11 +356,7 @@ function App({ currentUser }) {
               >
                 <Input
                   placeholder="Destino, ciudad o alojamiento"
-                  prefix={
-                    <EnvironmentOutlined
-                      style={{ color: beachColors.turquoise }}
-                    />
-                  }
+                  prefix={<EnvironmentOutlined style={{ color: beachColors.turquoise }} />}
                   style={{
                     flex: 1,
                     borderRadius: 10,
@@ -491,10 +370,7 @@ function App({ currentUser }) {
                   format="DD/MM/YYYY"
                   defaultValue={[dayjs(), dayjs().add(2, "day")]}
                 />
-                <Select
-                  defaultValue="2 adultos"
-                  style={{ width: 150, borderRadius: 10, height: 40 }}
-                >
+                <Select defaultValue="2 adultos" style={{ width: 150, borderRadius: 10, height: 40 }}>
                   <Option value="1">1 adulto</Option>
                   <Option value="2">2 adultos</Option>
                   <Option value="3">3 adultos</Option>
@@ -518,7 +394,6 @@ function App({ currentUser }) {
               </Flex>
             )}
 
-            {/* Acciones derecha Desktop */}
             {!isMobile && (
               <Space size={10}>
                 <Button
@@ -545,22 +420,10 @@ function App({ currentUser }) {
               </Space>
             )}
 
-            {/* Mobile: botones */}
             {isMobile && (
               <Space size={8} align="center">
-                <Button
-                  type="text"
-                  icon={<SearchOutlined style={{ color: "#ffffff" }} />}
-                  onClick={() => setOpenBuscadorMovil(true)}
-                />
-
-                <Button
-                  type="text"
-                  icon={<MenuOutlined style={{ color: "#ffffff" }} />}
-                  onClick={() => setOpenFiltrosMovil(true)}
-                />
-
-                {/* Botón Acceso staff en móvil */}
+                <Button type="text" icon={<SearchOutlined style={{ color: "#ffffff" }} />} onClick={() => setOpenBuscadorMovil(true)} />
+                <Button type="text" icon={<MenuOutlined style={{ color: "#ffffff" }} />} onClick={() => setOpenFiltrosMovil(true)} />
                 <Button
                   size="small"
                   href="/panel.web/login.panel.web"
@@ -585,14 +448,8 @@ function App({ currentUser }) {
 
         {/* MAIN */}
         <main style={{ minHeight: "calc(100vh - 160px)" }}>
-          {/* Buscador móvil */}
-          <BuscadorMovil
-            beachColors={beachColors}
-            open={openBuscadorMovil}
-            onclose={() => setOpenBuscadorMovil(false)}
-          />
+          <BuscadorMovil beachColors={beachColors} open={openBuscadorMovil} onclose={() => setOpenBuscadorMovil(false)} />
 
-          {/* Drawer filtros móvil */}
           <Drawer
             title="Filtrar tu estancia"
             placement="right"
@@ -634,11 +491,7 @@ function App({ currentUser }) {
                 type="primary"
                 block
                 icon={<FilterOutlined />}
-                style={{
-                  borderRadius: 10,
-                  background: beachColors.teal,
-                  borderColor: beachColors.teal,
-                }}
+                style={{ borderRadius: 10, background: beachColors.teal, borderColor: beachColors.teal }}
                 onClick={() => setOpenFiltrosMovil(false)}
               >
                 Aplicar filtros
@@ -646,83 +499,29 @@ function App({ currentUser }) {
             </Flex>
           </Drawer>
 
-          {/* Float buttons móvil + chat */}
           {isMobile && (
-            <FloatButton.Group
-              shape="circle"
-              style={{ right: 18, bottom: 90 }}
-              icon={<CommentOutlined />}
-            >
-              <FloatButton
-                icon={<CustomerServiceOutlined />}
-                onClick={() => setOpenChat(true)}
-              />
+            <FloatButton.Group shape="circle" style={{ right: 18, bottom: 90 }} icon={<CommentOutlined />}>
+              <FloatButton icon={<CustomerServiceOutlined />} onClick={() => setOpenChat(true)} />
             </FloatButton.Group>
           )}
 
-          {/* Layout principal */}
-          <Splitter
-            layout={isMobile ? "vertical" : "horizontal"}
-            style={{
-              height: isMobile ? "auto" : "calc(100vh - 160px)",
-              border: "none",
-            }}
-          >
-            {/* Panel Izquierdo: Filtros (desktop) */}
+          <Splitter layout={isMobile ? "vertical" : "horizontal"} style={{ height: isMobile ? "auto" : "calc(100vh - 160px)", border: "none" }}>
             {!isMobile && (
-              <Splitter.Panel
-                defaultSize="20%"
-                min="18%"
-                max="22%"
-                style={panelStyles.left}
-              >
+              <Splitter.Panel defaultSize="20%" min="18%" max="22%" style={panelStyles.left}>
                 <Flex vertical style={{ padding: 14, gap: 16 }}>
                   <Flex align="center" gap={8}>
                     <FilterOutlined style={{ color: beachColors.deepBlue }} />
-                    <Title
-                      level={4}
-                      style={{
-                        margin: 0,
-                        color: beachColors.deepBlue,
-                        fontSize: 16,
-                      }}
-                    >
+                    <Title level={4} style={{ margin: 0, color: beachColors.deepBlue, fontSize: 16 }}>
                       Filtros
                     </Title>
                   </Flex>
-                  <Tree
-                    checkable
-                    defaultExpandAll
-                    treeData={treeData}
-                    style={{ fontSize: 12 }}
-                  />
+                  <Tree checkable defaultExpandAll treeData={treeData} style={{ fontSize: 12 }} />
                   <div>
                     <Text strong>Precio por noche</Text>
-                    <div
-                      style={{
-                        background: "#e5e7eb",
-                        height: 4,
-                        borderRadius: 999,
-                        marginTop: 10,
-                        position: "relative",
-                      }}
-                    >
-                      <div
-                        style={{
-                          position: "absolute",
-                          top: -6,
-                          left: "20%",
-                          right: "23%",
-                          height: 16,
-                          background: beachColors.teal,
-                          borderRadius: 999,
-                        }}
-                      />
+                    <div style={{ background: "#e5e7eb", height: 4, borderRadius: 999, marginTop: 10, position: "relative" }}>
+                      <div style={{ position: "absolute", top: -6, left: "20%", right: "23%", height: 16, background: beachColors.teal, borderRadius: 999 }} />
                     </div>
-                    <Flex
-                      justify="space-between"
-                      style={{ marginTop: 6, fontSize: 11 }}
-                    >
+                    <Flex justify="space-between" style={{ marginTop: 6, fontSize: 11 }}>
                       <span>$800</span>
                       <span>$3,200</span>
                     </Flex>
@@ -731,38 +530,13 @@ function App({ currentUser }) {
               </Splitter.Panel>
             )}
 
-            {/* Panel Central */}
-            <Splitter.Panel
-              defaultSize={isMobile ? "100%" : "55%"}
-              min={isMobile ? "100%" : "50%"}
-              style={panelStyles.center}
-            >
-              <Flex
-                vertical
-                gap={18}
-                style={{ maxWidth: 900, margin: "0 auto" }}
-              >
-                {/* Hero (carrusel desacoplado) */}
+            <Splitter.Panel defaultSize={isMobile ? "100%" : "55%"} min={isMobile ? "100%" : "50%"} style={panelStyles.center}>
+              <Flex vertical gap={18} style={{ maxWidth: 900, margin: "0 auto" }}>
                 <HeroCarousel currentUser={currentUser} />
 
-                {/* Header resultados + Re-sincronizar */}
-                <Flex
-                  justify="space-between"
-                  align="center"
-                  wrap
-                  gap={8}
-                  style={{ marginTop: 4 }}
-                >
+                <Flex justify="space-between" align="center" wrap gap={8} style={{ marginTop: 4 }}>
                   <Flex gap={6} align="center">
-                    <Title
-                      level={4}
-                      style={{
-                        margin: 0,
-                        fontSize: 18,
-                        color: "#0f172a",
-                        fontWeight: 600,
-                      }}
-                    >
+                    <Title level={4} style={{ margin: 0, fontSize: 18, color: "#0f172a", fontWeight: 600 }}>
                       Alojamientos disponibles
                     </Title>
                   </Flex>
@@ -772,33 +546,23 @@ function App({ currentUser }) {
                       size="small"
                       icon={<ReloadOutlined />}
                       onClick={() => cargarHabitaciones(pagination.page, true)}
-                      style={{
-                        borderRadius: 999,
-                        fontSize: 10,
-                      }}
+                      style={{ borderRadius: 999, fontSize: 10 }}
                     >
                       Re-sincronizar
                     </Button>
                     {!isMobile && (
-                      <>
-                        <Button
-                          size="small"
-                          type="text"
-                          icon={
-                            <CommentOutlined
-                              style={{ color: beachColors.teal }}
-                            />
-                          }
-                          onClick={() => setOpenChat(true)}
-                        >
-                          Asistencia
-                        </Button>
-                      </>
+                      <Button
+                        size="small"
+                        type="text"
+                        icon={<CommentOutlined style={{ color: beachColors.teal }} />}
+                        onClick={() => setOpenChat(true)}
+                      >
+                        Asistencia
+                      </Button>
                     )}
                   </Space>
                 </Flex>
 
-                {/* Cards habitaciones */}
                 <RoomCards
                   beachColors={beachColors}
                   cardsData={cardsToShow}
@@ -811,75 +575,32 @@ function App({ currentUser }) {
               </Flex>
             </Splitter.Panel>
 
-            {/* Panel Derecho (desktop) */}
             {!isMobile && (
-              <Splitter.Panel
-                defaultSize="25%"
-                min="20%"
-                max="32%"
-                style={panelStyles.right}
-              >
+              <Splitter.Panel defaultSize="25%" min="20%" max="32%" style={panelStyles.right}>
                 <Flex vertical gap={12}>
-                  <Recommendcards
-                    recommendedDestinations={recommendedDestinations}
-                    beachColors={beachColors}
-                    loading={false}
-                  />
-                  <Card
-                    bordered={false}
-                    style={{
-                      borderRadius: 14,
-                      background: "#ffffff",
-                      boxShadow: "0 6px 18px rgba(148,163,253,0.16)",
-                    }}
-                  >
+                  <Recommendcards recommendedDestinations={recommendedDestinations} beachColors={beachColors} loading={false} />
+                  <Card bordered={false} style={{ borderRadius: 14, background: "#ffffff", boxShadow: "0 6px 18px rgba(148,163,253,0.16)" }}>
                     <Flex vertical gap={6}>
                       <Text strong style={{ fontSize: 13, color: "#0f172a" }}>
                         ¿Por qué reservar aquí?
                       </Text>
-                      <Text
-                        style={{
-                          fontSize: 11,
-                          color: "#6b7280",
-                        }}
-                      >
-                        Información directa, trato cercano y alojamientos
-                        seleccionados especialmente para tus huéspedes.
+                      <Text style={{ fontSize: 11, color: "#6b7280" }}>
+                        Información directa, trato cercano y alojamientos seleccionados especialmente para tus huéspedes.
                       </Text>
                       <Flex gap={6} wrap>
-                        <Tag
-                          color={beachColors.teal}
-                          style={{
-                            borderRadius: 999,
-                            fontSize: 9,
-                            color: "#064e3b",
-                          }}
-                        >
+                        <Tag color={beachColors.teal} style={{ borderRadius: 999, fontSize: 9, color: "#064e3b" }}>
                           Atención personalizada
                         </Tag>
-                        <Tag
-                          color={beachColors.turquoise}
-                          style={{
-                            borderRadius: 999,
-                            fontSize: 9,
-                            color: "#065f46",
-                          }}
-                        >
+                        <Tag color={beachColors.turquoise} style={{ borderRadius: 999, fontSize: 9, color: "#065f46" }}>
                           Reservas seguras
                         </Tag>
-                        <Tag
-                          color={beachColors.sand}
-                          style={{
-                            borderRadius: 999,
-                            fontSize: 9,
-                            color: beachColors.deepBlue,
-                          }}
-                        >
+                        <Tag color={beachColors.sand} style={{ borderRadius: 999, fontSize: 9, color: beachColors.deepBlue }}>
                           Experiencias únicas
                         </Tag>
                       </Flex>
                     </Flex>
                   </Card>
+
                   <Card
                     bordered={false}
                     style={{
@@ -891,14 +612,7 @@ function App({ currentUser }) {
                     <Flex vertical gap={6}>
                       <Flex align="center" gap={8}>
                         <CustomerServiceOutlined />
-                        <Text
-                          style={{
-                            fontSize: 12,
-                            color: "#eff6ff",
-                          }}
-                        >
-                          ¿Necesitas ayuda con tu reserva?
-                        </Text>
+                        <Text style={{ fontSize: 12, color: "#eff6ff" }}>¿Necesitas ayuda con tu reserva?</Text>
                       </Flex>
                       <Button
                         size="small"
@@ -933,51 +647,29 @@ function App({ currentUser }) {
             color: "white",
           }}
         >
-          <Flex
-            vertical
-            justify="center"
-            align="center"
-            gap={10}
-            style={{ maxWidth: 900, margin: "0 auto" }}
-          >
-            <Text
-              style={{
-                color: "white",
-                fontSize: 12,
-              }}
-            >
-              © {new Date().getFullYear()} Beach Club · Plataforma de reservas
-              desarrollada a la medida.
+          <Flex vertical justify="center" align="center" gap={10} style={{ maxWidth: 900, margin: "0 auto" }}>
+            <Text style={{ color: "white", fontSize: 12 }}>
+              © {new Date().getFullYear()} Beach Club · Plataforma de reservas desarrollada a la medida.
             </Text>
             <Flex gap={10} wrap justify="center">
-              {[
-                { nombre: "Términos", path: "#" },
-                { nombre: "Privacidad", path: "#" },
-                { nombre: "Contacto", path: "#" },
-                { nombre: "Nosotros", path: "#" },
-              ].map((link, i) => (
-                <a
-                  key={i}
-                  href={link.path}
-                  style={{
-                    color: "white",
-                    fontSize: 11,
-                  }}
-                >
-                  {link.nombre}
-                </a>
-              ))}
+              {[{ nombre: "Términos", path: "#" }, { nombre: "Privacidad", path: "#" }, { nombre: "Contacto", path: "#" }, { nombre: "Nosotros", path: "#" }].map(
+                (link, i) => (
+                  <a key={i} href={link.path} style={{ color: "white", fontSize: 11 }}>
+                    {link.nombre}
+                  </a>
+                )
+              )}
             </Flex>
           </Flex>
         </footer>
 
-        {/* CHAT (componente desacoplado) */}
+        {/* CHAT */}
         <ChatSoporte
           open={openChat}
-          onClose={() => setOpenChat(false)} // caso 2: chat abierto desde "Ayuda", sin cambiar estado
+          onClose={() => setOpenChat(false)}
           isMobile={isMobile}
           habitacionSeleccionada={habitacionSeleccionada}
-          onFinalizarReserva={handleChatClosedForReserva} // solo se usa si hay habitacionSeleccionada
+          onFinalizarReserva={handleChatClosedForReserva}
         />
       </div>
     </ConfigProvider>

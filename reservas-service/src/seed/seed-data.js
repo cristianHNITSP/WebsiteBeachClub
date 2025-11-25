@@ -4,7 +4,21 @@ const mongoose = require("mongoose");
 const { connectDB } = require("../config/db");
 const Habitacion = require("../models/Habitacion");
 const Reserva = require("../models/Reserva");
-const HeroSlide = require("../models/HeroSlide"); // 👈 NUEVO
+const HeroSlide = require("../models/HeroSlide");
+
+function defaultOffer() {
+  return { isSpecial: false, description: "", discountPercent: null };
+}
+
+function enforceSeedConsistency(room) {
+  return {
+    ...room,
+    offer: room.offer ? room.offer : defaultOffer(),
+    isReserved: room.isReserved === true ? true : false,
+    isDeleted: room.isDeleted === true ? true : false,
+    deletedAt: room.isDeleted ? room.deletedAt || new Date() : null,
+  };
+}
 
 async function seed() {
   try {
@@ -13,11 +27,11 @@ async function seed() {
     console.log("🧹 Borrando colecciones de reservas, habitaciones y heroSlides...");
     await Reserva.deleteMany({});
     await Habitacion.deleteMany({});
-    await HeroSlide.deleteMany({}); // 👈 limpiamos carrusel
+    await HeroSlide.deleteMany({});
 
     console.log("🛏 Creando habitaciones demo...");
 
-    const rooms = await Habitacion.insertMany([
+    const rawRooms = [
       {
         codigo: "CF-101",
         hotelCode: "casa_frida",
@@ -32,17 +46,8 @@ async function seed() {
         featured: true,
         size: 2,
         roomType: "Suite",
-        capacityLabel: "2 adultos",
         inventoryStatus: "Activa",
-        offer: {
-          isSpecial: true,
-          description: "Promo temporada baja",
-          discountPercent: 12, // ~2200 sobre 2500
-        },
-        availability: {
-          available: true,
-          nextAvailableDate: null,
-        },
+        offer: { isSpecial: true, description: "Promo temporada baja", discountPercent: 12 },
         favoritesCount: 12,
       },
       {
@@ -59,12 +64,7 @@ async function seed() {
         featured: false,
         size: 2,
         roomType: "Suite Jardín",
-        capacityLabel: "2 adultos",
         inventoryStatus: "Activa",
-        availability: {
-          available: true,
-          nextAvailableDate: null,
-        },
         favoritesCount: 8,
       },
       {
@@ -81,12 +81,7 @@ async function seed() {
         featured: false,
         size: 3,
         roomType: "Loft",
-        capacityLabel: "3 adultos",
         inventoryStatus: "Activa",
-        availability: {
-          available: true,
-          nextAvailableDate: null,
-        },
         favoritesCount: 5,
       },
       {
@@ -103,12 +98,7 @@ async function seed() {
         featured: false,
         size: 2,
         roomType: "Doble",
-        capacityLabel: "2 adultos",
         inventoryStatus: "Mantenimiento",
-        availability: {
-          available: false,
-          nextAvailableDate: new Date(),
-        },
         favoritesCount: 3,
       },
       {
@@ -125,12 +115,7 @@ async function seed() {
         featured: true,
         size: 4,
         roomType: "Suite",
-        capacityLabel: "Familia",
         inventoryStatus: "Activa",
-        availability: {
-          available: true,
-          nextAvailableDate: null,
-        },
         favoritesCount: 10,
       },
 
@@ -149,17 +134,8 @@ async function seed() {
         featured: true,
         size: 2,
         roomType: "Cabaña",
-        capacityLabel: "2 adultos",
         inventoryStatus: "Activa",
-        offer: {
-          isSpecial: true,
-          description: "Fin de semana romántico",
-          discountPercent: 9, // ~2100 sobre 2300
-        },
-        availability: {
-          available: true,
-          nextAvailableDate: null,
-        },
+        offer: { isSpecial: true, description: "Fin de semana romántico", discountPercent: 9 },
         favoritesCount: 20,
       },
       {
@@ -176,12 +152,7 @@ async function seed() {
         featured: false,
         size: 4,
         roomType: "Cabaña",
-        capacityLabel: "Familia",
         inventoryStatus: "Activa",
-        availability: {
-          available: true,
-          nextAvailableDate: null,
-        },
         favoritesCount: 9,
       },
       {
@@ -198,12 +169,7 @@ async function seed() {
         featured: false,
         size: 2,
         roomType: "King",
-        capacityLabel: "2 adultos",
         inventoryStatus: "Activa",
-        availability: {
-          available: true,
-          nextAvailableDate: null,
-        },
         favoritesCount: 4,
       },
       {
@@ -220,12 +186,7 @@ async function seed() {
         featured: false,
         size: 2,
         roomType: "Doble",
-        capacityLabel: "2 adultos",
         inventoryStatus: "Fuera de servicio",
-        availability: {
-          available: false,
-          nextAvailableDate: null,
-        },
         favoritesCount: 2,
       },
       {
@@ -242,22 +203,16 @@ async function seed() {
         featured: true,
         size: 3,
         roomType: "Loft",
-        capacityLabel: "3 adultos",
         inventoryStatus: "Bloqueada",
-        availability: {
-          available: false,
-          nextAvailableDate: null,
-        },
         favoritesCount: 6,
       },
-    ]);
+    ];
 
+    const roomsToInsert = rawRooms.map(enforceSeedConsistency);
+    const rooms = await Habitacion.insertMany(roomsToInsert);
     console.log("✅ Habitaciones creadas:", rooms.map((r) => r.codigo));
 
-    // ===============================
-    // 🎡 Semilla del carrusel (Hero)
-    // ===============================
-
+    // 🎡 Hero
     const heroImg =
       "https://scontent.fmid1-3.fna.fbcdn.net/v/t39.30808-6/487996831_1226933259437418_1477921974834808949_n.jpg?_nc_cat=103&ccb=1-7&_nc_sid=cc71e4&_nc_ohc=cQHYQExC3vwQ7kNvwFGHLbA&_nc_oc=AdlxWdChNxbYkumI2nH7QiON6SapBgC8KkjhN00wOL2N1mmLu0O6hOTd7E6VYswlwzRNHdiSUuxrnm3tA6Dn6FUo&_nc_zt=23&_nc_ht=scontent.fmid1-3.fna&_nc_gid=yhS2InLir0CyuUQMxBWDbA&oh=00_AfhZgogfliEuO5dyXGUIik3AkK05VkwJHPmctl7V8W5BqA&oe=6929ED41";
 
@@ -290,10 +245,7 @@ async function seed() {
       },
     ]);
 
-    console.log(
-      "✅ HeroSlides creados:",
-      heroSlides.map((s) => s.title)
-    );
+    console.log("✅ HeroSlides creados:", heroSlides.map((s) => s.title));
   } catch (err) {
     console.error("❌ Error seed-data:", err);
   } finally {

@@ -1,9 +1,10 @@
 // src/components/habitaciones/HabitacionesFilters.jsx
 import React from "react";
-import { Row, Col, Input, Select, Button, Space } from "antd";
-import { SEDES, INVENTORY_STATES } from "./helpers";
+import { Flex, Input, Select, Button, Space } from "antd";
+import { FilterOutlined, CloseCircleOutlined } from "@ant-design/icons";
+import { SEDES, INVENTORY_STATES, PAPELERA_OPTIONS, beachTheme as beachColors } from "./helpers";
 
-const { Option } = Select;
+const { Search } = Input;
 
 const HabitacionesFilters = ({
   busqueda,
@@ -16,121 +17,76 @@ const HabitacionesFilters = ({
   setFiltroPromo,
   filtroFavoritos,
   setFiltroFavoritos,
-  filtroEstadoReserva,
-  setFiltroEstadoReserva,
+  filtroPapelera,
+  setFiltroPapelera,
   onClearFilters,
 }) => {
   return (
-    <>
-      {/* Filtros principales */}
-      <Row gutter={[10, 10]} style={{ marginTop: 10 }} align="middle">
-        <Col xs={24} md={10}>
-          <Input
-            size="small"
-            placeholder="Buscar por código, nombre, tipo o ubicación..."
-            value={busqueda}
-            onChange={(e) => setBusqueda(e.target.value)}
-            allowClear
-            style={{ fontSize: 11 }}
-          />
-        </Col>
-        <Col xs={12} md={7}>
-          <Select
-            size="small"
-            value={filtroSede}
-            onChange={setFiltroSede}
-            style={{ width: "100%", fontSize: 11 }}
-          >
-            <Option value="todas">Todas las sedes</Option>
-            {SEDES.map((s) => (
-              <Option key={s.value} value={s.value}>
-                {s.label}
-              </Option>
-            ))}
-          </Select>
-        </Col>
-        <Col xs={12} md={7}>
-          <Select
-            size="small"
-            value={filtroEstado}
-            onChange={setFiltroEstado}
-            style={{ width: "100%", fontSize: 11 }}
-          >
-            <Option value="todas">Todos los estados</Option>
-            {INVENTORY_STATES.map((e) => (
-              <Option key={e} value={e}>
-                {e}
-              </Option>
-            ))}
-          </Select>
-        </Col>
-      </Row>
+    <Flex wrap gap={10} align="center" style={{ marginTop: 10 }}>
+      <Search
+        value={busqueda}
+        onChange={(e) => setBusqueda(e.target.value)}
+        placeholder="Buscar por código, título, tipo o ubicación…"
+        allowClear
+        style={{ width: 280 }}
+      />
 
-      {/* Filtros nuevos: promo, favoritos y estado de reserva */}
-      <Row
-        gutter={[10, 10]}
-        style={{ marginTop: 8, marginBottom: 4 }}
-        align="middle"
-      >
-        <Col xs={12} md={6}>
-          <Select
-            size="small"
-            value={filtroPromo}
-            onChange={setFiltroPromo}
-            style={{ width: "100%", fontSize: 11 }}
-          >
-            <Option value="todas">Promo: Todas</Option>
-            <Option value="con_promo">Solo con promo</Option>
-            <Option value="sin_promo">Sin promo</Option>
-          </Select>
-        </Col>
-        <Col xs={12} md={6}>
-          <Select
-            size="small"
-            value={filtroFavoritos}
-            onChange={setFiltroFavoritos}
-            style={{ width: "100%", fontSize: 11 }}
-          >
-            <Option value="todas">Favoritos: Todos</Option>
-            <Option value="con_favs">Con favoritos</Option>
-            <Option value="sin_favs">Sin favoritos</Option>
-          </Select>
-        </Col>
-        <Col xs={24} md={12}>
-          <Space
-            size={6}
-            style={{
-              width: "100%",
-              justifyContent: "space-between",
-              flexWrap: "wrap",
-            }}
-          >
-            <Select
-              size="small"
-              value={filtroEstadoReserva}
-              onChange={setFiltroEstadoReserva}
-              style={{ flex: 1, minWidth: 180, fontSize: 11 }}
-            >
-              <Option value="todos">Estado reserva: Todos</Option>
-              <Option value="no_reservada">No reservada</Option>
-              <Option value="reservada">Reservada</Option>
-              <Option value="en_espera">En espera</Option>
-            </Select>
+      <Select value={filtroSede} onChange={setFiltroSede} style={{ width: 170 }}>
+        <Select.Option value="todas">Todas las sedes</Select.Option>
+        {SEDES.map((s) => (
+          <Select.Option key={s.value} value={s.value}>
+            {s.label}
+          </Select.Option>
+        ))}
+      </Select>
 
-            <Button
-              size="small"
-              onClick={onClearFilters}
-              style={{
-                borderRadius: 999,
-                fontSize: 11,
-              }}
-            >
-              Limpiar filtros
-            </Button>
-          </Space>
-        </Col>
-      </Row>
-    </>
+      <Select value={filtroEstado} onChange={setFiltroEstado} style={{ width: 190 }}>
+        <Select.Option value="todas">Todos los estados</Select.Option>
+        {INVENTORY_STATES.map((st) => (
+          <Select.Option key={st} value={st}>
+            {st}
+          </Select.Option>
+        ))}
+      </Select>
+
+      <Select value={filtroPromo} onChange={setFiltroPromo} style={{ width: 150 }}>
+        <Select.Option value="todas">Promo: Todas</Select.Option>
+        <Select.Option value="con_promo">Con promo</Select.Option>
+        <Select.Option value="sin_promo">Sin promo</Select.Option>
+      </Select>
+
+      <Select value={filtroFavoritos} onChange={setFiltroFavoritos} style={{ width: 160 }}>
+        <Select.Option value="todas">Favoritos: Todos</Select.Option>
+        <Select.Option value="con_favs">Con favoritos</Select.Option>
+        <Select.Option value="sin_favs">Sin favoritos</Select.Option>
+      </Select>
+
+      <Select value={filtroPapelera} onChange={setFiltroPapelera} style={{ width: 190 }}>
+        {PAPELERA_OPTIONS.map((o) => (
+          <Select.Option key={o.value} value={o.value}>
+            {o.label}
+          </Select.Option>
+        ))}
+      </Select>
+
+      <Space>
+        <Button
+          icon={<FilterOutlined />}
+          style={{ borderRadius: 10, borderColor: beachColors.turquoise, color: beachColors.deepBlue }}
+          onClick={onClearFilters}
+        >
+          Limpiar
+        </Button>
+        <Button
+          icon={<CloseCircleOutlined />}
+          type="text"
+          onClick={onClearFilters}
+          style={{ color: "#64748b" }}
+        >
+          Reset
+        </Button>
+      </Space>
+    </Flex>
   );
 };
 

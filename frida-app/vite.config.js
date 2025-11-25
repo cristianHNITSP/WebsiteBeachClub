@@ -1,19 +1,21 @@
+// vite.config.js
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 
 export default defineConfig({
   plugins: [react()],
   server: {
+    host: "0.0.0.0", // 👈 importante: escuchar en todas las interfaces
+    // port: 5173,   // opcional, solo si quieres fijar el puerto
     proxy: {
-      //Backend de eventos (lo que ya tenías)
+      // Backend de eventos (lo que ya tenías)
       "/api/events": {
         target: "http://localhost:5050",
         changeOrigin: true,
         ws: false,
         selfHandleResponse: false,
       },
-
-      //Microservicio de reservas/habitaciones (puerto 4002)
+      // Microservicio de reservas/habitaciones (puerto 4002)
       "/api/reservas": {
         target: "http://localhost:4002",
         changeOrigin: true,
@@ -27,18 +29,17 @@ export default defineConfig({
         changeOrigin: true,
       },
 
-      //Microservicio de auth + users (puerto 4001)
-      // /api/auth/...  y /api/users/... van acá
+      // Microservicio de auth + users (puerto 4001)
       "/api": {
         target: "http://localhost:4001",
         changeOrigin: true,
       },
       /*
-        '/unsplash': {
+      '/unsplash': {
         target: 'https://images.unsplash.com',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/unsplash/, ''),
-      },  
+      },
       */
     },
   },

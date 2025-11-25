@@ -9,7 +9,6 @@ import HabitacionesMetrics from "../components/habitaciones/HabitacionesMetrics"
 import HabitacionesTable from "../components/habitaciones/HabitacionesTable";
 import HabitacionFormModal from "../components/habitaciones/HabitacionFormModal";
 
-// 🔐 Importante: aseguramos que SIEMPRE se manden cookies (auth_token)
 axios.defaults.withCredentials = true;
 
 const GestionHabitacionesView = ({ isMobile, currentUser }) => {
@@ -27,17 +26,14 @@ const GestionHabitacionesView = ({ isMobile, currentUser }) => {
   const [filtroEstado, setFiltroEstado] = useState("todas");
   const [filtroPromo, setFiltroPromo] = useState("todas");
   const [filtroFavoritos, setFiltroFavoritos] = useState("todas");
-  const [filtroEstadoReserva, setFiltroEstadoReserva] = useState("todos");
+  const [filtroPapelera, setFiltroPapelera] = useState("excluir"); // ✅ nuevo
 
   const [modalVisible, setModalVisible] = useState(false);
   const [editando, setEditando] = useState(null);
   const [form] = Form.useForm();
 
   const [messageApi, contextHolder] = message.useMessage();
-
-  useEffect(() => {
-    console.log("currentUser en GestionHabitacionesView:", currentUser);
-  }, [currentUser]);
+  const [deletingRoomId, setDeletingRoomId] = useState(null);
 
   const canManageRooms = useMemo(
     () =>
@@ -50,22 +46,19 @@ const GestionHabitacionesView = ({ isMobile, currentUser }) => {
 
   useEffect(() => {
     if (currentUser && !canManageRooms) {
-      messageApi.info(
-        "Estás en modo solo lectura: no puedes crear, editar ni eliminar habitaciones."
-      );
+      messageApi.info("Estás en modo solo lectura: no puedes crear, editar ni eliminar habitaciones.");
     }
   }, [currentUser, canManageRooms, messageApi]);
 
   const buildQueryParams = (page) => ({
     page,
     limit: pagination.pageSize,
-    // mismos nombres que espera el backend (buildHabitacionesFilterFromQuery)
     q: busqueda || undefined,
-    hotelCode: filtroSede, // el backend trata "todas" como sin filtro
-    inventoryStatus: filtroEstado, // igual
+    hotelCode: filtroSede,
+    inventoryStatus: filtroEstado,
     promo: filtroPromo,
     favorites: filtroFavoritos,
-    estadoReserva: filtroEstadoReserva, // "todos" | "no_reservada" | "reservada" | "en_espera"
+    papelera: filtroPapelera, // ✅ nuevo
   });
 
   const fetchHabitaciones = async (page = 1) => {
@@ -84,24 +77,12 @@ const GestionHabitacionesView = ({ isMobile, currentUser }) => {
       });
 
       const api = res.data || {};
-      const items = Array.isArray(api) ? api : api.items || [];
-      const total = Array.isArray(api)
-        ? api.length
-        : typeof api.total === "number"
-        ? api.total
-        : items.length;
-      const serverPage = Array.isArray(api)
-        ? page
-        : typeof api.page === "number"
-        ? api.page
-        : page;
+      const items = api.items || [];
+      const total = typeof api.total === "number" ? api.total : items.length;
+      const serverPage = typeof api.page === "number" ? api.page : page;
 
       setHabitaciones(items);
-      setPagination((prev) => ({
-        ...prev,
-        current: serverPage,
-        total,
-      }));
+      setPagination((prev) => ({ ...prev, current: serverPage, total }));
 
       messageApi.open({
         key: "loading-rooms",
@@ -114,8 +95,7 @@ const GestionHabitacionesView = ({ isMobile, currentUser }) => {
       messageApi.open({
         key: "loading-rooms",
         type: "error",
-        content:
-          "No se pudieron cargar las habitaciones. Intenta de nuevo más tarde.",
+        content: "No se pudieron cargar las habitaciones. Intenta de nuevo más tarde.",
         duration: 3,
       });
     } finally {
@@ -123,24 +103,13 @@ const GestionHabitacionesView = ({ isMobile, currentUser }) => {
     }
   };
 
-  // Carga inicial + recarga cuando cambian filtros
   useEffect(() => {
     fetchHabitaciones(1);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    busqueda,
-    filtroSede,
-    filtroEstado,
-    filtroPromo,
-    filtroFavoritos,
-    filtroEstadoReserva,
-  ]);
+  }, [busqueda, filtroSede, filtroEstado, filtroPromo, filtroFavoritos, filtroPapelera]);
 
   const abrirCrear = () => {
-    if (!canManageRooms) {
-      messageApi.warning("No tienes permisos para crear habitaciones.");
-      return;
-    }
+    if (!canManageRooms) return messageApi.warning("No tienes permisos para crear habitaciones.");
     setEditando(null);
     form.resetFields();
     form.setFieldsValue({
@@ -152,10 +121,9 @@ const GestionHabitacionesView = ({ isMobile, currentUser }) => {
   };
 
   const abrirEditar = (registro) => {
-    if (!canManageRooms) {
-      messageApi.warning("No tienes permisos para editar habitaciones.");
-      return;
-    }
+    if (!canManageRooms) return messageApi.warning("No tienes permisos para editar habitaciones.");
+    if (registro?.isDeleted) return messageApi.warning("Esta habitación está en papelera. Restaúrala para editar.");
+
     setEditando(registro);
     form.setFieldsValue({
       codigo: registro.codigo,
@@ -173,9 +141,7 @@ const GestionHabitacionesView = ({ isMobile, currentUser }) => {
       amenities: registro.amenities || [],
       offerIsSpecial: registro.offer?.isSpecial || false,
       offerDiscountPercent:
-        typeof registro.offer?.discountPercent === "number"
-          ? registro.offer.discountPercent
-          : null,
+        typeof registro.offer?.discountPercent === "number" ? registro.offer.discountPercent : null,
       offerDescription: registro.offer?.description || "",
     });
     setModalVisible(true);
@@ -188,196 +154,151 @@ const GestionHabitacionesView = ({ isMobile, currentUser }) => {
   };
 
   const guardarHabitacion = () => {
-    if (!canManageRooms) {
-      messageApi.warning("No tienes permisos para modificar habitaciones.");
-      return;
-    }
+    if (!canManageRooms) return messageApi.warning("No tienes permisos para modificar habitaciones.");
 
     form
       .validateFields()
       .then(async (values) => {
         try {
-          const {
-            offerIsSpecial,
-            offerDiscountPercent,
-            offerDescription,
-            ...baseValues
-          } = values;
+          const { offerIsSpecial, offerDiscountPercent, offerDescription, ...baseValues } = values;
 
           let discount = offerIsSpecial ? Number(offerDiscountPercent) : null;
-
           let offer;
-          if (
-            !offerIsSpecial ||
-            !discount ||
-            discount <= 0 ||
-            discount >= 100
-          ) {
-            offer = {
-              isSpecial: false,
-              description: "",
-              discountPercent: null,
-            };
+
+          if (!offerIsSpecial || !discount || discount <= 0 || discount >= 100) {
+            offer = { isSpecial: false, description: "", discountPercent: null };
           } else {
-            offer = {
-              isSpecial: true,
-              description: offerDescription || "",
-              discountPercent: discount,
-            };
+            offer = { isSpecial: true, description: offerDescription || "", discountPercent: discount };
           }
 
-          const payload = {
-            ...baseValues,
-            offer,
-          };
+          const payload = { ...baseValues, offer };
 
           messageApi.open({
             key: "saving-room",
             type: "loading",
-            content: editando
-              ? "Guardando cambios..."
-              : "Creando nueva habitación...",
+            content: editando ? "Guardando cambios..." : "Creando nueva habitación...",
             duration: 0,
           });
 
           if (editando && editando._id) {
-            await axios.put(`/api/habitaciones/${editando._id}`, {
-              ...editando,
-              ...payload,
-            });
-            messageApi.open({
-              key: "saving-room",
-              type: "success",
-              content: "Habitación actualizada correctamente.",
-              duration: 2,
-            });
+            await axios.put(`/api/habitaciones/${editando._id}`, payload, { withCredentials: true });
+            messageApi.open({ key: "saving-room", type: "success", content: "Habitación actualizada.", duration: 2 });
           } else {
-            await axios.post("/api/habitaciones", payload);
-            messageApi.open({
-              key: "saving-room",
-              type: "success",
-              content: "Habitación creada correctamente.",
-              duration: 2,
-            });
+            await axios.post("/api/habitaciones", payload, { withCredentials: true });
+            messageApi.open({ key: "saving-room", type: "success", content: "Habitación creada.", duration: 2 });
           }
 
           await fetchHabitaciones(pagination.current || 1);
           cerrarModal();
         } catch (err) {
           console.error(err);
-          if (err?.response?.status === 401) {
-            messageApi.open({
-              key: "saving-room",
-              type: "error",
-              content:
-                "No autorizado para modificar habitaciones. Revisa tu sesión o permisos.",
-              duration: 3,
-            });
-          } else {
-            messageApi.open({
-              key: "saving-room",
-              type: "error",
-              content: "Error al guardar la habitación.",
-              duration: 3,
-            });
-          }
+          messageApi.open({
+            key: "saving-room",
+            type: "error",
+            content:
+              err?.response?.status === 401
+                ? "No autorizado. Revisa tu sesión o permisos."
+                : err?.response?.data?.message || "Error al guardar la habitación.",
+            duration: 3,
+          });
         }
       })
       .catch(() => {});
   };
 
-  const eliminarHabitacion = async (id) => {
-    if (!canManageRooms) {
-      messageApi.warning("No tienes permisos para eliminar habitaciones.");
-      return;
-    }
+  // ✅ Papelera (soft delete)
+  const enviarAPapelera = async (id) => {
+    if (!canManageRooms) return messageApi.warning("No tienes permisos para eliminar habitaciones.");
 
     try {
-      messageApi.open({
-        key: `deleting-room-${id}`,
-        type: "loading",
-        content: "Eliminando habitación...",
-        duration: 0,
-      });
+      setDeletingRoomId(id);
+      messageApi.open({ key: `trash-${id}`, type: "loading", content: "Enviando a papelera...", duration: 0 });
 
-      await axios.delete(`/api/habitaciones/${id}`, {
-        withCredentials: true,
-      });
+      await axios.patch(`/api/habitaciones/${id}/trash`, {}, { withCredentials: true });
 
-      messageApi.open({
-        key: `deleting-room-${id}`,
-        type: "success",
-        content: "Habitación eliminada del inventario.",
-        duration: 2,
-      });
-
+      messageApi.open({ key: `trash-${id}`, type: "success", content: "Enviada a papelera.", duration: 2 });
       await fetchHabitaciones(pagination.current || 1);
     } catch (err) {
       console.error(err);
       messageApi.open({
-        key: `deleting-room-${id}`,
+        key: `trash-${id}`,
         type: "error",
         content:
           err?.response?.status === 401
-            ? "No autorizado para eliminar habitaciones. Revisa tu sesión o permisos."
-            : "No se pudo eliminar la habitación.",
+            ? "No autorizado. Revisa tu sesión o permisos."
+            : err?.response?.data?.message || "No se pudo enviar a papelera.",
         duration: 3,
       });
+    } finally {
+      setDeletingRoomId(null);
     }
   };
 
-  const cambiarEstadoDeReserva = async (id, nuevoEstado) => {
-    if (!canManageRooms) {
-      messageApi.warning(
-        "No tienes permisos para cambiar el estado de reserva."
-      );
-      return;
-    }
-
-    // Actualización optimista
-    setHabitaciones((prev) =>
-      prev.map((h) =>
-        h._id === id ? { ...h, estadoDeReserva: nuevoEstado } : h
-      )
-    );
+  // ✅ Restore
+  const restaurarHabitacion = async (id) => {
+    if (!canManageRooms) return messageApi.warning("No tienes permisos para restaurar.");
 
     try {
-      await axios.patch(`/api/habitaciones/${id}/estado-reserva`, {
-        estadoDeReserva: nuevoEstado,
-      });
-      messageApi.success("Estado de reserva actualizado.");
+      setDeletingRoomId(id);
+      messageApi.open({ key: `restore-${id}`, type: "loading", content: "Restaurando...", duration: 0 });
+
+      await axios.patch(`/api/habitaciones/${id}/restore`, {}, { withCredentials: true });
+
+      messageApi.open({ key: `restore-${id}`, type: "success", content: "Restaurada.", duration: 2 });
+      await fetchHabitaciones(pagination.current || 1);
     } catch (err) {
       console.error(err);
-      messageApi.error("No se pudo actualizar el estado de reserva.");
-      await fetchHabitaciones(pagination.current || 1);
+      messageApi.open({
+        key: `restore-${id}`,
+        type: "error",
+        content: err?.response?.data?.message || "No se pudo restaurar.",
+        duration: 3,
+      });
+    } finally {
+      setDeletingRoomId(null);
     }
   };
 
-  // métricas globales (sobre el dataset cargado en esta página)
-  const totalActivas = habitaciones.filter(
-    (h) => h.inventoryStatus === "Activa"
-  ).length;
-  const totalMantenimiento = habitaciones.filter(
-    (h) => h.inventoryStatus === "Mantenimiento"
-  ).length;
-  const totalFuera = habitaciones.filter(
-    (h) =>
-      h.inventoryStatus === "Fuera de servicio" ||
-      h.inventoryStatus === "Bloqueada"
-  ).length;
-  const totalConPromo = habitaciones.filter((h) => hasPromo(h)).length;
-  const totalConFavoritos = habitaciones.filter(
-    (h) => (h.favoritesCount || 0) > 0
-  ).length;
+  // ✅ Delete permanente
+  const eliminarHabitacionPermanent = async (id) => {
+    if (!canManageRooms) return messageApi.warning("No tienes permisos para eliminar permanentemente.");
 
-  // 🔄 limpiar filtros rápidamente
+    try {
+      setDeletingRoomId(id);
+      messageApi.open({ key: `permanent-${id}`, type: "loading", content: "Eliminando permanentemente...", duration: 0 });
+
+      await axios.delete(`/api/habitaciones/${id}/permanent`, { withCredentials: true });
+
+      messageApi.open({ key: `permanent-${id}`, type: "success", content: "Eliminada permanentemente.", duration: 2 });
+      await fetchHabitaciones(pagination.current || 1);
+    } catch (err) {
+      console.error(err);
+      messageApi.open({
+        key: `permanent-${id}`,
+        type: "error",
+        content: err?.response?.data?.message || "No se pudo eliminar permanentemente.",
+        duration: 3,
+      });
+    } finally {
+      setDeletingRoomId(null);
+    }
+  };
+
+  const totalActivas = habitaciones.filter((h) => h.inventoryStatus === "Activa" && !h.isDeleted).length;
+  const totalMantenimiento = habitaciones.filter((h) => h.inventoryStatus === "Mantenimiento" && !h.isDeleted).length;
+  const totalFuera = habitaciones.filter(
+    (h) => (h.inventoryStatus === "Fuera de servicio" || h.inventoryStatus === "Bloqueada") && !h.isDeleted
+  ).length;
+  const totalConPromo = habitaciones.filter((h) => hasPromo(h) && !h.isDeleted).length;
+  const totalConFavoritos = habitaciones.filter((h) => (h.favoritesCount || 0) > 0 && !h.isDeleted).length;
+
   const limpiarFiltros = () => {
     setBusqueda("");
     setFiltroSede("todas");
     setFiltroEstado("todas");
     setFiltroPromo("todas");
     setFiltroFavoritos("todas");
-    setFiltroEstadoReserva("todos");
+    setFiltroPapelera("excluir");
   };
 
   return (
@@ -399,9 +320,7 @@ const GestionHabitacionesView = ({ isMobile, currentUser }) => {
           currentUser={currentUser}
           canManageRooms={canManageRooms}
           onNueva={abrirCrear}
-          onRecargar={() =>
-            fetchHabitaciones(pagination.current || 1)
-          }
+          onRecargar={() => fetchHabitaciones(pagination.current || 1)}
           loading={loading}
         />
 
@@ -416,8 +335,8 @@ const GestionHabitacionesView = ({ isMobile, currentUser }) => {
           setFiltroPromo={setFiltroPromo}
           filtroFavoritos={filtroFavoritos}
           setFiltroFavoritos={setFiltroFavoritos}
-          filtroEstadoReserva={filtroEstadoReserva}
-          setFiltroEstadoReserva={setFiltroEstadoReserva}
+          filtroPapelera={filtroPapelera}
+          setFiltroPapelera={setFiltroPapelera}
           onClearFilters={limpiarFiltros}
         />
 
@@ -437,8 +356,10 @@ const GestionHabitacionesView = ({ isMobile, currentUser }) => {
           onChangePage={fetchHabitaciones}
           canManageRooms={canManageRooms}
           onEdit={abrirEditar}
-          onDelete={eliminarHabitacion}
-          onChangeEstadoReserva={cambiarEstadoDeReserva}
+          onTrash={enviarAPapelera}
+          onRestore={restaurarHabitacion}
+          onDeletePermanent={eliminarHabitacionPermanent}
+          deletingRoomId={deletingRoomId}
         />
       </Card>
 

@@ -1,4 +1,3 @@
-// src/components/website/RoomCards.jsx
 import {
   Card,
   Rate,
@@ -17,12 +16,7 @@ import {
   Popover,
   Pagination,
 } from "antd";
-import {
-  EnvironmentOutlined,
-  HeartOutlined,
-  FireFilled,
-  DownOutlined,
-} from "@ant-design/icons";
+import { EnvironmentOutlined, HeartOutlined, FireFilled, DownOutlined } from "@ant-design/icons";
 import axios from "axios";
 import { useState } from "react";
 
@@ -54,16 +48,14 @@ function RoomCards({
   loading,
   onReservaExpress,
   onInfoWhatsapp,
-  pagination, // 👈 viene del App (page, limit, total, totalPages, hasMore)
-  onPageChange, // 👈 handler del App para cambiar de página
+  pagination,
+  onPageChange,
 }) {
   const [messageApi, contextHolder] = message.useMessage();
   const [favLoadingId, setFavLoadingId] = useState(null);
 
   const placeholderImg = "https://via.placeholder.com/400x250?text=Sin+imagen";
-
   const safeCards = Array.isArray(cardsData) ? cardsData : [];
-  // const totalCards = safeCards.length; // por si lo necesitas después
 
   const getSedeLabel = (hotelCode) => {
     if (!hotelCode) return "Sede no definida";
@@ -79,16 +71,10 @@ function RoomCards({
 
   const getSedeTag = (hotelCode) => {
     const label = getSedeLabel(hotelCode);
-    const color =
-      hotelCode === "casa_frida"
-        ? beachColors.oceanBlue
-        : beachColors.turquoise;
+    const color = hotelCode === "casa_frida" ? beachColors.oceanBlue : beachColors.turquoise;
 
     return (
-      <Tag
-        color={color}
-        style={{ borderRadius: 999, fontSize: 10, color: "#0f172a" }}
-      >
+      <Tag color={color} style={{ borderRadius: 999, fontSize: 10, color: "#0f172a" }}>
         {label}
       </Tag>
     );
@@ -104,9 +90,7 @@ function RoomCards({
         duration: 0,
       });
 
-      const { data } = await axios.post(
-        `/api/habitaciones/${room._id}/favorite`
-      );
+      const { data } = await axios.post(`/api/habitaciones/${room._id}/favorite`);
 
       messageApi.open({
         key: `fav-${room._id}`,
@@ -117,8 +101,7 @@ function RoomCards({
     } catch (err) {
       console.error("Error al marcar favorito:", err);
       const backendMsg =
-        err.response?.data?.message ||
-        "No se pudo registrar tu favorito. Inténtalo más tarde.";
+        err.response?.data?.message || "No se pudo registrar tu favorito. Inténtalo más tarde.";
       messageApi.open({
         key: `fav-${room._id}`,
         type: "error",
@@ -130,46 +113,26 @@ function RoomCards({
     }
   };
 
-  const getEstadoReservaMeta = (room) => {
-    const estado =
-      typeof room.estadoDeReserva === "number" ? room.estadoDeReserva : 0;
-    const disponible = room.availability?.available !== false;
+  // ✅ regla consistente
+// ✅ regla consistente SIN availability
+const getDisponibilidadMeta = (room) => {
+  if (room?.isDeleted) {
+    return { code: "papelera", label: "No disponible", description: "Esta habitación está en papelera.", color: "#9ca3af" };
+  }
 
-    // 0 = no reservada, 1 = reservada, 3 = en espera
-    if (!disponible) {
-      return {
-        code: "no_disponible",
-        label: "No disponible",
-        description: "Esta habitación no está disponible en estas fechas.",
-        color: "#9ca3af",
-      };
-    }
+  const invOk = (room?.inventoryStatus || "Activa") === "Activa";
 
-    if (estado === 1) {
-      return {
-        code: "reservada",
-        label: "Reservada",
-        description: "Ya reservada, no disponible para nuevas reservas.",
-        color: "#f97373",
-      };
-    }
+  if (!invOk) {
+    return { code: "no_disponible", label: "No disponible", description: `Estado: ${room.inventoryStatus}`, color: "#9ca3af" };
+  }
 
-    if (estado === 3) {
-      return {
-        code: "en_espera",
-        label: "En espera",
-        description: "Reserva en proceso de confirmación.",
-        color: beachColors.sunset,
-      };
-    }
+  if (room?.isReserved === true) {
+    return { code: "reservada", label: "Reservada", description: "Ya reservada, no disponible para nuevas reservas.", color: "#f97373" };
+  }
 
-    return {
-      code: "disponible",
-      label: "Disponible para reservar",
-      description: "Puedes iniciar una reserva express o pedir más información.",
-      color: beachColors.teal,
-    };
-  };
+  return { code: "disponible", label: "Disponible", description: "Puedes solicitar una reserva o pedir más información.", color: beachColors.teal };
+};
+
 
   return (
     <>
@@ -177,33 +140,16 @@ function RoomCards({
 
       <Row gutter={[16, 16]} style={{ marginTop: 15 }}>
         {loading
-          ? // 🔄 Skeletons (5 para coincidir con el limit del backend)
-            Array.from({ length: 5 }).map((_, i) => (
+          ? Array.from({ length: 5 }).map((_, i) => (
               <Col key={i} xs={24} sm={12} md={12} lg={8}>
-                <Flex
-                  justify="start"
-                  align="center"
-                  style={{
-                    height: 180,
-                    backgroundColor: "#f0f0f0",
-                    padding: 16,
-                  }}
-                >
+                <Flex justify="start" align="center" style={{ height: 180, backgroundColor: "#f0f0f0", padding: 16 }}>
                   <Skeleton active>
                     <Card hoverable>
                       <Card.Meta
-                        title={
-                          <Skeleton.Input
-                            style={{ width: 200, marginTop: 16 }}
-                            active
-                          />
-                        }
+                        title={<Skeleton.Input style={{ width: 200, marginTop: 16 }} active />}
                         description={
                           <>
-                            <Skeleton.Input
-                              style={{ width: 150, marginTop: 8 }}
-                              active
-                            />
+                            <Skeleton.Input style={{ width: 150, marginTop: 8 }} active />
                             <div style={{ marginTop: 8 }}>
                               <Skeleton.Input style={{ width: 100 }} active />
                             </div>
@@ -231,25 +177,16 @@ function RoomCards({
 
               const discountPercent = c.offer?.discountPercent;
               const hasDiscount =
-                c.offer?.isSpecial &&
-                typeof discountPercent === "number" &&
-                discountPercent > 0;
+                c.offer?.isSpecial && typeof discountPercent === "number" && discountPercent > 0;
 
-              const discountedPrice = hasDiscount
-                ? Math.round(c.price * (1 - discountPercent / 100))
-                : null;
+              const discountedPrice = hasDiscount ? Math.round(c.price * (1 - discountPercent / 100)) : null;
 
-              const estadoMeta = getEstadoReservaMeta(c);
-
-              // 🔒 Para el website: solo se puede hacer reserva express si está "disponible"
-              const isNoDisponible = estadoMeta.code !== "disponible";
+              const meta = getDisponibilidadMeta(c);
+              const isDisponible = meta.code === "disponible";
+              const isNoDisponible = !isDisponible; // ✅ solo disponible permite reservar
 
               const menuItems = [
-                {
-                  key: "reserva",
-                  label: "Reserva express",
-                  disabled: isNoDisponible,
-                },
+                { key: "reserva", label: "Solicitar reserva (chat)", disabled: isNoDisponible },
                 {
                   key: "whatsapp",
                   label: (
@@ -262,26 +199,14 @@ function RoomCards({
               ];
 
               const visibleAmenities = c.amenities.slice(0, 3);
-              const extraAmenitiesCount =
-                c.amenities.length > 3 ? c.amenities.length - 3 : 0;
+              const extraAmenitiesCount = c.amenities.length > 3 ? c.amenities.length - 3 : 0;
 
               return (
                 <Col key={c._id || i} xs={24} sm={12} md={12} lg={8}>
-                  <Badge.Ribbon
-                    text={c.badge || ""}
-                    color={
-                      c.featured ? beachColors.coral : beachColors.turquoise
-                    }
-                  >
+                  <Badge.Ribbon text={c.badge || ""} color={c.featured ? beachColors.coral : beachColors.turquoise}>
                     <Card
                       hoverable
-                      cover={
-                        <img
-                          alt={c.title}
-                          src={c.img}
-                          style={{ height: 180, objectFit: "cover" }}
-                        />
-                      }
+                      cover={<img alt={c.title} src={c.img} style={{ height: 180, objectFit: "cover" }} />}
                       styles={{
                         body: {
                           padding: 10,
@@ -292,14 +217,8 @@ function RoomCards({
                         },
                       }}
                       actions={[
-                        <Flex
-                          justify="space-between"
-                          style={{ padding: "0 8px" }}
-                          key="actions"
-                        >
-                          <Tooltip
-                            title={`${c.favoritesCount} personas marcaron esta habitación como favorita`}
-                          >
+                        <Flex justify="space-between" style={{ padding: "0 8px" }} key="actions">
+                          <Tooltip title={`${c.favoritesCount} personas marcaron esta habitación como favorita`}>
                             <Button
                               type="default"
                               danger
@@ -319,9 +238,7 @@ function RoomCards({
                               items: menuItems,
                               onClick: ({ key }) => {
                                 if (key === "reserva") {
-                                  if (!isNoDisponible && onReservaExpress) {
-                                    onReservaExpress(c);
-                                  }
+                                  if (!isNoDisponible && onReservaExpress) onReservaExpress(c);
                                 } else if (key === "whatsapp") {
                                   if (onInfoWhatsapp) onInfoWhatsapp(c);
                                 }
@@ -340,83 +257,50 @@ function RoomCards({
                                 gap: 4,
                               }}
                             >
-                              Opciones
-                              <DownOutlined style={{ fontSize: 10 }} />
+                              Opciones <DownOutlined style={{ fontSize: 10 }} />
                             </Button>
                           </Dropdown>
                         </Flex>,
                       ]}
                     >
                       <Flex justify="space-between" align="flex-start" gap={8}>
-                        <Space
-                          direction="vertical"
-                          size={2}
-                          style={{ width: "100%" }}
-                        >
+                        <Space direction="vertical" size={2} style={{ width: "100%" }}>
                           <Typography.Title
                             level={5}
-                            style={{
-                              color: beachColors.deepBlue,
-                              marginBottom: 0,
-                              fontSize: 15,
-                            }}
+                            style={{ color: beachColors.deepBlue, marginBottom: 0, fontSize: 15 }}
                           >
                             {c.title}
                           </Typography.Title>
                           {getSedeTag(c.hotelCode)}
                         </Space>
 
-                        <Tooltip title={estadoMeta.description}>
+                        <Tooltip title={meta.description}>
                           <Tag
-                            color={estadoMeta.color}
+                            color={meta.color}
                             style={{
                               borderRadius: 999,
                               fontSize: 10,
                               marginTop: 2,
-                              color:
-                                estadoMeta.code === "disponible"
-                                  ? "#064e3b"
-                                  : "#111827",
+                              color: meta.code === "disponible" ? "#064e3b" : "#111827",
                             }}
                           >
-                            {estadoMeta.label}
+                            {meta.label}
                           </Tag>
                         </Tooltip>
                       </Flex>
 
-                      <Flex
-                        justify="space-between"
-                        align="center"
-                        wrap
-                        gap={4}
-                        style={{ marginTop: 2 }}
-                      >
+                      <Flex justify="space-between" align="center" wrap gap={4} style={{ marginTop: 2 }}>
                         <Typography.Text
                           type="secondary"
-                          style={{
-                            fontSize: 12,
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 4,
-                          }}
+                          style={{ fontSize: 12, display: "flex", alignItems: "center", gap: 4 }}
                         >
-                          <EnvironmentOutlined
-                            style={{ color: beachColors.turquoise }}
-                          />
+                          <EnvironmentOutlined style={{ color: beachColors.turquoise }} />
                           {c.location}
                         </Typography.Text>
 
-                        <Tooltip
-                          placement="top"
-                          title={`Puntuación: ${c.rating}`}
-                        >
+                        <Tooltip placement="top" title={`Puntuación: ${c.rating}`}>
                           <div style={{ display: "inline-flex" }}>
-                            <Rate
-                              allowHalf
-                              disabled
-                              defaultValue={c.rating}
-                              style={{ fontSize: 14 }}
-                            />
+                            <Rate allowHalf disabled defaultValue={c.rating} style={{ fontSize: 14 }} />
                           </div>
                         </Tooltip>
                       </Flex>
@@ -437,11 +321,7 @@ function RoomCards({
                           {hasDiscount && (
                             <Tag
                               color={beachColors.turquoise}
-                              style={{
-                                borderRadius: 999,
-                                fontSize: 10,
-                                color: "#064e3b",
-                              }}
+                              style={{ borderRadius: 999, fontSize: 10, color: "#064e3b" }}
                             >
                               -{discountPercent}%
                             </Tag>
@@ -449,28 +329,14 @@ function RoomCards({
                         </Typography.Text>
                       )}
 
-                      {/* ⭐⭐⭐ AMENIDADES (con Popover) ⭐⭐⭐ */}
                       {visibleAmenities.length > 0 && (
-                        <Space
-                          wrap
-                          size={[4, 4]}
-                          style={{ marginTop: 6, maxWidth: "100%" }}
-                        >
-                          {/* Primeras 3 amenidades */}
+                        <Space wrap size={[4, 4]} style={{ marginTop: 6, maxWidth: "100%" }}>
                           {visibleAmenities.map((a, j) => (
-                            <Tag
-                              key={j}
-                              color={beachColors.coral}
-                              style={{
-                                borderRadius: 12,
-                                fontSize: 10,
-                              }}
-                            >
+                            <Tag key={j} color={beachColors.coral} style={{ borderRadius: 12, fontSize: 10 }}>
                               {a}
                             </Tag>
                           ))}
 
-                          {/* Popover para extras */}
                           {extraAmenitiesCount > 0 && (
                             <Popover
                               title="Amenidades"
@@ -481,11 +347,7 @@ function RoomCards({
                                     <Tag
                                       key={j}
                                       color={beachColors.turquoise}
-                                      style={{
-                                        borderRadius: 12,
-                                        fontSize: 11,
-                                        padding: "2px 8px",
-                                      }}
+                                      style={{ borderRadius: 12, fontSize: 11, padding: "2px 8px" }}
                                     >
                                       {a}
                                     </Tag>
@@ -508,48 +370,23 @@ function RoomCards({
                         </Space>
                       )}
 
-                      <Flex
-                        justify="flex-start"
-                        align="baseline"
-                        gap={6}
-                        style={{ marginTop: 10 }}
-                      >
+                      <Flex justify="flex-start" align="baseline" gap={6} style={{ marginTop: 10 }}>
                         {hasDiscount && discountedPrice != null ? (
                           <>
-                            <Typography.Text
-                              delete
-                              type="secondary"
-                              style={{ fontSize: 12 }}
-                            >
+                            <Typography.Text delete type="secondary" style={{ fontSize: 12 }}>
                               ${c.price.toLocaleString("es-MX")}
                             </Typography.Text>
-                            <Typography.Text
-                              style={{
-                                fontSize: 18,
-                                fontWeight: 700,
-                                color: beachColors.deepBlue,
-                              }}
-                            >
+                            <Typography.Text style={{ fontSize: 18, fontWeight: 700, color: beachColors.deepBlue }}>
                               ${discountedPrice.toLocaleString("es-MX")}
                             </Typography.Text>
-                            <Typography.Text type="secondary">
-                              / noche
-                            </Typography.Text>
+                            <Typography.Text type="secondary">/ noche</Typography.Text>
                           </>
                         ) : (
                           <>
-                            <Typography.Text
-                              style={{
-                                fontSize: 18,
-                                fontWeight: 700,
-                                color: beachColors.deepBlue,
-                              }}
-                            >
+                            <Typography.Text style={{ fontSize: 18, fontWeight: 700, color: beachColors.deepBlue }}>
                               ${c.price.toLocaleString("es-MX")}
                             </Typography.Text>
-                            <Typography.Text type="secondary">
-                              / noche
-                            </Typography.Text>
+                            <Typography.Text type="secondary">/ noche</Typography.Text>
                           </>
                         )}
                       </Flex>
@@ -560,22 +397,18 @@ function RoomCards({
             })}
       </Row>
 
-      {/* 🔢 PAGINADOR: usa los datos que manda el backend */}
-      {!loading &&
-        pagination &&
-        pagination.total > pagination.limit &&
-        typeof onPageChange === "function" && (
-          <Flex justify="center" style={{ marginTop: 18 }}>
-            <Pagination
-              current={pagination.page}
-              pageSize={pagination.limit}
-              total={pagination.total}
-              onChange={onPageChange}
-              showSizeChanger={false}
-              hideOnSinglePage
-            />
-          </Flex>
-        )}
+      {!loading && pagination && pagination.total > pagination.limit && typeof onPageChange === "function" && (
+        <Flex justify="center" style={{ marginTop: 18 }}>
+          <Pagination
+            current={pagination.page}
+            pageSize={pagination.limit}
+            total={pagination.total}
+            onChange={onPageChange}
+            showSizeChanger={false}
+            hideOnSinglePage
+          />
+        </Flex>
+      )}
     </>
   );
 }
