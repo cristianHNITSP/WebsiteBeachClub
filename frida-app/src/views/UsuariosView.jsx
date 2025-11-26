@@ -1,5 +1,5 @@
 // src/views/UsuariosView.jsx
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import axios from "axios";
 import {
   Card,
@@ -130,90 +130,129 @@ const UsuariosView = ({ isMobile, currentUser }) => {
     return () => clearTimeout(handler);
   }, [userSearch]);
 
+  /* =======================
+     ✅ OPTIMIZACIÓN REQUESTS
+     ======================= */
+  const abortRef = useRef(null);
+  const reqSeqRef = useRef(0);
+  const skipFirstFiltersEffectRef = useRef(true);
+  const lastResetKeyRef = useRef(""); // evita spamear success si por alguna razón se repite
+
   /* ========== CARGAR LISTA DESDE API (paginada + filtros backend) ========== */
 
-  const fetchUsers = async ({ reset = false } = {}) => {
-    if (reset) {
-      setLoadingUsers(true);
-      setOffset(0);
-      setHasMore(true);
-      setUsers([]);
-    } else {
-      if (!hasMore) {
-        messageApi.info("Ya no hay más usuarios para cargar.");
-        return;
-      }
-      setLoadingMore(true);
-    }
+  const fetchUsers = useCallback(
+    async ({ reset = false } = {}) => {
+      // ✅ Cancela request anterior si todavía está en vuelo
+      if (abortRef.current) abortRef.current.abort();
+      const controller = new AbortController();
+      abortRef.current = controller;
 
-    setErrorMsg("");
-    try {
-      const currentOffset = reset ? 0 : offset;
-
-      const params = {
-        offset: currentOffset,
-        limit,
-      };
-
-      if (userRoleFilter !== "all") {
-        params.role = userRoleFilter;
-      }
-
-      if (debouncedSearch) {
-        params.q = debouncedSearch;
-      }
-
-      const res = await axios.get("/api/users", {
-        withCredentials: true,
-        params,
-      });
-
-      const api = res.data;
-      const apiUsers = Array.isArray(api) ? api : api.items || [];
-      const mapped = apiUsers.map((u) => mapUserFromApi(u, currentUser));
-
-      setUsers((prev) =>
-        reset
-          ? mapped
-          : [
-              ...prev,
-              ...mapped.filter((nu) => !prev.some((p) => p.id === nu.id)),
-            ]
-      );
-
-      const nextOffset = currentOffset + apiUsers.length;
-      setOffset(nextOffset);
-
-      if (!Array.isArray(api) && typeof api.hasMore === "boolean") {
-        setHasMore(api.hasMore);
-      } else {
-        setHasMore(false);
-      }
+      // ✅ Evita que respuestas viejas pisen estado
+      const mySeq = ++reqSeqRef.current;
 
       if (reset) {
-        messageApi.success("Usuarios cargados correctamente.");
+        setLoadingUsers(true);
+        setOffset(0);
+        setHasMore(true);
+        setUsers([]);
+      } else {
+        if (!hasMore) {
+          messageApi.info("Ya no hay más usuarios para cargar.");
+          return;
+        }
+        setLoadingMore(true);
       }
-    } catch (err) {
-      console.error("Error al obtener usuarios:", err);
-      const msg =
-        err.response?.data?.message ||
-        "No se pudieron cargar los usuarios. Inténtalo de nuevo más tarde.";
-      setErrorMsg(msg);
-      messageApi.error(msg);
-    } finally {
-      setLoadingUsers(false);
-      setLoadingMore(false);
-    }
-  };
 
-  // Carga inicial
+      setErrorMsg("");
+      try {
+        const currentOffset = reset ? 0 : offset;
+
+        const params = {
+          offset: currentOffset,
+          limit,
+        };
+
+        if (userRoleFilter !== "all") {
+          params.role = userRoleFilter;
+        }
+
+        if (debouncedSearch) {
+          params.q = debouncedSearch;
+        }
+
+        const res = await axios.get("/api/users", {
+          withCredentials: true,
+          params,
+          signal: controller.signal, // ✅ axios v1 + AbortController
+        });
+
+        // si llegó tarde (vieja), ignorar
+        if (mySeq !== reqSeqRef.current) return;
+
+        const api = res.data;
+        const apiUsers = Array.isArray(api) ? api : api.items || [];
+        const mapped = apiUsers.map((u) => mapUserFromApi(u, currentUser));
+
+        setUsers((prev) =>
+          reset
+            ? mapped
+            : [
+                ...prev,
+                ...mapped.filter((nu) => !prev.some((p) => p.id === nu.id)),
+              ]
+        );
+
+        const nextOffset = currentOffset + apiUsers.length;
+        setOffset(nextOffset);
+
+        if (!Array.isArray(api) && typeof api.hasMore === "boolean") {
+          setHasMore(api.hasMore);
+        } else {
+          setHasMore(false);
+        }
+
+        // ✅ Mantener tu mensaje de éxito, pero sin spam:
+        // solo cuando es reset y el "key" (filtro+search) cambió de verdad.
+        if (reset) {
+          const resetKey = `${userRoleFilter}::${debouncedSearch}`;
+          if (lastResetKeyRef.current !== resetKey) {
+            lastResetKeyRef.current = resetKey;
+            messageApi.success("Usuarios cargados correctamente.");
+          }
+        }
+      } catch (err) {
+        // Abort => no avisar (es normal si el usuario escribe/filtra rápido)
+        if (err?.code === "ERR_CANCELED" || err?.name === "CanceledError") {
+          return;
+        }
+
+        console.error("Error al obtener usuarios:", err);
+        const msg =
+          err.response?.data?.message ||
+          "No se pudieron cargar los usuarios. Inténtalo de nuevo más tarde.";
+        setErrorMsg(msg);
+        messageApi.error(msg);
+      } finally {
+        setLoadingUsers(false);
+        setLoadingMore(false);
+      }
+    },
+    [hasMore, offset, limit, userRoleFilter, debouncedSearch, currentUser, messageApi]
+  );
+
+  // Carga inicial (una vez)
   useEffect(() => {
     fetchUsers({ reset: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Cuando cambian filtros -> recargar desde 0
+  // ✅ pero saltar el primer render para que NO se duplique con la carga inicial
   useEffect(() => {
+    if (skipFirstFiltersEffectRef.current) {
+      skipFirstFiltersEffectRef.current = false;
+      return;
+    }
     fetchUsers({ reset: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userRoleFilter, debouncedSearch]);
@@ -507,7 +546,7 @@ const UsuariosView = ({ isMobile, currentUser }) => {
     }
   };
 
-  /* ========== RENDER ========== */
+  /* ========== RENDER (SIN CAMBIOS VISUALES) ========== */
 
   return (
     <>

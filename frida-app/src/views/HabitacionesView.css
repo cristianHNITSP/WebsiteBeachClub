@@ -1,0 +1,111 @@
+/* src/views/HabitacionesView.css */
+
+/* Panel manual (se ve limpio y consistente) */
+.hb-manual-panel {
+  padding: 12px;
+  margin-bottom: 10px;
+  border-radius: 12px;
+  background: #fafafa;
+  border: 1px solid #f0f0f0;
+  font-family: "SF Pro Text", "Inter", -apple-system, BlinkMacSystemFont, system-ui,
+    sans-serif;
+}
+
+.hb-manual-title {
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  color: rgba(0, 0, 0, 0.88) !important;
+}
+
+.hb-manual-subtitle {
+  font-size: 10px !important;
+  color: rgba(0, 0, 0, 0.55) !important;
+}
+
+/* ===== Calendar look like AntD docs (Card) ===== */
+
+.hb-calendar .ant-picker-panel {
+  border: 1px solid #f0f0f0;
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.hb-cal-header {
+  padding: 8px 12px 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.hb-cal-title {
+  font-weight: 600 !important;
+  font-size: 13px !important;
+  color: rgba(0, 0, 0, 0.88) !important;
+}
+
+.hb-calendar .ant-picker-content th {
+  padding: 8px 0;
+  font-size: 11px;
+  font-weight: 600;
+  color: rgba(0, 0, 0, 0.45);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.hb-calendar .ant-picker-cell-inner {
+  min-height: 88px; /* docs-like */
+  padding: 8px 8px 6px;
+  border-radius: 10px;
+  transition: background 150ms ease;
+}
+
+.hb-calendar.hb-compact .ant-picker-cell-inner {
+  min-height: 72px; /* compacto, pero premium */
+  padding: 6px;
+}
+
+.hb-calendar .ant-picker-cell:hover .ant-picker-cell-inner {
+  background: rgba(0, 0, 0, 0.03);
+}
+
+.hb-calendar .ant-picker-calendar-date-value {
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(0, 0, 0, 0.88);
+}
+
+.hb-calendar .ant-picker-calendar-date-content {
+  height: auto;
+  margin-top: 4px;
+}
+
+/* Listado dentro del día (tipo docs con Badge) */
+.hb-cal-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.hb-cal-item {
+  font-size: 11px;
+  line-height: 1.1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.hb-cal-item .ant-badge-status-text {
+  color: rgba(0, 0, 0, 0.78);
+}
+
+.hb-cal-more {
+  font-size: 11px;
+  color: #1677ff;
+  cursor: pointer;
+  user-select: none;
+}

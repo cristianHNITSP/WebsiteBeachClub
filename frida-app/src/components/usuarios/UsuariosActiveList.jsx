@@ -102,6 +102,7 @@ const UsuariosActiveList = ({
 
         return (
           <List.Item
+            key={user.id}
             style={{
               padding: isFading ? "0 6px" : "8px 6px",
               marginBottom: isFading ? 0 : 4,
@@ -152,21 +153,11 @@ const UsuariosActiveList = ({
               }
               description={
                 <Space direction="vertical" size={0}>
-                  <Text
-                    style={{
-                      fontSize: 11,
-                      color: neutrals.textMuted,
-                    }}
-                  >
+                  <Text style={{ fontSize: 11, color: neutrals.textMuted }}>
                     {user.email}
                   </Text>
 
-                  <Text
-                    style={{
-                      fontSize: 10,
-                      color: neutrals.textMuted,
-                    }}
-                  >
+                  <Text style={{ fontSize: 10, color: neutrals.textMuted }}>
                     Alta en el sistema:{" "}
                     {new Date(user.createdAt).toLocaleDateString("es-MX", {
                       day: "2-digit",
@@ -189,31 +180,17 @@ const UsuariosActiveList = ({
             >
               <Tag
                 color={beachColors.teal}
-                style={{
-                  borderRadius: 999,
-                  fontSize: 9,
-                  color: "#064e3b",
-                }}
+                style={{ borderRadius: 999, fontSize: 9, color: "#064e3b" }}
               >
                 Activo
               </Tag>
-              <Text
-                style={{
-                  fontSize: 10,
-                  color: neutrals.textMuted,
-                }}
-              >
+
+              <Text style={{ fontSize: 10, color: neutrals.textMuted }}>
                 {user.lastAccess}
               </Text>
 
               {!user.isSelf ? (
-                <Space
-                  size={4}
-                  wrap
-                  style={{
-                    justifyContent: "flex-end",
-                  }}
-                >
+                <Space size={4} wrap style={{ justifyContent: "flex-end" }}>
                   <Button
                     type="link"
                     size="small"
@@ -229,16 +206,13 @@ const UsuariosActiveList = ({
                     okText="Sí, enviar"
                     cancelText="Cancelar"
                     placement={isMobile ? "top" : "left"}
-                    overlayStyle={{
-                      maxWidth: 320,
-                      whiteSpace: "normal",
-                    }}
+                    overlayStyle={{ maxWidth: 320, whiteSpace: "normal" }}
                     onConfirm={() => cambiarEstado(user)}
                   >
                     <Button
                       type="link"
                       size="small"
-                      loading={togglingId === user.id} // 🔄 spinner en botón
+                      loading={togglingId === user.id}
                       style={{ paddingInline: 4, fontSize: 10 }}
                     >
                       Enviar a papelera
@@ -246,12 +220,7 @@ const UsuariosActiveList = ({
                   </Popconfirm>
                 </Space>
               ) : (
-                <Text
-                  style={{
-                    fontSize: 10,
-                    color: neutrals.textMuted,
-                  }}
-                >
+                <Text style={{ fontSize: 10, color: neutrals.textMuted }}>
                   Este es tu usuario actual (no editable aquí).
                 </Text>
               )}

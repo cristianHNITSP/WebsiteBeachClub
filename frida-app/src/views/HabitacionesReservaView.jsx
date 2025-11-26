@@ -1,6 +1,5 @@
 // src/views/HabitacionesView.jsx
-import React, { useState, useEffect } from "react";
-import axios from "axios";
+import { useState, useMemo } from "react";
 import {
   Card,
   Space,
@@ -14,7 +13,10 @@ import {
   Button,
   message,
   Grid,
-  Tooltip,
+  Popover,
+  Dropdown,
+  Modal,
+  Divider,
 } from "antd";
 import dayjs from "dayjs";
 import "dayjs/locale/es";
@@ -23,8 +25,14 @@ import {
   HomeOutlined,
   InfoCircleOutlined,
   UserOutlined,
+  MoreOutlined,
+  LoginOutlined,
+  LogoutOutlined,
+  DeleteOutlined,
 } from "@ant-design/icons";
 import { beachColors, neutrals } from "../theme/beachTheme";
+
+import { isMobile } from "react-device-detect";
 
 dayjs.locale("es");
 
@@ -32,6 +40,77 @@ const { Text } = Typography;
 const { useBreakpoint } = Grid;
 const { Option } = Select;
 const { RangePicker } = DatePicker;
+
+/* ===================== HELPERS ID ===================== */
+
+const genId = () => {
+  try {
+    // modern browsers
+    return crypto.randomUUID();
+  } catch {
+    return `evt_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+  }
+};
+
+/* ===================== DATA EN MEMORIA (EDITA AQUÍ) ===================== */
+
+const HABITACIONES_SEED = [
+  // Casa Frida
+  {
+    id: "cf-101",
+    codigo: "101",
+    roomNumber: "101",
+    title: "Suite Garden",
+    hotelCode: "casa_frida",
+  },
+  {
+    id: "cf-102",
+    codigo: "102",
+    roomNumber: "102",
+    title: "Ocean View",
+    hotelCode: "casa_frida",
+  },
+
+  // Cabañas Fridas
+  {
+    id: "cb-201",
+    codigo: "201",
+    roomNumber: "201",
+    title: "Cabaña Deluxe",
+    hotelCode: "cabanas_fridas",
+  },
+  {
+    id: "cb-202",
+    codigo: "202",
+    roomNumber: "202",
+    title: "Cabaña Familiar",
+    hotelCode: "cabanas_fridas",
+  },
+];
+
+// Si quieres empezar vacío, deja esto como []
+const EVENTOS_SEED = [
+  {
+    id: "evt_seed_1",
+    hotel: "casa_frida",
+    room: "101",
+    type: "stay",
+    startDate: dayjs().add(1, "day").format("YYYY-MM-DD"),
+    endDate: dayjs().add(3, "day").format("YYYY-MM-DD"),
+    label: "Reserva Daniel · pagado",
+    origen: "seed",
+    // checkinAt / checkoutAt se agregan cuando aplique
+  },
+  {
+    id: "evt_seed_2",
+    hotel: "cabanas_fridas",
+    room: "201",
+    type: "cleaning",
+    startDate: dayjs().format("YYYY-MM-DD"),
+    label: "Limpieza programada · AM",
+    origen: "seed",
+  },
+];
 
 /* ===================== SEDES ===================== */
 
@@ -48,22 +127,14 @@ const HOTELES_SHORT = {
 const getHotelLabel = (hotel) => HOTELES[hotel] || "Sede no especificada";
 const getHotelShort = (hotel) => HOTELES_SHORT[hotel] || "";
 
-/* ===================== META TIPOS ===================== */
+/* ===================== META TIPOS (BASE) ===================== */
 
 const metaTipo = (type) => {
   switch (type) {
     case "checkin":
-      return {
-        color: "#22c55e",
-        labelCorto: "Ent.",
-        labelLargo: "Entrada",
-      };
+      return { color: "#22c55e", labelCorto: "Ent.", labelLargo: "Entrada" };
     case "checkout":
-      return {
-        color: "#fb7185",
-        labelCorto: "Sal.",
-        labelLargo: "Salida",
-      };
+      return { color: "#fb7185", labelCorto: "Sal.", labelLargo: "Salida" };
     case "stay":
       return {
         color: "#38bdf8",
@@ -77,17 +148,9 @@ const metaTipo = (type) => {
         labelLargo: "Estancia abierta",
       };
     case "cleaning":
-      return {
-        color: "#fbbf24",
-        labelCorto: "Limp.",
-        labelLargo: "Limpieza",
-      };
+      return { color: "#fbbf24", labelCorto: "Limp.", labelLargo: "Limpieza" };
     case "block":
-      return {
-        color: "#9ca3af",
-        labelCorto: "Bloq.",
-        labelLargo: "Bloqueo",
-      };
+      return { color: "#9ca3af", labelCorto: "Bloq.", labelLargo: "Bloqueo" };
     default:
       return {
         color: beachColors.teal,
@@ -95,6 +158,21 @@ const metaTipo = (type) => {
         labelLargo: "Movimiento",
       };
   }
+};
+
+/**
+ * Estado derivado:
+ * - Las reservas (stay / stay_open) NO se crean como check-in/out.
+ * - check-in/out se registran desde un submenú dentro del tooltip (acciones).
+ * - Visualmente podemos reflejar el estado con el color/label de entrada/salida.
+ */
+const metaEvento = (evento) => {
+  if (evento?.type === "stay" || evento?.type === "stay_open") {
+    if (evento.checkoutAt) return metaTipo("checkout");
+    if (evento.checkinAt) return metaTipo("checkin");
+    return metaTipo(evento.type);
+  }
+  return metaTipo(evento?.type);
 };
 
 /* ===================== HELPERS TOOLTIP ===================== */
@@ -110,26 +188,92 @@ const buildFechasTexto = (evento) => {
     : "";
   const fin = evento.endDate ? dayjs(evento.endDate).format("DD/MM/YYYY") : "";
 
-  if (evento.type === "stay" && inicio && fin) {
-    return `${inicio} al ${fin}`;
-  }
-
-  if (evento.type === "stay_open" && inicio) {
+  if (evento.type === "stay" && inicio && fin) return `${inicio} al ${fin}`;
+  if (evento.type === "stay_open" && inicio)
     return `Desde ${inicio} · Sin fecha de salida`;
-  }
-
-  if (inicio && !fin) {
-    return inicio;
-  }
-
+  if (inicio && !fin) return inicio;
   return "";
 };
 
-const tooltipContenidoEvento = (evento) => {
-  const meta = metaTipo(evento.type);
+const eventoCubreFecha = (evento, fechaStr) => {
+  const inicio = evento.startDate;
+  const fin = evento.endDate;
+  if (!inicio) return false;
+
+  if (evento.type === "stay_open") return fechaStr >= inicio;
+  if (fin) return fechaStr >= inicio && fechaStr <= fin;
+  return fechaStr === inicio;
+};
+
+/* ===================== TOOLTIP CONTENT COMPONENT ===================== */
+
+const TooltipContenidoEvento = ({
+  evento,
+  onCheckin,
+  onCheckout,
+  onDelete,
+}) => {
+  const meta = metaEvento(evento);
   const hotelLabel = getHotelLabel(evento.hotel);
   const fechas = buildFechasTexto(evento);
   const detalleCorto = recortar(evento.label, 90);
+
+  const esReserva = evento.type === "stay" || evento.type === "stay_open";
+  const tieneCheckin = !!evento.checkinAt;
+  const tieneCheckout = !!evento.checkoutAt;
+
+  const accionesItems = [
+    !tieneCheckin && esReserva
+      ? {
+          key: "checkin",
+          icon: <LoginOutlined />,
+          label: "Marcar entrada (check-in)",
+        }
+      : null,
+    tieneCheckin && !tieneCheckout && esReserva
+      ? {
+          key: "checkout",
+          icon: <LogoutOutlined />,
+          label: "Marcar salida (check-out)",
+        }
+      : null,
+    esReserva
+      ? {
+          key: "delete",
+          icon: <DeleteOutlined />,
+          label: "Eliminar reserva",
+          danger: true,
+        }
+      : {
+          key: "delete",
+          icon: <DeleteOutlined />,
+          label: "Eliminar movimiento",
+          danger: true,
+        },
+  ].filter(Boolean);
+
+  const handleAccion = ({ key }) => {
+    if (key === "checkin") {
+      onCheckin?.(evento.id);
+      return;
+    }
+    if (key === "checkout") {
+      onCheckout?.(evento.id);
+      return;
+    }
+    if (key === "delete") {
+      Modal.confirm({
+        title: esReserva ? "Eliminar reserva" : "Eliminar movimiento",
+        content: esReserva
+          ? "Esto eliminará la reserva del calendario. ¿Deseas continuar?"
+          : "Esto eliminará el movimiento del calendario. ¿Deseas continuar?",
+        okText: "Eliminar",
+        okButtonProps: { danger: true },
+        cancelText: "Cancelar",
+        onOk: () => onDelete?.(evento.id),
+      });
+    }
+  };
 
   return (
     <div
@@ -141,23 +285,11 @@ const tooltipContenidoEvento = (evento) => {
         fontFamily:
           '"SF Pro Text", "Inter", -apple-system, BlinkMacSystemFont, system-ui, sans-serif',
         fontSize: 11,
+        minWidth: 260,
       }}
     >
-      {/* Encabezado */}
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          gap: 10,
-        }}
-      >
-        <div
-          style={{
-            display: "flex",
-            gap: 8,
-            alignItems: "center",
-          }}
-        >
+      <div style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
           <div
             style={{
               width: 4,
@@ -232,15 +364,7 @@ const tooltipContenidoEvento = (evento) => {
         </div>
       </div>
 
-      {/* Bloque de info */}
-      <div
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          gap: 4,
-          marginTop: 2,
-        }}
-      >
+      <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
         <div
           style={{
             display: "flex",
@@ -271,6 +395,99 @@ const tooltipContenidoEvento = (evento) => {
             />
             <span>{detalleCorto}</span>
           </div>
+        )}
+
+        {(evento.type === "stay" || evento.type === "stay_open") && (
+          <>
+            <Divider style={{ margin: "6px 0" }} />
+            <div
+              style={{
+                display: "flex",
+                flexWrap: "wrap",
+                gap: 6,
+                fontSize: 9.5,
+                color: neutrals.textMuted,
+              }}
+            >
+              {evento.checkinAt ? (
+                <span
+                  style={{
+                    padding: "2px 8px",
+                    borderRadius: 999,
+                    background: "#ecfdf5",
+                    border: "1px solid #bbf7d0",
+                    color: "#065f46",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 6,
+                  }}
+                >
+                  <LoginOutlined />
+                  Entrada: <b>{dayjs(evento.checkinAt).format("DD/MM/YYYY")}</b>
+                </span>
+              ) : (
+                <span
+                  style={{
+                    padding: "2px 8px",
+                    borderRadius: 999,
+                    background: "#eff6ff",
+                    border: "1px solid #bfdbfe",
+                    color: "#1e3a8a",
+                  }}
+                >
+                  Sin check-in
+                </span>
+              )}
+
+              {evento.checkoutAt ? (
+                <span
+                  style={{
+                    padding: "2px 8px",
+                    borderRadius: 999,
+                    background: "#fff1f2",
+                    border: "1px solid #fecdd3",
+                    color: "#9f1239",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 6,
+                  }}
+                >
+                  <LogoutOutlined />
+                  Salida: <b>{dayjs(evento.checkoutAt).format("DD/MM/YYYY")}</b>
+                </span>
+              ) : (
+                <span
+                  style={{
+                    padding: "2px 8px",
+                    borderRadius: 999,
+                    background: "#f8fafc",
+                    border: "1px solid #e5e7eb",
+                    color: "#334155",
+                  }}
+                >
+                  Sin check-out
+                </span>
+              )}
+            </div>
+
+            <div style={{ display: "flex", justifyContent: "flex-end" }}>
+              <Dropdown
+                trigger={isMobile ? ["click"] : ["hover"]}
+                menu={{ items: accionesItems, onClick: handleAccion }}
+              >
+                <Button
+                  size="small"
+                  icon={<MoreOutlined />}
+                  style={{
+                    borderRadius: 999,
+                    marginTop: 6,
+                  }}
+                >
+                  Acciones
+                </Button>
+              </Dropdown>
+            </div>
+          </>
         )}
       </div>
 
@@ -317,8 +534,9 @@ const tooltipContenidoListaExtra = (lista) => (
     >
       Otros movimientos en este día
     </div>
+
     {lista.map((e, idx) => {
-      const meta = metaTipo(e.type);
+      const meta = metaEvento(e);
       const fechas = buildFechasTexto(e);
       const detalle = recortar(e.label, 70);
 
@@ -358,7 +576,6 @@ const tooltipContenidoListaExtra = (lista) => (
                   height: 7,
                   borderRadius: "999px",
                   backgroundColor: meta.color,
-                  flexShrink: 0,
                 }}
               />
               <span style={{ fontWeight: 500 }}>
@@ -368,12 +585,7 @@ const tooltipContenidoListaExtra = (lista) => (
           </div>
 
           {detalle && (
-            <div
-              style={{
-                fontSize: 9.5,
-                color: neutrals.textMuted,
-              }}
-            >
+            <div style={{ fontSize: 9.5, color: neutrals.textMuted }}>
               {detalle}
             </div>
           )}
@@ -398,24 +610,6 @@ const tooltipContenidoListaExtra = (lista) => (
   </div>
 );
 
-/* ===================== COBERTURA FECHA ===================== */
-
-const eventoCubreFecha = (evento, fechaStr) => {
-  const inicio = evento.startDate;
-  const fin = evento.endDate;
-  if (!inicio) return false;
-
-  if (evento.type === "stay_open") {
-    return fechaStr >= inicio;
-  }
-
-  if (fin) {
-    return fechaStr >= inicio && fechaStr <= fin;
-  }
-
-  return fechaStr === inicio;
-};
-
 /* ===================== PANEL PROGRAMACIÓN ===================== */
 
 const PanelProgramacionManual = ({
@@ -433,22 +627,13 @@ const PanelProgramacionManual = ({
     setEnviando(true);
 
     try {
-      const {
-        hotel,
-        habitacion,
-        tipo,
-        huesped,
-        fecha,
-        rango,
-        fechaInicio,
-        notas,
-      } = valores;
+      const { hotel, habitacion, tipo, huesped, fecha, rango, fechaInicio, notas } =
+        valores;
 
       const habitacionObj = habitaciones.find((h) => h.id === habitacion);
 
       if (!habitacionObj) {
         message.error("Selecciona una habitación válida.");
-        setEnviando(false);
         return;
       }
 
@@ -461,20 +646,17 @@ const PanelProgramacionManual = ({
 
       if (!tipo) {
         message.error("Selecciona el tipo de movimiento.");
-        setEnviando(false);
         return;
       }
 
       const nombreHuesped = huesped ? ` ${huesped}` : "";
       const notasTexto = notas ? ` · ${notas}` : "";
 
-      // Reserva 1 o varios días
       if (tipo === "stay") {
         if (!rango || rango.length !== 2) {
           message.error(
             "Selecciona fechas de entrada y salida (pueden ser el mismo día)."
           );
-          setEnviando(false);
           return;
         }
 
@@ -484,6 +666,7 @@ const PanelProgramacionManual = ({
         const etiquetaFinal = `${etiquetaBase}${notasTexto}`;
 
         onCrearEvento({
+          id: genId(),
           hotel: hotelFinal,
           room: roomFinal,
           type: "stay",
@@ -495,15 +678,12 @@ const PanelProgramacionManual = ({
 
         formulario.resetFields();
         message.success("Reserva registrada en el calendario.");
-        setEnviando(false);
         return;
       }
 
-      // Estancia abierta
       if (tipo === "stay_open") {
         if (!fechaInicio) {
           message.error("Selecciona la fecha de entrada.");
-          setEnviando(false);
           return;
         }
 
@@ -513,6 +693,7 @@ const PanelProgramacionManual = ({
         const etiquetaFinal = `${etiquetaBase}${notasTexto}`;
 
         onCrearEvento({
+          id: genId(),
           hotel: hotelFinal,
           room: roomFinal,
           type: "stay_open",
@@ -523,14 +704,11 @@ const PanelProgramacionManual = ({
 
         formulario.resetFields();
         message.success("Estancia abierta registrada.");
-        setEnviando(false);
         return;
       }
 
-      // Eventos de un solo día: entrada, salida, limpieza, bloqueo
       if (!fecha) {
         message.error("Selecciona la fecha.");
-        setEnviando(false);
         return;
       }
 
@@ -538,12 +716,6 @@ const PanelProgramacionManual = ({
       let etiquetaBase = "";
 
       switch (tipo) {
-        case "checkin":
-          etiquetaBase = `Entrada${nombreHuesped}`.trim();
-          break;
-        case "checkout":
-          etiquetaBase = `Salida${nombreHuesped}`.trim();
-          break;
         case "cleaning":
           etiquetaBase = "Limpieza programada";
           break;
@@ -557,6 +729,7 @@ const PanelProgramacionManual = ({
       const etiquetaFinal = `${etiquetaBase}${notasTexto}`;
 
       onCrearEvento({
+        id: genId(),
         hotel: hotelFinal,
         room: roomFinal,
         type,
@@ -575,8 +748,12 @@ const PanelProgramacionManual = ({
     }
   };
 
-  const habitacionesFiltradas = habitaciones.filter((h) =>
-    hotelSeleccionado ? h.hotelCode === hotelSeleccionado : true
+  const habitacionesFiltradas = useMemo(
+    () =>
+      habitaciones.filter((h) =>
+        hotelSeleccionado ? h.hotelCode === hotelSeleccionado : true
+      ),
+    [habitaciones, hotelSeleccionado]
   );
 
   return (
@@ -592,38 +769,23 @@ const PanelProgramacionManual = ({
       }}
     >
       <Space direction="vertical" size={4} style={{ width: "100%" }}>
-        <Text
-          style={{
-            fontSize: 12,
-            fontWeight: 600,
-            color: neutrals.textMain,
-          }}
-        >
+        <Text style={{ fontSize: 12, fontWeight: 600, color: neutrals.textMain }}>
           Programar habitación manualmente
         </Text>
 
-        <Text
-          style={{
-            fontSize: 10,
-            color: neutrals.textMuted,
-          }}
-        >
-          Registra <b>entradas</b>, <b>salidas</b>,{" "}
-          <b>reservas (1 o varios días)</b>, estancias abiertas, limpiezas y
-          bloqueos para Casa Frida y Cabañas Fridas.
+        <Text style={{ fontSize: 10, color: neutrals.textMuted }}>
+          Registra <b>reservas</b>, <b>estancias abiertas</b>, <b>limpiezas</b> y{" "}
+          <b>bloqueos</b>. <br />
+          El <b>check-in</b> y <b>check-out</b> se marcan desde el{" "}
+          <b>tooltip (Acciones)</b> de la reserva para no saturar el formulario.
         </Text>
 
         <Form
           form={formulario}
           layout={esMobile ? "vertical" : "inline"}
           onFinish={manejarEnvio}
-          style={{
-            width: "100%",
-            marginTop: 4,
-            rowGap: 6,
-          }}
+          style={{ width: "100%", marginTop: 4, rowGap: 6 }}
         >
-          {/* Sede */}
           <Form.Item
             name="hotel"
             style={{ marginRight: esMobile ? 0 : 6, marginBottom: 6 }}
@@ -639,7 +801,6 @@ const PanelProgramacionManual = ({
             </Select>
           </Form.Item>
 
-          {/* Habitación */}
           <Form.Item
             name="habitacion"
             rules={[{ required: true, message: "Selecciona la habitación" }]}
@@ -647,9 +808,7 @@ const PanelProgramacionManual = ({
           >
             <Select
               size="small"
-              placeholder={
-                loadingHabitaciones ? "Cargando habitaciones..." : "Habitación"
-              }
+              placeholder={loadingHabitaciones ? "Cargando..." : "Habitación"}
               style={{ width: esMobile ? "100%" : 260 }}
               loading={loadingHabitaciones}
               showSearch
@@ -661,12 +820,11 @@ const PanelProgramacionManual = ({
               }
               onChange={(value) => {
                 const hab = habitaciones.find((h) => h.id === value);
-                if (hab) {
+                if (hab)
                   formulario.setFieldsValue({
                     habitacion: value,
                     hotel: hab.hotelCode,
                   });
-                }
               }}
             >
               {habitacionesFiltradas.map((h) => {
@@ -683,7 +841,6 @@ const PanelProgramacionManual = ({
             </Select>
           </Form.Item>
 
-          {/* Tipo */}
           <Form.Item
             name="tipo"
             rules={[{ required: true, message: "Selecciona el tipo" }]}
@@ -694,8 +851,6 @@ const PanelProgramacionManual = ({
               placeholder="Tipo de movimiento"
               style={{ width: esMobile ? "100%" : 220 }}
             >
-              <Option value="checkin">Entrada (check-in)</Option>
-              <Option value="checkout">Salida (check-out)</Option>
               <Option value="stay">Reserva (1 o varios días)</Option>
               <Option value="stay_open">Estancia abierta</Option>
               <Option value="cleaning">Limpieza</Option>
@@ -703,17 +858,10 @@ const PanelProgramacionManual = ({
             </Select>
           </Form.Item>
 
-          {/* Fecha según tipo */}
           {tipoSeleccionado === "stay" ? (
             <Form.Item
               name="rango"
-              rules={[
-                {
-                  required: true,
-                  message:
-                    "Selecciona entrada y salida (pueden ser la misma fecha).",
-                },
-              ]}
+              rules={[{ required: true, message: "Selecciona entrada y salida." }]}
               style={{ marginRight: esMobile ? 0 : 6, marginBottom: 6 }}
             >
               <RangePicker
@@ -725,12 +873,7 @@ const PanelProgramacionManual = ({
           ) : tipoSeleccionado === "stay_open" ? (
             <Form.Item
               name="fechaInicio"
-              rules={[
-                {
-                  required: true,
-                  message: "Selecciona la fecha de entrada",
-                },
-              ]}
+              rules={[{ required: true, message: "Selecciona la fecha de entrada" }]}
               style={{ marginRight: esMobile ? 0 : 6, marginBottom: 6 }}
             >
               <DatePicker
@@ -743,12 +886,7 @@ const PanelProgramacionManual = ({
           ) : (
             <Form.Item
               name="fecha"
-              rules={[
-                {
-                  required: true,
-                  message: "Selecciona la fecha",
-                },
-              ]}
+              rules={[{ required: true, message: "Selecciona la fecha" }]}
               style={{ marginRight: esMobile ? 0 : 6, marginBottom: 6 }}
             >
               <DatePicker
@@ -759,7 +897,6 @@ const PanelProgramacionManual = ({
             </Form.Item>
           )}
 
-          {/* Huésped */}
           <Form.Item
             name="huesped"
             style={{
@@ -775,7 +912,6 @@ const PanelProgramacionManual = ({
             />
           </Form.Item>
 
-          {/* Notas */}
           <Form.Item
             name="notas"
             style={{
@@ -791,19 +927,18 @@ const PanelProgramacionManual = ({
             />
           </Form.Item>
 
-          {/* Botón */}
           <Form.Item style={{ marginBottom: 6 }}>
             <Button
               type="primary"
               htmlType="submit"
               size="small"
-              loading={enviando}
               style={{
                 borderRadius: 999,
                 paddingInline: 16,
                 background: beachColors.oceanBlue,
                 borderColor: beachColors.oceanBlue,
               }}
+              loading={enviando}
             >
               Guardar
             </Button>
@@ -819,75 +954,124 @@ const PanelProgramacionManual = ({
 const HabitacionesReservaView = ({ isMobile: forzarMobile }) => {
   const puntosCorte = useBreakpoint();
   const esMobileDetectado = !puntosCorte.md;
-  const esMobile =
+  const esMobileFinal =
     typeof forzarMobile === "boolean" ? forzarMobile : esMobileDetectado;
-  const compacto = esMobile;
+  const compacto = esMobileFinal;
 
-  // AHORA el calendario empieza vacío: tú creas todo
-  const [eventos, setEventos] = useState([]);
+  // Data en memoria
+  const [habitaciones] = useState(HABITACIONES_SEED);
+  const [eventos, setEventos] = useState(EVENTOS_SEED);
+
+  // Ya no hay carga API
+  const [loadingHabitaciones] = useState(false);
 
   const [filtroHotel, setFiltroHotel] = useState("all");
 
-  // Habitaciones desde tu API de inventario
-  const [habitaciones, setHabitaciones] = useState([]);
-  const [loadingHabitaciones, setLoadingHabitaciones] = useState(false);
+  const manejarCrearEvento = (nuevoEvento) => {
+    setEventos((anteriores) => [
+      ...anteriores,
+      { ...nuevoEvento, id: nuevoEvento.id || genId() },
+    ]);
+  };
 
-  useEffect(() => {
-    const fetchHabitaciones = async () => {
-      try {
-        setLoadingHabitaciones(true);
-        const res = await axios.get("/api/habitaciones/name.habitaciones");
+  const marcarCheckin = (eventoId) => {
+    setEventos((prev) =>
+      prev.map((e) => {
+        if (e.id !== eventoId) return e;
+        if (e.type !== "stay" && e.type !== "stay_open") return e;
+        if (e.checkinAt) return e;
+        return { ...e, checkinAt: dayjs().format("YYYY-MM-DD") };
+      })
+    );
+    message.success("Entrada (check-in) registrada.");
+  };
 
-        const raw = Array.isArray(res.data) ? res.data : [];
+  const marcarCheckout = (eventoId) => {
+    const evento = eventos.find((e) => e.id === eventoId);
+    if (!evento) return;
 
-        // Normalizamos por si acaso
-        const rooms = raw.map((h) => ({
-          id: h.id || h._id, // por si alguna vez viene _id
-          codigo: h.codigo || "",
-          roomNumber: h.roomNumber || "",
-          title: h.title || "",
-          hotelCode: h.hotelCode || "",
-        }));
+    if ((evento.type === "stay" || evento.type === "stay_open") && !evento.checkinAt) {
+      message.warning("Primero marca la entrada (check-in).");
+      return;
+    }
 
-        setHabitaciones(rooms);
-      } catch (err) {
-        console.error(err);
-        message.error("No se pudieron cargar las habitaciones");
-      } finally {
-        setLoadingHabitaciones(false);
-      }
-    };
+    setEventos((prev) =>
+      prev.map((e) => {
+        if (e.id !== eventoId) return e;
+        if (e.type !== "stay" && e.type !== "stay_open") return e;
+        if (e.checkoutAt) return e;
+        return { ...e, checkoutAt: dayjs().format("YYYY-MM-DD") };
+      })
+    );
+    message.success("Salida (check-out) registrada.");
+  };
 
-    fetchHabitaciones();
-  }, []);
+  const eliminarEvento = (eventoId) => {
+    setEventos((prev) => prev.filter((e) => e.id !== eventoId));
+    message.success("Eliminado.");
+  };
 
+  // ===================== HEADER RESPONSIVE (ARREGLADO) =====================
+  const headerWrapStyle = {
+    display: "grid",
+    gridTemplateColumns: compacto ? "1fr" : "max-content 1fr",
+    alignItems: "center",
+    columnGap: 12,
+    rowGap: 10,
+    width: "100%",
+    minWidth: 0,
+  };
+
+  const headerTitleStyle = {
+    fontWeight: 600,
+    color: neutrals.textMain,
+    fontSize: 15,
+    lineHeight: 1.2,
+    whiteSpace: compacto ? "normal" : "nowrap",
+    minWidth: 0,
+  };
+
+  const headerRightStyle = {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: 10,
+    alignItems: "center",
+    justifyContent: "flex-start",
+    minWidth: 0,
+  };
+
+  const legendWrapStyle = {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: 6,
+    alignItems: "center",
+    minWidth: 0,
+  };
+
+  const tagBase = {
+    borderRadius: 999,
+    fontSize: 9,
+    whiteSpace: "nowrap",
+    lineHeight: "18px",
+    paddingInline: 10,
+    paddingBlock: 2,
+  };
+
+  // ✅ ya NO mostramos Entrada/Salida arriba (se manejan desde tooltip->Acciones)
   const leyendaTipos = (
-    <Space size={6} wrap>
-      <Tag color="#22c55e" style={{ borderRadius: 999, fontSize: 9 }}>
-        Entrada
-      </Tag>
-      <Tag color="#fb7185" style={{ borderRadius: 999, fontSize: 9 }}>
-        Salida
-      </Tag>
-      <Tag
-        color="#38bdf8"
-        style={{ borderRadius: 999, fontSize: 9, color: "#0f172a" }}
-      >
+    <div style={legendWrapStyle}>
+      <Tag color="#38bdf8" style={{ ...tagBase, color: "#0f172a" }}>
         Reserva 1 o varios días
       </Tag>
-      <Tag
-        color="#4f46e5"
-        style={{ borderRadius: 999, fontSize: 9, color: "#eff6ff" }}
-      >
+      <Tag color="#4f46e5" style={{ ...tagBase, color: "#eff6ff" }}>
         Estancia abierta
       </Tag>
-      <Tag color="#fbbf24" style={{ borderRadius: 999, fontSize: 9 }}>
+      <Tag color="#fbbf24" style={tagBase}>
         Limpieza
       </Tag>
       <Tag
         style={{
-          borderRadius: 999,
-          fontSize: 9,
+          ...tagBase,
           color: "#111827",
           background: "#e5e7eb",
           border: "none",
@@ -895,7 +1079,7 @@ const HabitacionesReservaView = ({ isMobile: forzarMobile }) => {
       >
         Bloqueo
       </Tag>
-    </Space>
+    </div>
   );
 
   const selectorHotel = (
@@ -903,17 +1087,14 @@ const HabitacionesReservaView = ({ isMobile: forzarMobile }) => {
       size="small"
       value={filtroHotel}
       onChange={setFiltroHotel}
-      style={{ minWidth: 150 }}
+      style={{ minWidth: 160 }}
+      dropdownMatchSelectWidth={false}
     >
       <Option value="all">Todas las sedes</Option>
       <Option value="casa_frida">Casa Frida</Option>
       <Option value="cabanas_fridas">Cabañas Fridas</Option>
     </Select>
   );
-
-  const manejarCrearEvento = (nuevoEvento) => {
-    setEventos((anteriores) => [...anteriores, nuevoEvento]);
-  };
 
   const renderCeldaFecha = (valor) => {
     const fechaStr = valor.format("YYYY-MM-DD");
@@ -928,7 +1109,6 @@ const HabitacionesReservaView = ({ isMobile: forzarMobile }) => {
     const maxItems = compacto ? 3 : 4;
     const visibles = lista.slice(0, maxItems);
     const extras = lista.slice(maxItems);
-    const restantes = extras.length;
 
     return (
       <ul
@@ -941,26 +1121,33 @@ const HabitacionesReservaView = ({ isMobile: forzarMobile }) => {
         }}
       >
         {visibles.map((item, indice) => {
-          const meta = metaTipo(item.type);
+          const meta = metaEvento(item);
           const shortHotel = getHotelShort(item.hotel);
+
           const etiquetaCorta = `${shortHotel ? `${shortHotel} · ` : ""}Hab ${
             item.room
           } · ${meta.labelCorto}`.trim();
 
           return (
-            <Tooltip
-              key={`${item.startDate || ""}-${item.room}-${indice}-${
-                item.type
-              }-${item.hotel || "x"}`}
-              title={tooltipContenidoEvento(item)}
+            <Popover
+              key={`${item.id || ""}-${item.startDate || ""}-${item.room}-${indice}-${item.type}-${item.hotel || "x"}`}
+              content={
+                <TooltipContenidoEvento
+                  evento={item}
+                  onCheckin={marcarCheckin}
+                  onCheckout={marcarCheckout}
+                  onDelete={eliminarEvento}
+                />
+              }
               color="#ffffff"
               overlayInnerStyle={{
                 background: "#ffffff",
                 borderRadius: 14,
                 boxShadow: "0 14px 34px rgba(15,23,42,0.16)",
                 border: "1px solid #e5e7eb",
+                padding: 10,
               }}
-              trigger={["hover", "click"]}
+              trigger={isMobile ? "click" : "hover"}
             >
               <li
                 style={{
@@ -982,7 +1169,6 @@ const HabitacionesReservaView = ({ isMobile: forzarMobile }) => {
                     height: 7,
                     borderRadius: "999px",
                     backgroundColor: meta.color,
-                    flexShrink: 0,
                   }}
                 />
                 <span
@@ -999,21 +1185,22 @@ const HabitacionesReservaView = ({ isMobile: forzarMobile }) => {
                   {etiquetaCorta}
                 </span>
               </li>
-            </Tooltip>
+            </Popover>
           );
         })}
 
-        {restantes > 0 && (
-          <Tooltip
-            title={tooltipContenidoListaExtra(extras)}
+        {extras.length > 0 && (
+          <Popover
+            content={tooltipContenidoListaExtra(extras)}
             color="#ffffff"
             overlayInnerStyle={{
               background: "#ffffff",
               borderRadius: 14,
               boxShadow: "0 14px 34px rgba(15,23,42,0.16)",
               border: "1px solid #e5e7eb",
+              padding: 10,
             }}
-            trigger={["hover", "click"]}
+            trigger={isMobile ? "click" : "hover"}
           >
             <li
               style={{
@@ -1027,9 +1214,9 @@ const HabitacionesReservaView = ({ isMobile: forzarMobile }) => {
                 fontWeight: 500,
               }}
             >
-              +{restantes} más
+              +{extras.length} más
             </li>
-          </Tooltip>
+          </Popover>
         )}
       </ul>
     );
@@ -1047,45 +1234,17 @@ const HabitacionesReservaView = ({ isMobile: forzarMobile }) => {
           '"SF Pro Text", "Inter", -apple-system, BlinkMacSystemFont, system-ui, sans-serif',
       }}
       title={
-        <Space size={6} direction={compacto ? "vertical" : "horizontal"} wrap>
-          <Text
-            style={{
-              fontWeight: 600,
-              color: neutrals.textMain,
-              fontSize: 15,
-            }}
-          >
-            Calendario de ocupación centralizado
-          </Text>
-          <Tag
-            color={beachColors.oceanBlue}
-            style={{
-              borderRadius: 999,
-              fontSize: 10,
-              color: "#0f172a",
-            }}
-          >
-            Casa Frida & Cabañas Fridas · Reservas, entradas, salidas y bloqueos
-          </Tag>
-          {compacto && (
-            <Space size={8} wrap>
-              {leyendaTipos}
-              {selectorHotel}
-            </Space>
-          )}
-        </Space>
-      }
-      extra={
-        !compacto && (
-          <Space size={10} wrap>
+        <div style={headerWrapStyle}>
+          <Text style={headerTitleStyle}>Calendario de ocupación centralizado</Text>
+          <div style={headerRightStyle}>
             {leyendaTipos}
             {selectorHotel}
-          </Space>
-        )
+          </div>
+        </div>
       }
     >
       <PanelProgramacionManual
-        esMobile={esMobile}
+        esMobile={esMobileFinal}
         onCrearEvento={manejarCrearEvento}
         habitaciones={habitaciones}
         loadingHabitaciones={loadingHabitaciones}
@@ -1105,9 +1264,8 @@ const HabitacionesReservaView = ({ isMobile: forzarMobile }) => {
             headerRender={(props) => {
               const { value, onChange } = props;
               const meses = [];
-              for (let i = 0; i < 12; i++) {
+              for (let i = 0; i < 12; i++)
                 meses.push(value.clone().month(i).format("MMM"));
-              }
 
               return (
                 <div
@@ -1120,23 +1278,15 @@ const HabitacionesReservaView = ({ isMobile: forzarMobile }) => {
                     flexWrap: "wrap",
                   }}
                 >
-                  <Text
-                    style={{
-                      fontWeight: 600,
-                      color: neutrals.textMain,
-                      fontSize: 13,
-                    }}
-                  >
+                  <Text style={{ fontWeight: 600, color: neutrals.textMain, fontSize: 13 }}>
                     {value.format("MMMM YYYY")}
                   </Text>
+
                   <Space size={6} wrap>
                     <Select
                       size="small"
                       value={value.month()}
-                      onChange={(mes) => {
-                        const nuevo = value.clone().month(mes);
-                        onChange(nuevo);
-                      }}
+                      onChange={(mes) => onChange(value.clone().month(mes))}
                       style={{ width: 110 }}
                     >
                       {meses.map((nombreMes, indice) => (
@@ -1145,13 +1295,11 @@ const HabitacionesReservaView = ({ isMobile: forzarMobile }) => {
                         </Option>
                       ))}
                     </Select>
+
                     <Select
                       size="small"
                       value={value.year()}
-                      onChange={(anio) => {
-                        const nuevo = value.clone().year(anio);
-                        onChange(nuevo);
-                      }}
+                      onChange={(anio) => onChange(value.clone().year(anio))}
                       style={{ width: 90 }}
                     >
                       {[2024, 2025, 2026].map((anio) => (

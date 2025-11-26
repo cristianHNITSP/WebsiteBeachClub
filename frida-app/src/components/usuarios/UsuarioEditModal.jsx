@@ -20,7 +20,8 @@ const UsuarioEditModal = ({
       okText="Guardar cambios"
       cancelText="Cancelar"
       centered
-      destroyOnClose
+      // destroyOnClose  ❌ deprecated -> destroyOnHidden ✅ :contentReference[oaicite:1]{index=1}
+      destroyOnHidden
     >
       <Form form={form} layout="vertical" preserve={false}>
         <Form.Item

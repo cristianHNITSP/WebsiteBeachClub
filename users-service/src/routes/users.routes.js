@@ -31,39 +31,33 @@ const router = express.Router();
  *   items: [ ...usuarios... ]
  * }
  */
+const escapeRegExp = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
 router.get(
-  '/',
+  "/",
   authMiddleware,
-  requirePermissions(['manage_users']),
+  requirePermissions(["manage_users"]),
   async (req, res) => {
     try {
       let { offset, limit, role, state, q } = req.query;
 
       const skip = Math.max(parseInt(offset, 10) || 0, 0);
       const pageSizeRaw = parseInt(limit, 10);
-
-      // ✅ Máximo 5 registros por página sin importar lo que mande el cliente
       const pageSize = Math.min(Math.max(pageSizeRaw || 5, 1), 5);
 
       const filter = {};
 
-      if (role && ['administrador', 'staff'].includes(role)) {
+      if (role && ["administrador", "staff"].includes(role)) {
         filter.role = role;
       }
 
-      if (state === 'active') {
-        filter.isActive = true;
-      } else if (state === 'inactive') {
-        filter.isActive = false;
-      }
+      if (state === "active") filter.isActive = true;
+      else if (state === "inactive") filter.isActive = false;
 
-      if (q && typeof q === 'string' && q.trim() !== '') {
-        const regex = new RegExp(q.trim(), 'i');
-        filter.$or = [
-          { name: regex },
-          { email: regex },
-          { role: regex }, // 🔎 también permite buscar por texto del rol
-        ];
+      if (q && typeof q === "string" && q.trim() !== "") {
+        const safe = escapeRegExp(q.trim());
+        const regex = new RegExp(safe, "i");
+        filter.$or = [{ name: regex }, { email: regex }, { role: regex }];
       }
 
       const [total, users] = await Promise.all([
@@ -72,7 +66,8 @@ router.get(
           .sort({ createdAt: -1 })
           .skip(skip)
           .limit(pageSize)
-          .select('-password -tokens'),
+          .select("-password -tokens")
+          .lean(), // ✅ más ligero
       ]);
 
       const count = users.length;
@@ -87,14 +82,15 @@ router.get(
         items: users,
       });
     } catch (err) {
-      console.error('Error al obtener usuarios:', err);
-      res.status(500).json({
-        error: 'INTERNAL_ERROR',
-        message: 'Error interno del servidor al obtener usuarios',
+      console.error("Error al obtener usuarios:", err);
+      return res.status(500).json({
+        error: "INTERNAL_ERROR",
+        message: "Error interno del servidor al obtener usuarios",
       });
     }
   }
 );
+
 
 /**
  * POST /api/users
