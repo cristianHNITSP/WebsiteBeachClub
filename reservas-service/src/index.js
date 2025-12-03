@@ -10,6 +10,7 @@ const createHabitacionesRouter = require("./routes/habitaciones.routes");
 const reservasRoutes = require("./routes/reservas.routes");
 const heroSlideRoutes = require("./routes/heroSlide.routes");
 const Habitacion = require("./models/Habitacion");
+const { bindHabitacionesSocket } = require("./ws/habitaciones.socket");
 
 const app = express();
 
@@ -66,6 +67,8 @@ io.on("connection", async (socket) => {
     console.log("❌ Cliente WebSocket desconectado:", socket.id);
   });
 });
+// ✅ binder WS
+bindHabitacionesSocket(io);
 
 // 🔗 Rutas HTTP
 app.use("/api/habitaciones", createHabitacionesRouter(io));

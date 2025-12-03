@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import axios from "axios";
+import axios from "@api/axios";
 import { Card, Form, message, Modal, Table, Tag, Space, Button, Typography } from "antd";
 import dayjs from "dayjs";
 import { ReloadOutlined } from "@ant-design/icons";

@@ -11,8 +11,10 @@ import {
 
 import { DownOutlined, UserOutlined, HomeOutlined } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
-import axios from "axios";
+import axios from "@api/axios";
 import { beachColors } from "../theme/beachTheme";
+import { useState } from "react";
+import ConfigModal from "../components/admin/ConfigModal";
 
 const { Header } = Layout;
 const { Text } = Typography;
@@ -25,9 +27,10 @@ const AdminHeader = ({ isMobile, currentUser }) => {
       case "profile":
         message.info("Vista de perfil en construcción.");
         break;
-
       case "settings":
-        message.info("Configuración en construcción.");
+        // abrir demo de configuración
+        setDemoOpen(true);
+        break;
         break;
 
       case "logout":
@@ -57,6 +60,8 @@ const AdminHeader = ({ isMobile, currentUser }) => {
     ],
     onClick: handleMenuClick,
   };
+
+  const [demoOpen, setDemoOpen] = useState(false);
 
   const displayName = currentUser?.name || "Manager Admin";
 
@@ -185,6 +190,7 @@ const AdminHeader = ({ isMobile, currentUser }) => {
           </Dropdown>
         </Space>
       </Flex>
+      <ConfigModal open={demoOpen} onClose={() => setDemoOpen(false)} />
     </Header>
   );
 };

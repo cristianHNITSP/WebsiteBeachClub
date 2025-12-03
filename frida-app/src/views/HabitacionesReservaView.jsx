@@ -1,6 +1,6 @@
 // src/views/HabitacionesView.jsx
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
-import axios from "axios";
+import axios from "@api/axios";
 import {
   Card,
   Space,

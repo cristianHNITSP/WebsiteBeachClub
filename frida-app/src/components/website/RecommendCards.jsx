@@ -1,6 +1,6 @@
 // src/components/Recommendcards.jsx
 import { useEffect, useState } from "react";
-import axios from "axios";
+import axios from "@api/axios";
 import {
   Card,
   Flex,
@@ -32,12 +32,9 @@ function Recommendcards({ beachColors, maxItems = 4 }) {
         setLoading(true);
         setErrorMsg("");
 
-        const { data } = await axios.get(
-          "/api/habitaciones/recomendaciones",
-          {
-            params: { limit: maxItems },
-          }
-        );
+        const { data } = await axios.get("/api/habitaciones/recomendaciones", {
+          params: { limit: maxItems },
+        });
 
         const items = Array.isArray(data) ? data : data.items || [];
 
@@ -283,8 +280,9 @@ function Recommendcards({ beachColors, maxItems = 4 }) {
             })}
       </Row>
 
-      {/* Bloque newsletter */}
-      <div
+      {/* Bloque newsletter 
+      
+            <div
         style={{
           marginTop: 8,
           padding: 20,
@@ -315,6 +313,8 @@ function Recommendcards({ beachColors, maxItems = 4 }) {
           Suscribirme
         </Button>
       </div>
+      
+      */}
     </Flex>
   );
 }

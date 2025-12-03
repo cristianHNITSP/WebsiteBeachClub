@@ -1,6 +1,6 @@
 // src/components/website/HeroCarousel.jsx
 import { useState, useEffect } from "react";
-import axios from "axios";
+import axios from "@api/axios";
 import {
   Carousel,
   Card,

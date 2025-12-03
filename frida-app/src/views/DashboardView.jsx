@@ -1,5 +1,6 @@
 // src/views/DashboardView.jsx
-import React from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import axios from "axios";
 import {
   Card,
   Row,
@@ -18,47 +19,226 @@ import {
   WarningTwoTone,
 } from "@ant-design/icons";
 import { beachColors, neutrals } from "../theme/beachTheme";
+import { initSocket } from "../api/websockets/index"; // <-- ajusta path si tu archivo está en otra ruta
 
 const { Text, Title } = Typography;
 
-const hoy = {
-  reservas: 12,
-  checkins: 5,
-  ocupacion: 86,
-  ingresos: 18450,
+// YYYY-MM-DD en America/Merida (sin dayjs timezone)
+function todayMeridaStr() {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Merida",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+}
+const round2 = (n) => {
+  const x = Number(n);
+  if (!Number.isFinite(x)) return 0;
+  return Math.round((x + Number.EPSILON) * 100) / 100;
 };
 
+// Promos (no hay endpoint en lo que pegaste, así que quedan estáticas)
 const promos = [
   { nombre: "Hotel Beach Club #25", canal: "Email", fecha: "20/04/2025" },
   { nombre: "Pool Weekend Promo", canal: "WhatsApp", fecha: "18/04/2025" },
   { nombre: "Family Spring Offer", canal: "Facebook Ads", fecha: "10/04/2025" },
 ];
 
-const notificacionesSSE = [
-  {
-    tipo: "success",
-    texto:
-      "Nueva solicitud WhatsApp · Cliente: Ana G. · Hab. 204 · Llegada 22/04",
-  },
-  {
-    tipo: "success",
-    texto:
-      "Nueva solicitud WhatsApp · Cliente: Luis Q. · Hab. 102 · Llegada 23/04",
-  },
-  {
-    tipo: "warning",
-    texto: "Habitación 101 liberada · Lista para nueva asignación",
-  },
-];
-
-const disponibilidad = [
-  { label: "Ocupadas", porcentaje: 60, color: beachColors.oceanBlue },
-  { label: "Disponibles", porcentaje: 25, color: beachColors.teal },
-  { label: "Limpieza", porcentaje: 10, color: beachColors.sunset },
-  { label: "Limpias", porcentaje: 5, color: "#9ca3af" },
-];
-
 const DashboardView = ({ isMobile }) => {
+  const [loading, setLoading] = useState(true);
+
+  // Resumen real
+  const [hoy, setHoy] = useState({
+    reservas: 0, // reservas activas hoy (overlap)
+    checkins: 0, // previstas hoy (startDate==hoy y sin checkinAt)
+    ocupacion: 0, // %
+    ingresos: 0, // estimado del día (prorrateado)
+  });
+
+  // Barras de disponibilidad (reales)
+  const [disp, setDisp] = useState({
+    totalRooms: 0,
+    occupied: 0,
+    available: 0,
+    unreservable: 0,
+    trashed: 0,
+  });
+
+  // Notificaciones (Socket.IO)
+  const [notificaciones, setNotificaciones] = useState([
+    { tipo: "success", texto: "Conectando a tiempo real…" },
+  ]);
+
+  const socketRef = useRef(null);
+
+  const apiBase = useMemo(() => {
+    // Si tienes un env, úsalo. Si no, queda relativo (sirve con proxy/gateway).
+    return import.meta.env.VITE_RESERVAS_API_URL || "";
+  }, []);
+
+  useEffect(() => {
+    let alive = true;
+
+    async function loadDashboard() {
+      setLoading(true);
+      const hoyStr = todayMeridaStr();
+
+      try {
+        // 1) Reservas activas hoy (overlap)
+        const reservasReq = axios.get(`${apiBase}/api/reservas`, {
+          withCredentials: true,
+          params: { from: hoyStr, to: hoyStr },
+        });
+
+        // 2) Disponibilidad por habitaciones (incluye available/blockedByBooking/reservableByStatus)
+        const roomsAvailReq = axios.get(`${apiBase}/api/reservas/habitaciones`, {
+          withCredentials: true,
+          params: { startDate: hoyStr, endDate: hoyStr },
+        });
+
+        // 3) Total habitaciones (incluyendo papelera) y total papelera — usando SOLO tu /gestor.admin
+        const totalAllReq = axios.get(`${apiBase}/api/habitaciones/gestor.admin`, {
+          withCredentials: true,
+          params: { papelera: "todas", page: 1, limit: 1 },
+        });
+
+        const trashedReq = axios.get(`${apiBase}/api/habitaciones/gestor.admin`, {
+          withCredentials: true,
+          params: { papelera: "solo", page: 1, limit: 1 },
+        });
+
+        const [reservasRes, roomsAvailRes, totalAllRes, trashedRes] =
+          await Promise.all([reservasReq, roomsAvailReq, totalAllReq, trashedReq]);
+
+        if (!alive) return;
+
+        const reservas = Array.isArray(reservasRes.data?.data) ? reservasRes.data.data : [];
+        const habitaciones = Array.isArray(roomsAvailRes.data?.data) ? roomsAvailRes.data.data : [];
+
+        const totalRoomsAll = Number(totalAllRes.data?.total ?? 0) || 0;
+        const trashedCount = Number(trashedRes.data?.total ?? 0) || 0;
+
+        // Reservas activas hoy
+        const reservasActivasHoy = reservas.length;
+
+        // Checkins previstos hoy: startDate==hoy y sin checkinAt
+        const checkinsPrevistos = reservas.filter(
+          (r) => r?.startDate === hoyStr && !r?.checkinAt && !r?.checkoutAt && !r?.isDeleted
+        ).length;
+
+        // Conteos de disponibilidad (solo NO papelera porque /reservas/habitaciones filtra isDeleted:false)
+        const occupied = habitaciones.filter((x) => x?.blockedByBooking === true).length;
+        const available = habitaciones.filter((x) => x?.available === true).length;
+        const unreservable = habitaciones.filter((x) => x?.reservableByStatus === false).length;
+
+        // Ocupación % (sobre habitaciones "operables": ocupadas+disponibles)
+        const operables = occupied + available;
+        const ocupacion = operables > 0 ? Math.round((occupied / operables) * 100) : 0;
+
+        // Ingresos estimados HOY:
+        // prorrateo del total entre días (billing.total / billing.days) solo de reservas activas hoy
+        const ingresos = round2(
+          reservas.reduce((acc, r) => {
+            const days = Number(r?.billing?.days);
+            const total = Number(r?.billing?.total);
+            if (!Number.isFinite(days) || days <= 0) return acc;
+            if (!Number.isFinite(total) || total < 0) return acc;
+            return acc + total / days;
+          }, 0)
+        );
+
+        setHoy({
+          reservas: reservasActivasHoy,
+          checkins: checkinsPrevistos,
+          ocupacion,
+          ingresos,
+        });
+
+        setDisp({
+          totalRooms: totalRoomsAll,
+          occupied,
+          available,
+          unreservable,
+          trashed: trashedCount,
+        });
+      } catch (e) {
+        console.error("[Dashboard] Error cargando datos:", e);
+        if (!alive) return;
+
+        setNotificaciones((prev) => [
+          { tipo: "warning", texto: "No se pudo cargar el resumen (revisa permisos / sesión)." },
+          ...prev.filter((x) => x.texto !== "Conectando a tiempo real…"),
+        ]);
+      } finally {
+        if (alive) setLoading(false);
+      }
+    }
+
+    loadDashboard();
+    return () => {
+      alive = false;
+    };
+  }, [apiBase]);
+
+  // Socket.IO: escuchamos solo eventos que YA emites en habitaciones.routes.js
+  useEffect(() => {
+    const s = initSocket();
+    socketRef.current = s;
+
+    const push = (tipo, texto) => {
+      setNotificaciones((prev) => {
+        const next = [{ tipo, texto }, ...prev.filter((x) => x.texto !== "Conectando a tiempo real…")];
+        return next.slice(0, 6);
+      });
+    };
+
+    const onConnect = () => push("success", "Tiempo real conectado.");
+    const onDisconnect = () => push("warning", "Tiempo real desconectado.");
+
+    const onRoomCreated = (room) => push("success", `Habitación creada · ${room?.title || room?.codigo || "Nueva"}`);
+    const onRoomUpdated = (room) => push("success", `Habitación actualizada · ${room?.title || room?.codigo || "—"}`);
+    const onRoomTrashed = (payload) => push("warning", `Habitación enviada a papelera · ${payload?._id || "—"}`);
+    const onRoomRestored = (room) => push("success", `Habitación restaurada · ${room?.title || room?.codigo || "—"}`);
+    const onRoomDeleted = (payload) => push("warning", `Habitación eliminada permanente · ${payload?._id || "—"}`);
+
+    s.on("connect", onConnect);
+    s.on("disconnect", onDisconnect);
+
+    s.on("habitaciones:created", onRoomCreated);
+    s.on("habitaciones:updated", onRoomUpdated);
+    s.on("habitaciones:trashed", onRoomTrashed);
+    s.on("habitaciones:restored", onRoomRestored);
+    s.on("habitaciones:deleted_permanent", onRoomDeleted);
+
+    return () => {
+      try {
+        s.off("connect", onConnect);
+        s.off("disconnect", onDisconnect);
+
+        s.off("habitaciones:created", onRoomCreated);
+        s.off("habitaciones:updated", onRoomUpdated);
+        s.off("habitaciones:trashed", onRoomTrashed);
+        s.off("habitaciones:restored", onRoomRestored);
+        s.off("habitaciones:deleted_permanent", onRoomDeleted);
+      } catch (_) {
+        // ignore
+      }
+    };
+  }, []);
+
+  const disponibilidad = useMemo(() => {
+    const total = disp.totalRooms || 0;
+    const pct = (n) => (total > 0 ? Math.round((n / total) * 100) : 0);
+
+    return [
+      { label: "Ocupadas", porcentaje: pct(disp.occupied), color: beachColors.oceanBlue },
+      { label: "Disponibles", porcentaje: pct(disp.available), color: beachColors.teal },
+      { label: "No reservables", porcentaje: pct(disp.unreservable), color: beachColors.sunset },
+      { label: "Papelera", porcentaje: pct(disp.trashed), color: "#9ca3af" },
+    ];
+  }, [disp]);
+
   return (
     <>
       {/* Resumen + Promos */}
@@ -75,11 +255,7 @@ const DashboardView = ({ isMobile }) => {
             }}
             bodyStyle={{ padding: isMobile ? 16 : 20 }}
           >
-            <Space
-              direction="vertical"
-              size={8}
-              style={{ width: "100%", color: "#fff" }}
-            >
+            <Space direction="vertical" size={8} style={{ width: "100%", color: "#fff" }}>
               <Text
                 style={{
                   fontSize: 11,
@@ -88,8 +264,9 @@ const DashboardView = ({ isMobile }) => {
                   color: "rgba(255,255,255,0.82)",
                 }}
               >
-                Resumen de hoy
+                Resumen de hoy {loading ? "· cargando…" : ""}
               </Text>
+
               <Title
                 level={3}
                 style={{
@@ -101,14 +278,11 @@ const DashboardView = ({ isMobile }) => {
               >
                 Hotel Beach Club
               </Title>
+
               <Row gutter={16} style={{ marginTop: 8 }}>
                 <Col span={12}>
                   <Statistic
-                    title={
-                      <Text style={{ color: "#e5e7eb", fontSize: 11 }}>
-                        Reservas del día
-                      </Text>
-                    }
+                    title={<Text style={{ color: "#e5e7eb", fontSize: 11 }}>Reservas activas hoy</Text>}
                     value={hoy.reservas}
                     valueStyle={{
                       color: "#fff",
@@ -119,11 +293,7 @@ const DashboardView = ({ isMobile }) => {
                 </Col>
                 <Col span={12}>
                   <Statistic
-                    title={
-                      <Text style={{ color: "#e5e7eb", fontSize: 11 }}>
-                        Check-ins previstos
-                      </Text>
-                    }
+                    title={<Text style={{ color: "#e5e7eb", fontSize: 11 }}>Check-ins previstos hoy</Text>}
                     value={hoy.checkins}
                     valueStyle={{
                       color: "#fff",
@@ -133,14 +303,11 @@ const DashboardView = ({ isMobile }) => {
                   />
                 </Col>
               </Row>
+
               <Row gutter={16}>
                 <Col span={12}>
                   <Statistic
-                    title={
-                      <Text style={{ color: "#e5e7eb", fontSize: 10 }}>
-                        Ocupación actual
-                      </Text>
-                    }
+                    title={<Text style={{ color: "#e5e7eb", fontSize: 10 }}>Ocupación (operables)</Text>}
                     value={hoy.ocupacion}
                     suffix="%"
                     valueStyle={{
@@ -152,14 +319,10 @@ const DashboardView = ({ isMobile }) => {
                 </Col>
                 <Col span={12}>
                   <Statistic
-                    title={
-                      <Text style={{ color: "#e5e7eb", fontSize: 10 }}>
-                        Ingresos estimados hoy
-                      </Text>
-                    }
+                    title={<Text style={{ color: "#e5e7eb", fontSize: 10 }}>Ingreso estimado hoy</Text>}
                     prefix="$"
                     value={hoy.ingresos}
-                    precision={0}
+                    precision={2}
                     valueStyle={{
                       color: "#fff",
                       fontSize: isMobile ? 16 : 18,
@@ -168,6 +331,15 @@ const DashboardView = ({ isMobile }) => {
                   />
                 </Col>
               </Row>
+
+              <Space size={8} wrap style={{ marginTop: 4 }}>
+                <Tag color="rgba(255,255,255,0.18)" style={{ border: "none", color: "#fff", borderRadius: 999, fontSize: 11 }}>
+                  Total habitaciones: {disp.totalRooms || 0}
+                </Tag>
+                <Tag color="rgba(255,255,255,0.18)" style={{ border: "none", color: "#fff", borderRadius: 999, fontSize: 11 }}>
+                  Papelera: {disp.trashed || 0}
+                </Tag>
+              </Space>
             </Space>
           </Card>
         </Col>
@@ -178,25 +350,12 @@ const DashboardView = ({ isMobile }) => {
             hoverable
             bordered={false}
             title={
-              <Text
-                style={{
-                  fontWeight: 600,
-                  color: neutrals.textMain,
-                  fontSize: 15,
-                }}
-              >
+              <Text style={{ fontWeight: 600, color: neutrals.textMain, fontSize: 15 }}>
                 Últimas promociones enviadas
               </Text>
             }
             extra={
-              <Text
-                style={{
-                  padding: 0,
-                  fontSize: 12,
-                  color: beachColors.oceanBlue,
-                  cursor: "pointer",
-                }}
-              >
+              <Text style={{ padding: 0, fontSize: 12, color: beachColors.oceanBlue, cursor: "pointer" }}>
                 Ver historial
               </Text>
             }
@@ -217,30 +376,15 @@ const DashboardView = ({ isMobile }) => {
                     padding: "6px 8px",
                     marginBottom: 2,
                     borderRadius: 10,
-                    background:
-                      index === 0 ? "rgba(46,196,182,0.04)" : "transparent",
+                    background: index === 0 ? "rgba(46,196,182,0.04)" : "transparent",
                   }}
                 >
                   <List.Item.Meta
-                    title={
-                      <Text
-                        style={{
-                          fontWeight: 500,
-                          color: neutrals.textMain,
-                          fontSize: 13,
-                        }}
-                      >
-                        {item.nombre}
-                      </Text>
-                    }
+                    title={<Text style={{ fontWeight: 500, color: neutrals.textMain, fontSize: 13 }}>{item.nombre}</Text>}
                     description={
                       <Space size={10}>
-                        <Text type="secondary" style={{ fontSize: 11 }}>
-                          {item.canal}
-                        </Text>
-                        <Text type="secondary" style={{ fontSize: 11 }}>
-                          {item.fecha}
-                        </Text>
+                        <Text type="secondary" style={{ fontSize: 11 }}>{item.canal}</Text>
+                        <Text type="secondary" style={{ fontSize: 11 }}>{item.fecha}</Text>
                       </Space>
                     }
                   />
@@ -260,22 +404,12 @@ const DashboardView = ({ isMobile }) => {
             bordered={false}
             title={
               <Space size={8} wrap>
-                <Text
-                  style={{
-                    fontWeight: 600,
-                    color: neutrals.textMain,
-                    fontSize: 15,
-                  }}
-                >
+                <Text style={{ fontWeight: 600, color: neutrals.textMain, fontSize: 15 }}>
                   Disponibilidad de habitaciones
                 </Text>
                 <Tag
                   color={beachColors.turquoise}
-                  style={{
-                    borderRadius: 999,
-                    fontSize: 10,
-                    color: "#064e3b",
-                  }}
+                  style={{ borderRadius: 999, fontSize: 10, color: "#064e3b" }}
                 >
                   Ocupación {hoy.ocupacion}%
                 </Tag>
@@ -316,33 +450,23 @@ const DashboardView = ({ isMobile }) => {
                       background: item.color,
                     }}
                   />
-                  <Text style={{ fontSize: 10, color: neutrals.textMuted }}>
-                    {item.label}
-                  </Text>
-                  <Text style={{ fontSize: 9, color: neutrals.textMuted }}>
-                    {item.porcentaje}%
-                  </Text>
+                  <Text style={{ fontSize: 10, color: neutrals.textMuted }}>{item.label}</Text>
+                  <Text style={{ fontSize: 9, color: neutrals.textMuted }}>{item.porcentaje}%</Text>
                 </div>
               ))}
             </div>
           </Card>
         </Col>
 
-        {/* Notificaciones SSE */}
+        {/* Notificaciones (Socket.IO) */}
         <Col xs={24} md={10}>
           <Card
             hoverable
             bordered={false}
             title={
               <Space size={8} wrap>
-                <Text
-                  style={{
-                    fontWeight: 600,
-                    color: neutrals.textMain,
-                    fontSize: 15,
-                  }}
-                >
-                  Notificaciones en tiempo real (SSE)
+                <Text style={{ fontWeight: 600, color: neutrals.textMain, fontSize: 15 }}>
+                  Notificaciones en tiempo real
                 </Text>
                 <Badge
                   color={beachColors.teal}
@@ -362,10 +486,8 @@ const DashboardView = ({ isMobile }) => {
               </Space>
             }
             extra={
-              <Tooltip title="Actualizado desde PMS, recepción y WhatsApp Business">
-                <ThunderboltOutlined
-                  style={{ color: beachColors.sunset, fontSize: 16 }}
-                />
+              <Tooltip title="Actualizado por Socket.IO (habitaciones: created/updated/trashed/restored)">
+                <ThunderboltOutlined style={{ color: beachColors.sunset, fontSize: 16 }} />
               </Tooltip>
             }
             style={{
@@ -377,14 +499,13 @@ const DashboardView = ({ isMobile }) => {
           >
             <List
               size="small"
-              dataSource={notificacionesSSE}
+              dataSource={notificaciones}
               split={false}
               renderItem={(n, index) => (
                 <List.Item
                   style={{
                     padding: "6px 6px",
-                    marginBottom:
-                      index === notificacionesSSE.length - 1 ? 0 : 4,
+                    marginBottom: index === notificaciones.length - 1 ? 0 : 4,
                     borderRadius: 8,
                     background:
                       n.tipo === "warning"
@@ -401,10 +522,7 @@ const DashboardView = ({ isMobile }) => {
                     <Text
                       style={{
                         fontSize: 11,
-                        color:
-                          n.tipo === "warning"
-                            ? neutrals.textMain
-                            : neutrals.textMuted,
+                        color: n.tipo === "warning" ? neutrals.textMain : neutrals.textMuted,
                       }}
                     >
                       {n.texto}

@@ -1,6 +1,6 @@
 // src/views/InicioSesionApp.jsx
 import { useState, useEffect } from "react";
-import axios from "axios";
+import axios from "@api/axios";
 import { useNavigate } from "react-router-dom";
 import {
   ConfigProvider,

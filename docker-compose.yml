@@ -14,12 +14,64 @@ version: '3.9'
 # sudo docker logs -f beachclub-reservas-service
 
 services:
-  #MongoDB BeachClub
+  # =========================
+  # FRIDA APP (DEV - Vite)
+  # =========================
+  frida-app-dev:
+    image: node:18-alpine
+    container_name: frida-app-dev
+    working_dir: /app
+    volumes:
+      - ./frida-app:/app
+      - /app/node_modules
+    ports:
+      - "5175:5173" # host 5175 -> contenedor 5173
+    environment:
+      NODE_ENV: development
+
+      # Para Vite proxy (vite.config.js usa estas)
+      VITE_RESERVAS_TARGET: "http://beachclub-reservas-service:4002"
+      VITE_USERS_TARGET: "http://beachclub-users-service:4001"
+      VITE_EVENTS_TARGET: "http://host.docker.internal:5050"
+
+      # Tu .env actual trae esto en localhost; en docker no sirve:
+      # lo dejamos vacío para que el socket use el mismo origen (recomendado),
+      # o si tu código lo exige, apunta al HOST publicado:
+      VITE_RESERVAS_WS_URL: ""
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    command: sh -c "npm install && npm run dev -- --host 0.0.0.0 --port 5173"
+    restart: unless-stopped
+    profiles: ["dev"]
+    networks:
+      - beachclub-net
+
+  # =========================
+  # FRIDA APP (PROD - Nginx)
+  # =========================
+  frida-app:
+    build:
+      context: ./frida-app
+      dockerfile: Dockerfile
+      target: prod
+    container_name: frida-app
+    ports:
+      - "4200:80" # host 4200 -> contenedor 80 (no choca con RSBO 80)
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+    profiles: ["prod"]
+    networks:
+      - beachclub-net
+
+  # =========================
+  # MongoDB BeachClub
+  # =========================
   beachclub-mongo:
     image: mongo:6
     container_name: beachclub-mongo
     ports:
-      - "27019:27017"  # host:contenedor → host usa 27019, contenedor 27017
+      - "27029:27017"
     environment:
       MONGO_INITDB_ROOT_USERNAME: root
       MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD}
@@ -29,12 +81,14 @@ services:
     networks:
       - beachclub-net
 
-  #Mongo Express BeachClub
+  # =========================
+  # Mongo Express (DEV only)
+  # =========================
   beachclub-mongo-express:
     image: mongo-express
     container_name: beachclub-mongo-express
     ports:
-      - "127.0.0.1:8082:8081"
+      - "127.0.0.1:18082:8081"
     environment:
       ME_CONFIG_MONGODB_URL: mongodb://root:${MONGO_PASSWORD}@beachclub-mongo:27017/
       ME_CONFIG_BASICAUTH_USERNAME: beachclubapp
@@ -47,7 +101,9 @@ services:
       - beachclub-net
     profiles: ["dev"]
 
-  #Microservicio de usuarios + auth
+  # =========================
+  # Users service (dev/prod)
+  # =========================
   beachclub-users-service:
     build:
       context: ./users-service
@@ -56,21 +112,31 @@ services:
       - ./users-service/.env
     environment:
       MONGO_URI: "mongodb://root:${MONGO_PASSWORD}@beachclub-mongo:27017/beachclub_auth?authSource=admin"
-      NODE_ENV: development
+      NODE_ENV: ${BEACHCLUB_NODE_ENV:-development}
     depends_on:
       - beachclub-mongo
     networks:
       - beachclub-net
     ports:
-      - "4001:4001"
+      - "4101:4001"
     restart: always
-    profiles: ["dev"]
+    profiles: ["dev", "prod"]
     volumes:
-      - ./users-service:/app       # monta el código del host
-      - /app/node_modules          # reserva node_modules del contenedor
-    command: ["npm", "run", "dev"] # usa nodemon (script "dev")
+      - ./users-service:/app
+      - /app/node_modules
+    command:
+      - sh
+      - -c
+      - |
+        if [ "$NODE_ENV" = "production" ]; then
+          npm start
+        else
+          npm run dev
+        fi
 
-  #Microservicio de reservas + habitaciones
+  # =========================
+  # Reservas service (dev/prod)
+  # =========================
   beachclub-reservas-service:
     build:
       context: ./reservas-service
@@ -79,19 +145,27 @@ services:
       - ./reservas-service/.env
     environment:
       MONGO_URI: "mongodb://root:${MONGO_PASSWORD}@beachclub-mongo:27017/beachclub_reservas?authSource=admin"
-      NODE_ENV: development
+      NODE_ENV: ${BEACHCLUB_NODE_ENV:-development}
     depends_on:
       - beachclub-mongo
     networks:
       - beachclub-net
     ports:
-      - "4002:4002"
+      - "4102:4002"
     restart: always
-    profiles: ["dev"]
+    profiles: ["dev", "prod"]
     volumes:
-      - ./reservas-service:/app     # monta código
-      - /app/node_modules           # node_modules interno
-    command: ["npm", "run", "dev"]  # usa nodemon
+      - ./reservas-service:/app
+      - /app/node_modules
+    command:
+      - sh
+      - -c
+      - |
+        if [ "$NODE_ENV" = "production" ]; then
+          npm start
+        else
+          npm run dev
+        fi
 
 networks:
   beachclub-net:
@@ -100,3 +174,4 @@ networks:
 volumes:
   beachclub-mongo-data:
     driver: local
+

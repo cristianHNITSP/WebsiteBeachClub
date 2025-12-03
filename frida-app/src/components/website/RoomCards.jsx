@@ -17,7 +17,7 @@ import {
   Pagination,
 } from "antd";
 import { EnvironmentOutlined, HeartOutlined, FireFilled, DownOutlined } from "@ant-design/icons";
-import axios from "axios";
+import axios from "@api/axios";
 import { useState } from "react";
 
 function WhatsappChip() {
@@ -351,7 +351,7 @@ const getDisponibilidadMeta = (room) => {
 
                           {extraAmenitiesCount > 0 && (
                             <Popover
-                              title="Amenidades"
+                              title="Tags adicionales"
                               trigger="click"
                               content={
                                 <Space wrap size={[4, 4]}>

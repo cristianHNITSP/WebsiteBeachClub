@@ -7,7 +7,7 @@ import {
   Navigate,
   useLocation,
 } from "react-router-dom";
-import axios from "axios";
+import axios from "@api/axios";
 
 import Home from "../App";
 import PanelAdmin from "../pages/PanelAdminWeb";
@@ -143,7 +143,7 @@ function LoginRoute() {
 
 const RouterApp = () => {
   return (
-    <Router>
+    <Router basename="/hotelesfrida.app">
       <Routes>
         {/* Home público, usando PublicHomeRoute */}
         <Route path="/" element={<PublicHomeRoute />} />
