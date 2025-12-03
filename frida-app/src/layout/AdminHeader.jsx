@@ -11,7 +11,7 @@ import {
 
 import { DownOutlined, UserOutlined, HomeOutlined } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
-import { usuariosAPI } from "../api";
+import axios from "axios";
 import { beachColors } from "../theme/beachTheme";
 
 const { Header } = Layout;
@@ -32,7 +32,7 @@ const AdminHeader = ({ isMobile, currentUser }) => {
 
       case "logout":
         try {
-          await usuariosAPI.logoutUsuario();
+          await axios.post("/api/auth/logout", {}, { withCredentials: true });
 
           window.localStorage.removeItem("panelAdminActiveTab");
 

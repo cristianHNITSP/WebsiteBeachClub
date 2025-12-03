@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { habitacionesAPI } from "../api";
+import axios from "axios";
 import { Card, Form, message, Modal, Table, Tag, Space, Button, Typography } from "antd";
 import dayjs from "dayjs";
 import { ReloadOutlined } from "@ant-design/icons";
@@ -9,6 +9,8 @@ import HabitacionesFilters from "../components/habitaciones/HabitacionesFilters"
 import HabitacionesMetrics from "../components/habitaciones/HabitacionesMetrics";
 import HabitacionesTable from "../components/habitaciones/HabitacionesTable";
 import HabitacionFormModal from "../components/habitaciones/HabitacionFormModal";
+
+axios.defaults.withCredentials = true;
 
 const { Text } = Typography;
 
@@ -72,7 +74,12 @@ const GestionHabitacionesView = ({ isMobile, currentUser }) => {
         duration: 0,
       });
 
-      const api = await habitacionesAPI.fetchHabitacionesList(buildQueryParams(page));
+      const res = await axios.get("/api/habitaciones/gestor.admin", {
+        withCredentials: true,
+        params: buildQueryParams(page),
+      });
+
+      const api = res.data || {};
       const items = api.items || [];
       const total = typeof api.total === "number" ? api.total : items.length;
       const serverPage = typeof api.page === "number" ? api.page : page;
@@ -87,17 +94,11 @@ const GestionHabitacionesView = ({ isMobile, currentUser }) => {
         duration: 2,
       });
     } catch (err) {
-      // Ignorar errores de solicitudes duplicadas (sistema funcionando correctamente)
-      if (err.code === "DUPLICATE_REQUEST") {
-        console.log("⚠️ Solicitud duplicada evitada (sistema anti-duplicados funcionando)");
-        return;
-      }
-
-      console.error("❌ Error cargando habitaciones:", err);
+      console.error(err);
       messageApi.open({
         key: "loading-rooms",
         type: "error",
-        content: err?.response?.data?.message || "No se pudieron cargar las habitaciones. Intenta de nuevo más tarde.",
+        content: "No se pudieron cargar las habitaciones. Intenta de nuevo más tarde.",
         duration: 3,
       });
     } finally {
@@ -182,10 +183,10 @@ const GestionHabitacionesView = ({ isMobile, currentUser }) => {
           });
 
           if (editando && editando._id) {
-            await habitacionesAPI.updateHabitacion(editando._id, payload);
+            await axios.put(`/api/habitaciones/${editando._id}`, payload, { withCredentials: true });
             messageApi.open({ key: "saving-room", type: "success", content: "Habitación actualizada.", duration: 2 });
           } else {
-            await habitacionesAPI.createHabitacion(payload);
+            await axios.post("/api/habitaciones", payload, { withCredentials: true });
             messageApi.open({ key: "saving-room", type: "success", content: "Habitación creada.", duration: 2 });
           }
 
@@ -236,7 +237,7 @@ const GestionHabitacionesView = ({ isMobile, currentUser }) => {
     try {
       setDeletingRoomId(id);
       messageApi.open({ key: `restore-${id}`, type: "loading", content: "Restaurando...", duration: 0 });
-      await habitacionesAPI.restoreHabitacion(id);
+      await axios.patch(`/api/habitaciones/${id}/restore`, {}, { withCredentials: true });
       messageApi.open({ key: `restore-${id}`, type: "success", content: "Restaurada.", duration: 2 });
       await fetchHabitaciones(pagination.current || 1);
     } catch (err) {
@@ -252,7 +253,7 @@ const GestionHabitacionesView = ({ isMobile, currentUser }) => {
     try {
       setDeletingRoomId(id);
       messageApi.open({ key: `permanent-${id}`, type: "loading", content: "Eliminando permanentemente...", duration: 0 });
-      await habitacionesAPI.deleteHabitacion(id, true);
+      await axios.delete(`/api/habitaciones/${id}/permanent`, { withCredentials: true });
       messageApi.open({ key: `permanent-${id}`, type: "success", content: "Eliminada permanentemente.", duration: 2 });
       await fetchHabitaciones(pagination.current || 1);
     } catch (err) {
@@ -295,8 +296,12 @@ const GestionHabitacionesView = ({ isMobile, currentUser }) => {
 
     setReservasModal((p) => ({ ...p, loading: true, page }));
     try {
-      const api = await habitacionesAPI.fetchHabitacionById(rid);
-      const reservas = Array.isArray(api.reservas) ? api.reservas : [];
+      const res = await axios.get(`/api/habitaciones/${rid}/reservas.futuras`, {
+        withCredentials: true,
+        params: { page, limit: reservasModal.limit },
+      });
+
+      const api = res.data || {};
       setReservasModal((p) => ({
         ...p,
         loading: false,
