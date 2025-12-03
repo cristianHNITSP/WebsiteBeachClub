@@ -1,7 +1,6 @@
-// src/App.jsx
-import axios from "axios";
 import { useMediaQuery } from "react-responsive";
-import { useState, useEffect, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { initSocket, disconnectSocket } from "@api/websockets";
 
 import {
   ConfigProvider,
@@ -12,7 +11,6 @@ import {
   Space,
   Splitter,
   Typography,
-  Carousel,
   Tree,
   Select,
   message,
@@ -20,7 +18,9 @@ import {
   DatePicker,
   Drawer,
   Tag,
-  Skeleton,
+  Empty,
+  Spin,
+  Tooltip,
 } from "antd";
 
 import {
@@ -32,18 +32,19 @@ import {
   FilterOutlined,
   MenuOutlined,
   CommentOutlined,
-  StarFilled,
-  HeartOutlined,
   CustomerServiceOutlined,
   ReloadOutlined,
+  CalendarOutlined,
+  CheckCircleOutlined,
 } from "@ant-design/icons";
 
 import dayjs from "dayjs";
 
-import RoomCards from "./components/RoomCards.jsx";
-import Recommendcards from "./components/RecommendCards.jsx";
-import BuscadorMovil from "./components/BuscadorMovil.jsx";
-import ChatSoporte from "./components/ChatSoporte.jsx";
+import RoomCards from "./components/website/RoomCards.jsx";
+import Recommendcards from "./components/website/RecommendCards.jsx";
+import BuscadorMovil from "./components/website/BuscadorMovil.jsx";
+import ChatSoporte from "./components/website/ChatSoporte.jsx";
+import HeroCarousel from "./components/website/HeroCarousel.jsx";
 import { beachColors } from "./theme/beachTheme";
 
 const { Title, Text } = Typography;
@@ -52,356 +53,454 @@ const { Option } = Select;
 const backgroundColor = "#f8fafc";
 const borderColor = "#e2e8f0";
 
-const carruselImages = [
-  {
-    img: "https://images.unsplash.com/photo-1520250497591-112f2f40a3f4?w=1200",
-    title: "Escápate frente al mar",
-    subtitle: "Alojamientos seleccionados para disfrutar como en casa.",
-  },
-  {
-    img: "https://images.unsplash.com/photo-1564501049412-61c2a3083791?w=1200",
-    title: "Cabañas con encanto",
-    subtitle: "Naturaleza, diseño y comodidad en un solo lugar.",
-  },
-  {
-    img: "https://images.unsplash.com/photo-1571896349842-33c89424de2d?w=1200",
-    title: "Experiencias inolvidables",
-    subtitle: "Reserva directo con quienes te atienden de verdad.",
-  },
-];
+const WS_URL = import.meta.env.VITE_RESERVAS_WS_URL || "http://localhost:4002";
 
-const treeData = [
-  {
-    title: (
-      <Flex align="center" gap={8}>
-        <HomeOutlined style={{ color: beachColors.turquoise }} />
-        <b>Tipo de alojamiento</b>
-      </Flex>
-    ),
-    key: "1",
-    children: ["Habitación", "Suite", "Cabaña", "Villa"].map((t, i) => ({
-      title: t,
-      key: `1-${i + 1}`,
-    })),
-  },
-  {
-    title: (
-      <Flex align="center" gap={8}>
-        <GiftOutlined style={{ color: beachColors.coral }} />
-        <b>Servicios</b>
-      </Flex>
-    ),
-    key: "2",
-    children: ["WiFi", "Piscina", "Estacionamiento", "Spa", "Pet Friendly"].map(
-      (t, i) => ({
-        title: t,
-        key: `2-${i + 1}`,
-      })
-    ),
-  },
-  {
-    title: (
-      <Flex align="center" gap={8}>
-        <CompassOutlined style={{ color: beachColors.sunset }} />
-        <b>Ubicación</b>
-      </Flex>
-    ),
-    key: "3",
-    children: ["Playa", "Centro", "Montaña", "Selva"].map((t, i) => ({
-      title: t,
-      key: `3-${i + 1}`,
-      // aquí podrías luego mapear filtros reales
-    })),
-  },
-];
+/** ================= helpers ================= */
+const toArrayCheckedKeys = (checkedKeys) => {
+  if (Array.isArray(checkedKeys)) return checkedKeys;
+  if (checkedKeys && Array.isArray(checkedKeys.checked)) return checkedKeys.checked;
+  return [];
+};
 
-const recommendedDestinations = [
-  {
-    name: "Tulum",
-    desc: "Playas de ensueño, cenotes y gastronomía local.",
-    img: "https://lp-cms-production.imgix.net/2024-08/PlayaRuinasTulum.jpg?auto=format,compress&q=72&fit=crop&w=1200",
-  },
-];
+const normalizeStr = (s) => String(s || "").trim().toLowerCase();
+const isYmd = (s) => /^\d{4}-\d{2}-\d{2}$/.test(String(s || ""));
 
-function App() {
+const roomMatchesFilters = (room, filters) => {
+  const q = normalizeStr(filters.q);
+  const roomTypes = Array.isArray(filters.roomTypes) ? filters.roomTypes : [];
+  const amenities = Array.isArray(filters.amenities) ? filters.amenities : [];
+  const locations = Array.isArray(filters.locations) ? filters.locations : [];
+
+  if (q) {
+    const haystack = [
+      room?.codigo,
+      room?.title,
+      room?.roomType,
+      room?.location,
+      room?.hotelCode,
+      room?.roomNumber,
+    ]
+      .map((x) => normalizeStr(x))
+      .join(" | ");
+    if (!haystack.includes(q)) return false;
+  }
+
+  if (roomTypes.length) {
+    const rt = normalizeStr(room?.roomType);
+    const ok = roomTypes.some((t) => normalizeStr(t) === rt);
+    if (!ok) return false;
+  }
+
+  if (amenities.length) {
+    const have = new Set((room?.amenities || []).map((a) => normalizeStr(a)));
+    const ok = amenities.every((a) => have.has(normalizeStr(a)));
+    if (!ok) return false;
+  }
+
+  if (locations.length) {
+    const loc = normalizeStr(room?.location);
+    const ok = locations.some((x) => loc.includes(normalizeStr(x)));
+    if (!ok) return false;
+  }
+
+  const hasDates = isYmd(filters.startDate) && isYmd(filters.endDate);
+  if (hasDates && filters.onlyAvailable === true) {
+    if (room?.available !== true) return false;
+  }
+
+  return true;
+};
+
+function App({ currentUser }) {
   const [openBuscadorMovil, setOpenBuscadorMovil] = useState(false);
   const [openFiltrosMovil, setOpenFiltrosMovil] = useState(false);
   const [openChat, setOpenChat] = useState(false);
 
   const isMobile = useMediaQuery({ maxWidth: 1024 });
+  const [messageApi, contextHolder] = message.useMessage();
 
-  // HABITACIONES / API
+  /** ================= socket ================= */
+  const socketRef = useRef(null);
+
+  /** ================= data ================= */
   const [habitaciones, setHabitaciones] = useState([]);
   const [loadingHabitaciones, setLoadingHabitaciones] = useState(true);
   const [error, setError] = useState(null);
-  const [messageApi, contextHolder] = message.useMessage();
 
-  // HERO
-  const [loadingHero, setLoadingHero] = useState(true);
+  /** ================= filtros (FUENTE de verdad) ================= */
+  const [filters, setFilters] = useState({
+    q: "",
+    roomTypes: [],
+    amenities: [],
+    locations: [],
+    startDate: null, // "YYYY-MM-DD"
+    endDate: null, // "YYYY-MM-DD"
+    guests: "2",
+    onlyAvailable: true,
+  });
 
-  // SSE reservado (si lo activas de nuevo)
-  const [sseConnected] = useState(false);
-  const [reconnectAttempts] = useState(0);
-  const eventSourceRef = useRef(null);
-  const reconnectTimeoutRef = useRef(null);
+  const filtersRef = useRef(filters);
+  useEffect(() => {
+    filtersRef.current = filters;
+  }, [filters]);
 
-  const MAX_RECONNECT_ATTEMPTS = 8;
-  const INITIAL_RECONNECT_DELAY = 1000;
-  const MAX_RECONNECT_DELAY = 30000;
+  const [checkedKeys, setCheckedKeys] = useState([]);
 
-  // Cargar habitaciones
-  const cargarHabitaciones = async (showToast = false) => {
-    try {
+  /** ================= header controls ================= */
+  const [searchText, setSearchText] = useState("");
+  const [dates, setDates] = useState(null); // ✅ null = sin rango
+  const [guests, setGuests] = useState("2");
+
+  /** ================= paginado local ================= */
+  const [pagination, setPagination] = useState({
+    page: 1,
+    limit: 6,
+    total: 0,
+    totalPages: 0,
+    hasMore: false,
+  });
+
+  /** ================= selection ================= */
+  const [habitacionSeleccionada, setHabitacionSeleccionada] = useState(null);
+
+  /** ================= TREE dinámico (sale de habitaciones) ================= */
+  const treeData = useMemo(() => {
+    const rooms = Array.isArray(habitaciones) ? habitaciones : [];
+
+    const uniq = (arr) =>
+      [...new Set(arr.filter(Boolean).map((x) => String(x).trim()).filter(Boolean))].sort();
+
+    const roomTypes = uniq(rooms.map((r) => r?.roomType));
+    const amenities = uniq(
+      rooms.flatMap((r) => (Array.isArray(r?.amenities) ? r.amenities : []))
+    );
+    const locations = uniq(rooms.map((r) => r?.location));
+
+    return [
+      {
+        title: (
+          <Flex align="center" gap={8}>
+            <HomeOutlined style={{ color: beachColors.turquoise }} />
+            <b>Tipo de alojamiento</b>
+          </Flex>
+        ),
+        key: "group:type",
+        children: roomTypes.length
+          ? roomTypes.map((t) => ({ title: t, key: `t:${t}` }))
+          : [{ title: <Text type="secondary">Sin datos</Text>, key: "t:__empty", disabled: true }],
+      },
+      {
+        title: (
+          <Flex align="center" gap={8}>
+            <GiftOutlined style={{ color: beachColors.coral }} />
+            <b>Servicios</b>
+          </Flex>
+        ),
+        key: "group:amenities",
+        children: amenities.length
+          ? amenities.map((a) => ({ title: a, key: `a:${a}` }))
+          : [{ title: <Text type="secondary">Sin datos</Text>, key: "a:__empty", disabled: true }],
+      },
+      {
+        title: (
+          <Flex align="center" gap={8}>
+            <CompassOutlined style={{ color: beachColors.sunset }} />
+            <b>Ubicación</b>
+          </Flex>
+        ),
+        key: "group:location",
+        children: locations.length
+          ? locations.map((l) => ({ title: l, key: `l:${l}` }))
+          : [{ title: <Text type="secondary">Sin datos</Text>, key: "l:__empty", disabled: true }],
+      },
+    ];
+  }, [habitaciones]);
+
+  /** ================= emitir query por WS ================= */
+  const emitQuery = useCallback(
+    (opts = {}) => {
+      const socket = socketRef.current;
+      if (!socket) return;
+
+      const f = filtersRef.current;
+      const hasDates = isYmd(f.startDate) && isYmd(f.endDate);
+
+      const payload = {
+        q: f.q || "",
+        roomType: (f.roomTypes || []).join(","),
+        amenities: (f.amenities || []).join(","),
+        locationTag: (f.locations || []).join(","),
+        startDate: hasDates ? f.startDate : null,
+        endDate: hasDates ? f.endDate : null,
+        guests: f.guests || "2",
+        onlyAvailable: hasDates ? !!f.onlyAvailable : false,
+      };
+
+      if (opts.showToast) {
+        messageApi.open({
+          type: "loading",
+          content: "Aplicando filtros…",
+          key: "roomsSync",
+          duration: 0,
+        });
+      }
+
       setLoadingHabitaciones(true);
       setError(null);
 
-      const response = await axios.get("/api/habitaciones");
-      const data = response.data || [];
+      socket.emit("habitaciones:query", payload);
+    },
+    [messageApi]
+  );
 
-      if (Array.isArray(data) && data.length > 0) {
-        setHabitaciones(data);
-        setLoadingHabitaciones(false);
-        if (showToast) {
-          messageApi.success("Habitaciones sincronizadas correctamente.");
-        }
-      } else {
-        setHabitaciones([]);
-        setLoadingHabitaciones(true);
-        if (showToast) {
-          messageApi.warning(
-            "No se recibieron habitaciones. Esperando datos del sistema..."
-          );
-        }
-      }
-    } catch (err) {
-      console.error("Error al cargar las habitaciones:", err);
-      setHabitaciones([]);
-      setError(err);
-      setLoadingHabitaciones(true);
-      if (showToast) {
-        messageApi.error(
-          "No se pudo sincronizar. Revisa la conexión o inténtalo de nuevo."
-        );
-      }
-    }
-  };
-
+  /** ================= conectar socket UNA sola vez ================= */
   useEffect(() => {
-    cargarHabitaciones(false);
-  }, []);
+    const socket = initSocket(WS_URL);
+    socketRef.current = socket;
 
+    socket.on("connect", () => {
+      console.log("✅ WS conectado:", socket.id);
+      emitQuery({ showToast: false }); // ✅ carga inicial desde WS (no axios)
+    });
 
-    /*
-    
-      const actualizarHabitaciones = useCallback((evento) => {
-        console.log("📥 Evento SSE procesado:", evento);
-    
-        setHabitaciones(prev => {
-          const { type, habitacion } = evento;
-    
-          // 🆔 OBTENER ID DE FORMA SEGURA
-          const habitacionId = habitacion?.id || habitacion?._id;
-          if (!habitacionId) {
-            console.error("❌ Evento sin ID válido:", evento);
-            return prev;
-          }
-    
-          switch (type) {
-            case 'CREATED':
-              // 🔍 VERIFICAR DUPLICADOS
-              const existe = prev.some(h =>
-                h.id === habitacionId || h._id === habitacionId
-              );
-              if (existe) {
-                console.log("⚠️ Habitación ya existe, actualizando:", habitacionId);
-                return prev.map(h =>
-                  (h.id === habitacionId || h._id === habitacionId) ? habitacion : h
-                );
-              }
-              console.log("🆕 Nueva habitación creada:", habitacionId);
-              return [...prev, habitacion];
-    
-            case 'UPDATED':
-              console.log("🔄 Habitación actualizada:", habitacionId);
-              return prev.map(h =>
-                (h.id === habitacionId || h._id === habitacionId) ? habitacion : h
-              );
-    
-            case 'DELETED':
-              console.log("🗑️ Habitación eliminada:", habitacionId);
-              return prev.filter(h =>
-                (h.id !== habitacionId) && (h._id !== habitacionId)
-              );
-    
-            default:
-              console.warn("❓ Tipo de evento no reconocido:", type);
-              return prev;
-          }
-        });
-      }, []);
-    
-      const conectarSSE = useCallback(() => {
-        try {
-          // Limpieza de conexiones existentes
-          if (eventSourceRef.current) {
-            console.log("🔌 Cerrando conexión SSE anterior");
-            eventSourceRef.current.close();
-            eventSourceRef.current = null;
-          }
-    
-          if (reconnectTimeoutRef.current) {
-            clearTimeout(reconnectTimeoutRef.current);
-            reconnectTimeoutRef.current = null;
-          }
-    
-          console.log(`🔗 Intento de conexión SSE #${reconnectAttempts + 1}`);
-    
-          // 🎯 CREAR NUEVA CONEXIÓN SSE
-          eventSourceRef.current = new EventSource('/api/events/habitaciones');
-    
-          // ✅ CONEXIÓN EXITOSA
-          eventSourceRef.current.onopen = () => {
-            console.log("✅ Conexión SSE establecida");
-            setSseConnected(true);
-            setReconnectAttempts(0); // Resetear contador al conectar
-            setError(null);
-    
-            // Mostrar mensaje de éxito solo en la primera conexión
-            if (reconnectAttempts === 0) {
-              messageApi.success({
-                content: "Conectado en tiempo real",
-                duration: 2,
-              });
-            } else {
-              messageApi.success({
-                content: `Conexión restaurada después de ${reconnectAttempts} intentos`,
-                duration: 2,
-              });
-            }
-          };
-    
-          // 📨 MANEJAR MENSAJES GENÉRICOS
-          eventSourceRef.current.onmessage = (event) => {
-            try {
-              const eventData = JSON.parse(event.data);
-              console.log("📨 Mensaje SSE recibido:", eventData);
-              actualizarHabitaciones(eventData);
-            } catch (parseError) {
-              console.error("❌ Error parseando mensaje SSE:", parseError);
-            }
-          };
-    
-          // 🎯 MANEJAR EVENTOS ESPECÍFICOS
-          const manejarEvento = (eventType) => (event) => {
-            try {
-              const eventData = JSON.parse(event.data);
-              console.log(`🎯 Evento ${eventType} recibido:`, eventData);
-              actualizarHabitaciones({ ...eventData, type: eventType.toUpperCase() });
-            } catch (parseError) {
-              console.error(`❌ Error parseando evento ${eventType}:`, parseError);
-            }
-          };
-    
-          eventSourceRef.current.addEventListener('created', manejarEvento('CREATED'));
-          eventSourceRef.current.addEventListener('updated', manejarEvento('UPDATED'));
-          eventSourceRef.current.addEventListener('deleted', manejarEvento('DELETED'));
-    
-          // ❌ MANEJAR ERRORES CON RECONEXIÓN INTELIGENTE
-          eventSourceRef.current.onerror = (error) => {
-            console.error("❌ Error en conexión SSE:", error);
-            setSseConnected(false);
-    
-            const nextAttempt = reconnectAttempts + 1;
-    
-            // 🚨 VERIFICAR SI SUPERAMOS EL LÍMITE DE INTENTOS
-            if (nextAttempt > MAX_RECONNECT_ATTEMPTS) {
-              console.error("🚫 Máximo de intentos de reconexión alcanzado");
-              setError(new Error("No se pudo establecer conexión en tiempo real"));
-              messageApi.warning({
-                content: "Modo sin conexión en tiempo real. Los cambios pueden no ser inmediatos.",
-                duration: 5,
-              });
-              return;
-            }
-    
-            // 🎰 CALCULAR DELAY CON BACKOFF EXPONENCIAL
-            const delay = Math.min(
-              INITIAL_RECONNECT_DELAY * Math.pow(1.8, nextAttempt), // Crecimiento exponencial
-              MAX_RECONNECT_DELAY // No superar el máximo
-            );
-    
-            console.log(`🔄 Reintento #${nextAttempt} en ${delay / 1000} segundos...`);
-    
-            // Mostrar mensaje informativo al usuario
-            if (nextAttempt <= 3) {
-              messageApi.info({
-                content: `Reconectando... Intento ${nextAttempt}/${MAX_RECONNECT_ATTEMPTS}`,
-                duration: 3,
-              });
-            }
-    
-            // ⏰ PROGRAMAR RECONEXIÓN
-            reconnectTimeoutRef.current = setTimeout(() => {
-              console.log(`🔄 Ejecutando reconexión #${nextAttempt}`);
-              setReconnectAttempts(nextAttempt);
-              conectarSSE();
-            }, delay);
-          };
-    
-        } catch (sseError) {
-          console.error("❌ Error crítico al crear EventSource:", sseError);
-          setSseConnected(false);
-    
-          // 🆘 RECONEXIÓN INMEDIATA PARA ERRORES CRÍTICOS
-          const nextAttempt = reconnectAttempts + 1;
-          if (nextAttempt <= MAX_RECONNECT_ATTEMPTS) {
-            reconnectTimeoutRef.current = setTimeout(() => {
-              setReconnectAttempts(nextAttempt);
-              conectarSSE();
-            }, 2000);
-          }
+    socket.on("disconnect", () => {
+      console.log("🔌 WS desconectado");
+    });
+
+    const handleResult = (data) => {
+      const items = Array.isArray(data)
+        ? data
+        : Array.isArray(data?.items)
+          ? data.items
+          : Array.isArray(data?.data)
+            ? data.data
+            : [];
+
+      setHabitaciones(items);
+      setLoadingHabitaciones(false);
+
+      messageApi.open({
+        type: "success",
+        content: `Listo ✅ ${items.length} habitaciones sincronizadas`,
+        key: "roomsSync",
+        duration: 2,
+      });
+    };
+
+    socket.on("habitaciones:init", handleResult);
+    socket.on("habitaciones:result", handleResult);
+
+    socket.on("habitaciones:created", (room) => {
+      if (!room || !room._id) return;
+      const f = filtersRef.current;
+      if (!roomMatchesFilters(room, f)) return;
+
+      setHabitaciones((prev) => {
+        const exists = prev.some((h) => h._id === room._id);
+        if (exists) return prev;
+        return [room, ...prev];
+      });
+    });
+
+    socket.on("habitaciones:updated", (room) => {
+      if (!room || !room._id) return;
+      const f = filtersRef.current;
+
+      setHabitaciones((prev) => {
+        const exists = prev.some((h) => h._id === room._id);
+
+        if (exists && !roomMatchesFilters(room, f)) {
+          return prev.filter((h) => h._id !== room._id);
         }
-      }, [actualizarHabitaciones, reconnectAttempts, messageApi]);
-    
-    
-      useEffect(() => {
-        console.log("🚀 Iniciando conexión SSE...");
-        conectarSSE();
-    
-        // 🧹 CLEANUP: Limpiar todo al desmontar el componente
-        return () => {
-          console.log("🧹 Limpiando recursos SSE");
-          if (eventSourceRef.current) {
-            eventSourceRef.current.close();
-            eventSourceRef.current = null;
-          }
-          if (reconnectTimeoutRef.current) {
-            clearTimeout(reconnectTimeoutRef.current);
-            reconnectTimeoutRef.current = null;
-          }
-          setSseConnected(false);
-          setReconnectAttempts(0);
-        };
-      }, [conectarSSE]);
-    
-    */
+        if (!exists && roomMatchesFilters(room, f)) {
+          return [room, ...prev];
+        }
+        return prev.map((h) => (h._id === room._id ? { ...h, ...room } : h));
+      });
+    });
 
+    socket.on("habitaciones:deleted", (payload) => {
+      const deleteId = payload?._id || payload?.id;
+      if (!deleteId) return;
+      setHabitaciones((prev) => prev.filter((h) => h._id !== deleteId));
+    });
 
-  useEffect(() => {
-    if (error) {
+    socket.on("habitaciones:error", (payload) => {
+      console.error("WS habitaciones:error", payload);
+      setError(payload || { message: "Ocurrió un error en tiempo real." });
+      setLoadingHabitaciones(false);
       messageApi.open({
         type: "error",
-        content:
-          "Error al cargar las habitaciones. Por favor, intenta de nuevo más tarde.",
+        content: payload?.message || "Ocurrió un error en tiempo real.",
+        key: "roomsSync",
+        duration: 3,
       });
-    }
-  }, [error, messageApi]);
+    });
+
+    return () => {
+      try {
+        disconnectSocket();
+      } finally {
+        socketRef.current = null;
+      }
+    };
+  }, [emitQuery, messageApi]);
+
+  /** ================= debounce: cuando cambien filtros => re-query WS ================= */
+  useEffect(() => {
+    const t = setTimeout(() => {
+      emitQuery({ showToast: false });
+    }, 250);
+    return () => clearTimeout(t);
+  }, [filters, emitQuery]);
+
+  /** ================= aplicar filtros desde Tree (keys dinámicos) ================= */
+  const applyTreeCheckedKeys = (keys) => {
+    const arr = toArrayCheckedKeys(keys).filter((k) => !String(k).endsWith("__empty"));
+    setCheckedKeys(arr);
+
+    const roomTypes = arr
+      .filter((k) => String(k).startsWith("t:"))
+      .map((k) => String(k).slice(2))
+      .filter(Boolean);
+
+    const amenities = arr
+      .filter((k) => String(k).startsWith("a:"))
+      .map((k) => String(k).slice(2))
+      .filter(Boolean);
+
+    const locations = arr
+      .filter((k) => String(k).startsWith("l:"))
+      .map((k) => String(k).slice(2))
+      .filter(Boolean);
+
+    setPagination((p) => ({ ...p, page: 1 }));
+    setFilters((prev) => ({ ...prev, roomTypes, amenities, locations }));
+  };
+
+  /** ✅ limpiar DE VERDAD (tree + header + filtros) */
+  const clearFilters = () => {
+    setCheckedKeys([]);
+    setSearchText("");
+    setDates(null);
+    setGuests("2");
+
+    setPagination((p) => ({ ...p, page: 1 }));
+
+    setFilters({
+      q: "",
+      roomTypes: [],
+      amenities: [],
+      locations: [],
+      startDate: null,
+      endDate: null,
+      guests: "2",
+      onlyAvailable: true,
+    });
+
+    messageApi.success("Filtros limpiados.");
+  };
+
+  /** ================= buscar (desktop / móvil) ================= */
+  const runSearch = (payload) => {
+    const q = String(payload?.q ?? "").trim();
+    const startDate = payload?.startDate || null;
+    const endDate = payload?.endDate || null;
+    const g = String(payload?.guests || "2");
+
+    // ✅ sincroniza también el header (para que no “se quede pegado” visualmente)
+    setSearchText(q);
+    setGuests(g);
+
+    const hasRange = isYmd(startDate) && isYmd(endDate);
+    setDates(
+      hasRange ? [dayjs(startDate, "YYYY-MM-DD"), dayjs(endDate, "YYYY-MM-DD")] : null
+    );
+
+    setPagination((p) => ({ ...p, page: 1 }));
+
+    setFilters((prev) => ({
+      ...prev,
+      q,
+      startDate: isYmd(startDate) ? startDate : null,
+      endDate: isYmd(endDate) ? endDate : null,
+      guests: g,
+      onlyAvailable: true,
+    }));
+
+    messageApi.open({
+      type: "success",
+      icon: <CheckCircleOutlined />,
+      content: "Búsqueda aplicada ✅",
+      duration: 1.6,
+    });
+  };
+
+  const handleSearchClick = () => {
+    runSearch({
+      q: searchText,
+      startDate: dates?.[0]?.format("YYYY-MM-DD") || null,
+      endDate: dates?.[1]?.format("YYYY-MM-DD") || null,
+      guests,
+    });
+  };
+
+  /** ================= cards filtradas + paginado local ================= */
+  const filteredCards = useMemo(() => {
+    const arr = Array.isArray(habitaciones) ? habitaciones : [];
+    return arr.filter((r) => roomMatchesFilters(r, filters));
+  }, [habitaciones, filters]);
 
   useEffect(() => {
-    const timer = setTimeout(() => setLoadingHero(false), 800);
-    return () => clearTimeout(timer);
-  }, []);
+    const total = filteredCards.length;
+    const limit = pagination.limit || 6;
+    const totalPages = Math.max(1, Math.ceil(total / limit));
+    setPagination((p) => ({
+      ...p,
+      page: Math.min(p.page, totalPages),
+      total,
+      totalPages,
+      hasMore: p.page < totalPages,
+    }));
+  }, [filteredCards, pagination.limit]);
 
+  const cardsToShow = useMemo(() => {
+    const { page, limit } = pagination;
+    const start = (page - 1) * (limit || 6);
+    const end = start + (limit || 6);
+    return filteredCards.slice(start, end);
+  }, [filteredCards, pagination]);
+
+  const handleChangePageHabitaciones = (page) => {
+    setPagination((p) => ({ ...p, page }));
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  /** ================= reserva/chat ================= */
+  const handleReservaExpress = async (room) => {
+    setHabitacionSeleccionada(room);
+    setOpenChat(true);
+    messageApi.info("Listo ✅ Abriendo chat para solicitar tu reserva.");
+  };
+
+  const handleInfoWhatsapp = (room) => {
+    setHabitacionSeleccionada(room);
+
+    const numero = "9993676541";
+    const texto = `Hola, me interesa la habitación ${room.codigo || ""} - ${room.title || ""} en ${
+      room.location || "su propiedad"
+    }. ¿Podrían darme más información?`;
+
+    const url = `https://wa.me/${numero}?text=${encodeURIComponent(texto)}`;
+    window.open(url, "_blank", "noopener,noreferrer");
+  };
+
+  const handleChatClosedForReserva = async () => {
+    setHabitacionSeleccionada(null);
+    setOpenChat(false);
+  };
+
+  /** ================= styles ================= */
   const headerStyle = {
     padding: "10px 16px",
     background: `linear-gradient(120deg, ${beachColors.teal}, ${beachColors.oceanBlue})`,
@@ -412,39 +511,13 @@ function App() {
     borderBottom: `2px solid ${beachColors.turquoise}`,
   };
 
-  const carouselSlide = (slide) => ({
-    height: "320px",
-    width: "100%",
-    display: "flex",
-    alignItems: "flex-end",
-    padding: 24,
-    color: "#ffffff",
-    backgroundImage: `linear-gradient(to top, rgba(15,23,42,0.82), rgba(15,23,42,0.08)), url(${slide.img})`,
-    backgroundSize: "cover",
-    backgroundPosition: "center",
-    boxShadow: "0 14px 40px rgba(15,23,42,0.35)",
-  });
-
   const panelStyles = {
-    left: {
-      background: "#f1f5f9",
-      borderRight: `1px solid ${borderColor}`,
-    },
-    center: {
-      background: "#ffffff",
-      padding: 16,
-    },
-    right: {
-      background: "#f8fafc",
-      borderLeft: `1px solid ${borderColor}`,
-      padding: 12,
-    },
+    left: { background: "#f1f5f9", borderRight: `1px solid ${borderColor}` },
+    center: { background: "#ffffff", padding: 16 },
+    right: { background: "#f8fafc", borderLeft: `1px solid ${borderColor}`, padding: 12 },
   };
 
-  const cardsToShow =
-    Array.isArray(habitaciones) && habitaciones.length > 0
-      ? habitaciones
-      : [];
+  const hasDateFilter = isYmd(filters.startDate) && isYmd(filters.endDate);
 
   return (
     <ConfigProvider
@@ -453,8 +526,7 @@ function App() {
           colorPrimary: beachColors.oceanBlue,
           colorLink: beachColors.oceanBlue,
           borderRadius: 10,
-          fontFamily:
-            '-apple-system, BlinkMacSystemFont, system-ui, "SF Pro Text", sans-serif',
+          fontFamily: '-apple-system, BlinkMacSystemFont, system-ui, "SF Pro Text", sans-serif',
         },
       }}
     >
@@ -468,13 +540,7 @@ function App() {
 
         {/* HEADER */}
         <header style={headerStyle}>
-          <Flex
-            justify="space-between"
-            align="center"
-            gap={16}
-            style={{ maxWidth: 1400, margin: "0 auto" }}
-          >
-            {/* Branding */}
+          <Flex justify="space-between" align="center" gap={16} style={{ maxWidth: 1400, margin: "0 auto" }}>
             <Flex align="center" gap={10}>
               <img
                 src="/beachclub.svg"
@@ -487,29 +553,15 @@ function App() {
                 }}
               />
               <div style={{ lineHeight: 1.1 }}>
-                <Title
-                  level={4}
-                  style={{
-                    margin: 0,
-                    color: "#ffffff",
-                    fontWeight: 700,
-                    letterSpacing: 0.3,
-                  }}
-                >
-                  Beach Club
+                <Title level={4} style={{ margin: 0, color: "#ffffff", fontWeight: 700, letterSpacing: 0.3 }}>
+                  Hoteles Frida
                 </Title>
-                <Text
-                  style={{
-                    fontSize: 10,
-                    color: "rgba(241,245,249,0.9)",
-                  }}
-                >
+                <Text style={{ fontSize: 10, color: "rgba(241,245,249,0.9)" }}>
                   Reservas directas con un solo clic
                 </Text>
               </div>
             </Flex>
 
-            {/* Buscador Desktop */}
             {!isMobile && (
               <Flex
                 align="center"
@@ -517,7 +569,7 @@ function App() {
                 style={{
                   flex: 1,
                   justifyContent: "center",
-                  minWidth: 520,
+                  minWidth: 560,
                   padding: "10px 14px",
                   borderRadius: 18,
                   background: "rgba(15,23,42,0.18)",
@@ -526,12 +578,12 @@ function App() {
                 }}
               >
                 <Input
+                  value={searchText}
+                  onChange={(e) => setSearchText(e.target.value)}
+                  onPressEnter={handleSearchClick}
+                  allowClear
                   placeholder="Destino, ciudad o alojamiento"
-                  prefix={
-                    <EnvironmentOutlined
-                      style={{ color: beachColors.turquoise }}
-                    />
-                  }
+                  prefix={<EnvironmentOutlined style={{ color: beachColors.turquoise }} />}
                   style={{
                     flex: 1,
                     borderRadius: 10,
@@ -540,23 +592,26 @@ function App() {
                     background: "rgba(255,255,255,0.98)",
                   }}
                 />
+
                 <DatePicker.RangePicker
-                  style={{ width: 230, borderRadius: 10, height: 40 }}
+                  value={dates}
+                  onChange={(v) => setDates(v)}
+                  style={{ width: 250, borderRadius: 10, height: 40 }}
                   format="DD/MM/YYYY"
-                  defaultValue={[dayjs(), dayjs().add(2, "day")]}
+                  allowClear
                 />
-                <Select
-                  defaultValue="2 adultos"
-                  style={{ width: 150, borderRadius: 10, height: 40 }}
-                >
+
+                <Select value={guests} onChange={setGuests} style={{ width: 150, borderRadius: 10, height: 40 }}>
                   <Option value="1">1 adulto</Option>
                   <Option value="2">2 adultos</Option>
                   <Option value="3">3 adultos</Option>
                   <Option value="4">Familia</Option>
                 </Select>
+
                 <Button
                   type="primary"
                   icon={<SearchOutlined />}
+                  onClick={handleSearchClick}
                   style={{
                     borderRadius: 12,
                     fontWeight: 600,
@@ -569,10 +624,17 @@ function App() {
                 >
                   Buscar
                 </Button>
+
+                <Button
+                  icon={<ReloadOutlined />}
+                  onClick={clearFilters}
+                  style={{ borderRadius: 12, height: 40 }}
+                >
+                  Limpiar
+                </Button>
               </Flex>
             )}
 
-            {/* Acciones derecha Desktop */}
             {!isMobile && (
               <Space size={10}>
                 <Button
@@ -599,19 +661,27 @@ function App() {
               </Space>
             )}
 
-            {/* Mobile: botones */}
             {isMobile && (
-              <Space size={8}>
+              <Space size={8} align="center">
+                <Button type="text" icon={<SearchOutlined style={{ color: "#ffffff" }} />} onClick={() => setOpenBuscadorMovil(true)} />
+                <Button type="text" icon={<MenuOutlined style={{ color: "#ffffff" }} />} onClick={() => setOpenFiltrosMovil(true)} />
                 <Button
-                  type="text"
-                  icon={<SearchOutlined style={{ color: "#ffffff" }} />}
-                  onClick={() => setOpenBuscadorMovil(true)}
-                />
-                <Button
-                  type="text"
-                  icon={<MenuOutlined style={{ color: "#ffffff" }} />}
-                  onClick={() => setOpenFiltrosMovil(true)}
-                />
+                  size="small"
+                  href="/panel.web/login.panel.web"
+                  style={{
+                    borderRadius: 999,
+                    paddingInline: 12,
+                    height: 30,
+                    fontSize: 11,
+                    background: "rgba(15,23,42,0.65)",
+                    color: "#ffffff",
+                    border: "1px solid rgba(248,250,252,0.45)",
+                    display: "flex",
+                    alignItems: "center",
+                  }}
+                >
+                  Staff
+                </Button>
               </Space>
             )}
           </Flex>
@@ -619,396 +689,319 @@ function App() {
 
         {/* MAIN */}
         <main style={{ minHeight: "calc(100vh - 160px)" }}>
-          {/* Buscador móvil */}
           <BuscadorMovil
             beachColors={beachColors}
             open={openBuscadorMovil}
             onclose={() => setOpenBuscadorMovil(false)}
+            initialQuery={filters.q}
+            initialDates={{
+              startDate: filters.startDate ? dayjs(filters.startDate, "YYYY-MM-DD") : null,
+              endDate: filters.endDate ? dayjs(filters.endDate, "YYYY-MM-DD") : null,
+            }}
+            initialGuests={filters.guests}
+            onClear={() => {
+              clearFilters();
+              setOpenBuscadorMovil(false);
+            }}
+            onSearch={(payload) => {
+              runSearch(payload);
+              setOpenBuscadorMovil(false);
+            }}
           />
 
-          {/* Drawer filtros móvil */}
+          {/* Drawer filtros mobile */}
           <Drawer
             title="Filtrar tu estancia"
             placement="right"
-            width={280}
+            width={310}
             open={openFiltrosMovil}
             onClose={() => setOpenFiltrosMovil(false)}
           >
-            <Flex vertical gap={16}>
-              <Tree checkable defaultExpandAll treeData={treeData} />
-              <div>
-                <Text strong>Precio por noche</Text>
-                <div
-                  style={{
-                    background: beachColors.turquoise,
-                    height: 4,
-                    borderRadius: 999,
-                    marginTop: 10,
-                    position: "relative",
+            <Flex vertical gap={14}>
+              <Tree
+                checkable
+                defaultExpandAll
+                treeData={treeData}
+                checkedKeys={checkedKeys}
+                onCheck={(keys) => applyTreeCheckedKeys(keys)}
+              />
+
+              <Card size="small" style={{ borderRadius: 12 }}>
+                <Flex vertical gap={8}>
+                  <Flex align="center" gap={8}>
+                    <CalendarOutlined style={{ color: beachColors.oceanBlue }} />
+                    <Text strong>Disponibilidad</Text>
+                  </Flex>
+
+                  <Text style={{ fontSize: 11, color: "#64748b" }}>
+                    Este filtro funciona cuando el backend WS envía <b>available</b> según fechas.
+                  </Text>
+
+                  <Flex wrap gap={6}>
+                    <Tag color={hasDateFilter ? "green" : "default"}>
+                      {hasDateFilter ? `${filters.startDate} → ${filters.endDate}` : "Sin rango"}
+                    </Tag>
+                    <Tag color="blue">{filters.guests} huésped(es)</Tag>
+                    {hasDateFilter && filters.onlyAvailable ? <Tag color="green">Solo disponibles</Tag> : null}
+                  </Flex>
+                </Flex>
+              </Card>
+
+              <Flex gap={8}>
+                <Button block onClick={clearFilters} style={{ borderRadius: 10 }}>
+                  Limpiar
+                </Button>
+                <Button
+                  type="primary"
+                  block
+                  icon={<FilterOutlined />}
+                  style={{ borderRadius: 10, background: beachColors.teal, borderColor: beachColors.teal }}
+                  onClick={() => {
+                    emitQuery({ showToast: true });
+                    setOpenFiltrosMovil(false);
                   }}
                 >
-                  <div
-                    style={{
-                      position: "absolute",
-                      top: -6,
-                      left: "18%",
-                      right: "22%",
-                      height: 16,
-                      background: beachColors.deepBlue,
-                      borderRadius: 999,
-                    }}
-                  />
-                </div>
-                <Flex justify="space-between" style={{ marginTop: 6 }}>
-                  <Text style={{ fontSize: 11 }}>$800</Text>
-                  <Text style={{ fontSize: 11 }}>$3,200</Text>
-                </Flex>
+                  Aplicar
+                </Button>
+              </Flex>
+
+              <div style={{ marginTop: 4 }}>
+                <Text type="secondary" style={{ fontSize: 11 }}>
+                  Tip: al marcar filtros, se actualiza automáticamente.
+                </Text>
               </div>
-              <Button
-                type="primary"
-                block
-                icon={<FilterOutlined />}
-                style={{
-                  borderRadius: 10,
-                  background: beachColors.teal,
-                  borderColor: beachColors.teal,
-                }}
-                onClick={() => setOpenFiltrosMovil(false)}
-              >
-                Aplicar filtros
-              </Button>
             </Flex>
           </Drawer>
 
-          {/* Float buttons móvil + chat */}
           {isMobile && (
-            <FloatButton.Group
-              shape="circle"
-              style={{ right: 18, bottom: 90 }}
-              icon={<CommentOutlined />}
-            >
-              <FloatButton
-                tooltip="Chat"
-                icon={<CustomerServiceOutlined />}
-                onClick={() => setOpenChat(true)}
-              />
-              <FloatButton
-                tooltip="Favoritos"
-                icon={<HeartOutlined />}
-              />
+            <FloatButton.Group shape="circle" style={{ right: 18, bottom: 90 }} icon={<CommentOutlined />}>
+              <FloatButton icon={<CustomerServiceOutlined />} onClick={() => setOpenChat(true)} />
             </FloatButton.Group>
           )}
 
-          {/* Layout principal */}
           <Splitter
             layout={isMobile ? "vertical" : "horizontal"}
-            style={{
-              height: isMobile ? "auto" : "calc(100vh - 160px)",
-              border: "none",
-            }}
+            style={{ height: isMobile ? "auto" : "calc(100vh - 160px)", border: "none" }}
           >
-            {/* Panel Izquierdo: Filtros (desktop) */}
             {!isMobile && (
-              <Splitter.Panel
-                defaultSize="20%"
-                min="18%"
-                max="22%"
-                style={panelStyles.left}
-              >
-                <Flex vertical style={{ padding: 14, gap: 16 }}>
+              <Splitter.Panel defaultSize="20%" min="18%" max="24%" style={panelStyles.left}>
+                <Flex vertical style={{ padding: 14, gap: 14 }}>
                   <Flex align="center" gap={8}>
                     <FilterOutlined style={{ color: beachColors.deepBlue }} />
-                    <Title
-                      level={4}
-                      style={{
-                        margin: 0,
-                        color: beachColors.deepBlue,
-                        fontSize: 16,
-                      }}
-                    >
+                    <Title level={4} style={{ margin: 0, color: beachColors.deepBlue, fontSize: 16 }}>
                       Filtros
                     </Title>
                   </Flex>
+
                   <Tree
                     checkable
                     defaultExpandAll
                     treeData={treeData}
+                    checkedKeys={checkedKeys}
+                    onCheck={(keys) => applyTreeCheckedKeys(keys)}
                     style={{ fontSize: 12 }}
                   />
-                  <div>
-                    <Text strong>Precio por noche</Text>
-                    <div
-                      style={{
-                        background: "#e5e7eb",
-                        height: 4,
-                        borderRadius: 999,
-                        marginTop: 10,
-                        position: "relative",
-                      }}
-                    >
-                      <div
-                        style={{
-                          position: "absolute",
-                          top: -6,
-                          left: "20%",
-                          right: "23%",
-                          height: 16,
-                          background: beachColors.teal,
-                          borderRadius: 999,
-                        }}
-                      />
-                    </div>
-                    <Flex
-                      justify="space-between"
-                      style={{ marginTop: 6, fontSize: 11 }}
-                    >
-                      <span>$800</span>
-                      <span>$3,200</span>
+
+                  <Card size="small" style={{ borderRadius: 12 }}>
+                    <Flex vertical gap={8}>
+                      <Flex align="center" gap={8}>
+                        <CalendarOutlined style={{ color: beachColors.oceanBlue }} />
+                        <Text strong>Disponibilidad (fechas)</Text>
+                      </Flex>
+                      <Text style={{ fontSize: 11, color: "#64748b" }}>
+                        Se usa cuando el WS te manda <b>available</b> según el rango.
+                      </Text>
+                      <Flex wrap gap={6}>
+                        <Tag color={hasDateFilter ? "green" : "default"}>
+                          {hasDateFilter ? `${filters.startDate} → ${filters.endDate}` : "Sin rango"}
+                        </Tag>
+                        <Tag color="blue">{filters.guests} huésped(es)</Tag>
+                        {hasDateFilter && filters.onlyAvailable ? <Tag color="green">Solo disponibles</Tag> : null}
+                      </Flex>
                     </Flex>
-                  </div>
+                  </Card>
+
+                  <Flex gap={8}>
+                    <Button onClick={clearFilters} style={{ borderRadius: 10 }}>
+                      Limpiar
+                    </Button>
+                    <Button
+                      type="primary"
+                      icon={<FilterOutlined />}
+                      style={{ borderRadius: 10, background: beachColors.teal, borderColor: beachColors.teal }}
+                      onClick={() => emitQuery({ showToast: true })}
+                      loading={loadingHabitaciones}
+                    >
+                      Aplicar
+                    </Button>
+                  </Flex>
+
+                  <Card size="small" style={{ borderRadius: 12, background: "#ffffff" }}>
+                    <Flex vertical gap={6}>
+                      <Text strong style={{ fontSize: 12 }}>
+                        Activos:
+                      </Text>
+                      <Flex wrap gap={6}>
+                        {filters.q ? <Tag color={beachColors.turquoise}>Buscar: {filters.q}</Tag> : null}
+                        {filters.roomTypes.map((t) => (
+                          <Tag key={t} color={beachColors.sand} style={{ color: beachColors.deepBlue }}>
+                            {t}
+                          </Tag>
+                        ))}
+                        {filters.amenities.map((a) => (
+                          <Tag key={a} color={beachColors.coral}>
+                            {a}
+                          </Tag>
+                        ))}
+                        {filters.locations.map((l) => (
+                          <Tag key={l} color={beachColors.turquoise} style={{ color: "#064e3b" }}>
+                            {l}
+                          </Tag>
+                        ))}
+                        {hasDateFilter ? (
+                          <Tag color="green">
+                            {filters.startDate} → {filters.endDate}
+                          </Tag>
+                        ) : null}
+
+                        {!filters.q &&
+                        !filters.roomTypes.length &&
+                        !filters.amenities.length &&
+                        !filters.locations.length &&
+                        !hasDateFilter ? (
+                          <Text type="secondary" style={{ fontSize: 11 }}>
+                            Sin filtros
+                          </Text>
+                        ) : null}
+                      </Flex>
+                    </Flex>
+                  </Card>
                 </Flex>
               </Splitter.Panel>
             )}
 
-            {/* Panel Central */}
-            <Splitter.Panel
-              defaultSize={isMobile ? "100%" : "55%"}
-              min={isMobile ? "100%" : "50%"}
-              style={panelStyles.center}
-            >
-              <Flex
-                vertical
-                gap={18}
-                style={{ maxWidth: 900, margin: "0 auto" }}
-              >
-                {/* Hero */}
-                <Carousel
-                  autoplay
-                  dots
-                  style={{ width: "100%" }}
-                  autoplaySpeed={5500}
-                >
-                  {carruselImages.map((slide, i) => (
-                    <div key={i}>
-                      {loadingHero ? (
-                        <Card
-                          style={{
-                            height: 320,
-                            background: "#e5e7eb",
-                          }}
-                        >
-                          <Skeleton active paragraph={false} />
-                        </Card>
-                      ) : (
-                        <div style={carouselSlide(slide)}>
-                          <div>
-                            <Tag
-                              color={beachColors.turquoise}
-                              style={{
-                                borderRadius: 999,
-                                fontSize: 10,
-                                color: "#065f46",
-                                marginBottom: 4,
-                              }}
-                            >
-                              Reservas directas · Mejor atención
-                            </Tag>
-                            <Title
-                              level={3}
-                              style={{
-                                margin: 0,
-                                color: "#ffffff",
-                                fontWeight: 600,
-                              }}
-                            >
-                              {slide.title}
-                            </Title>
-                            <Text
-                              style={{
-                                fontSize: 12,
-                                color: "rgba(241,245,249,0.9)",
-                              }}
-                            >
-                              {slide.subtitle}
-                            </Text>
-                            <Flex gap={8} style={{ marginTop: 10 }}>
-                              <StarFilled
-                                style={{
-                                  color: beachColors.sunset,
-                                  fontSize: 14,
-                                }}
-                              />
-                              <Text
-                                style={{
-                                  fontSize: 11,
-                                  color: "#e5e7eb",
-                                }}
-                              >
-                                Opiniones reales, sin intermediarios.
-                              </Text>
-                            </Flex>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </Carousel>
+            <Splitter.Panel defaultSize={isMobile ? "100%" : "55%"} min={isMobile ? "100%" : "50%"} style={panelStyles.center}>
+              <Flex vertical gap={18} style={{ maxWidth: 900, margin: "0 auto" }}>
+                <HeroCarousel currentUser={currentUser} />
 
-                {/* Header resultados + Re-sincronizar */}
-                <Flex
-                  justify="space-between"
-                  align="center"
-                  wrap
-                  gap={8}
-                  style={{ marginTop: 4 }}
-                >
-                  <Flex gap={6} align="center">
-                    <Title
-                      level={4}
-                      style={{
-                        margin: 0,
-                        fontSize: 18,
-                        color: "#0f172a",
-                        fontWeight: 600,
-                      }}
-                    >
+                <Flex justify="space-between" align="center" wrap gap={8} style={{ marginTop: 4 }}>
+                  <Flex gap={10} align="center">
+                    <Title level={4} style={{ margin: 0, fontSize: 18, color: "#0f172a", fontWeight: 600 }}>
                       Alojamientos disponibles
                     </Title>
-                    <Tag
-                      color={beachColors.sand}
-                      style={{
-                        borderRadius: 999,
-                        fontSize: 9,
-                        color: beachColors.deepBlue,
-                      }}
-                    >
-                      Selección curada
-                    </Tag>
+
+                    <Tooltip title="Resultados después de aplicar filtros">
+                      <Tag color={filteredCards.length ? "blue" : "default"} style={{ borderRadius: 999 }}>
+                        {filteredCards.length} resultado(s)
+                      </Tag>
+                    </Tooltip>
+
+                    {hasDateFilter && (
+                      <Tag color={filters.onlyAvailable ? "green" : "default"} style={{ borderRadius: 999 }}>
+                        {filters.onlyAvailable ? "Solo disponibles" : "Incluye ocupadas"}
+                      </Tag>
+                    )}
                   </Flex>
 
                   <Space size={6} align="center">
                     <Button
                       size="small"
                       icon={<ReloadOutlined />}
-                      onClick={() => cargarHabitaciones(true)}
-                      style={{
-                        borderRadius: 999,
-                        fontSize: 10,
-                      }}
+                      onClick={() => emitQuery({ showToast: true })}
+                      style={{ borderRadius: 999, fontSize: 10 }}
+                      loading={loadingHabitaciones}
                     >
                       Re-sincronizar
                     </Button>
+
                     {!isMobile && (
-                      <>
-                        <Button
-                          size="small"
-                          type="text"
-                          icon={
-                            <HeartOutlined
-                              style={{ color: beachColors.coral }}
-                            />
-                          }
-                        >
-                          Favoritos
-                        </Button>
-                        <Button
-                          size="small"
-                          type="text"
-                          icon={
-                            <CommentOutlined
-                              style={{ color: beachColors.teal }}
-                            />
-                          }
-                          onClick={() => setOpenChat(true)}
-                        >
-                          Asistencia
-                        </Button>
-                      </>
+                      <Button
+                        size="small"
+                        type="text"
+                        icon={<CommentOutlined style={{ color: beachColors.teal }} />}
+                        onClick={() => setOpenChat(true)}
+                      >
+                        Asistencia
+                      </Button>
                     )}
                   </Space>
                 </Flex>
 
-                {/* Cards habitaciones */}
-                <RoomCards
-                  beachColors={beachColors}
-                  cardsData={cardsToShow}
-                  loading={loadingHabitaciones}
-                />
+                {error ? (
+                  <Card style={{ borderRadius: 14 }}>
+                    <Text type="danger">Error al cargar habitaciones: {error?.message || "desconocido"}</Text>
+                  </Card>
+                ) : null}
+
+                {loadingHabitaciones ? (
+                  <Card style={{ borderRadius: 14 }}>
+                    <Flex align="center" gap={10}>
+                      <Spin />
+                      <Text>Sincronizando habitaciones…</Text>
+                    </Flex>
+                  </Card>
+                ) : filteredCards.length === 0 ? (
+                  <Card style={{ borderRadius: 14 }}>
+                    <Empty
+                      description={
+                        <Flex vertical gap={6}>
+                          <Text strong>No hay resultados con esos filtros</Text>
+                          <Text type="secondary" style={{ fontSize: 12 }}>
+                            Prueba limpiar filtros o ajustar fechas / servicios.
+                          </Text>
+                        </Flex>
+                      }
+                    />
+                    <Flex justify="center" gap={10} style={{ marginTop: 10 }}>
+                      <Button onClick={clearFilters} style={{ borderRadius: 999 }}>
+                        Limpiar filtros
+                      </Button>
+                      <Button type="primary" onClick={() => emitQuery({ showToast: true })} style={{ borderRadius: 999 }}>
+                        Reintentar
+                      </Button>
+                    </Flex>
+                  </Card>
+                ) : (
+                  <RoomCards
+                    beachColors={beachColors}
+                    cardsData={cardsToShow}
+                    loading={loadingHabitaciones}
+                    onReservaExpress={handleReservaExpress}
+                    onInfoWhatsapp={handleInfoWhatsapp}
+                    pagination={pagination}
+                    onPageChange={handleChangePageHabitaciones}
+                  />
+                )}
               </Flex>
             </Splitter.Panel>
 
-            {/* Panel Derecho (desktop) */}
             {!isMobile && (
-              <Splitter.Panel
-                defaultSize="25%"
-                min="20%"
-                max="32%"
-                style={panelStyles.right}
-              >
+              <Splitter.Panel defaultSize="25%" min="20%" max="32%" style={panelStyles.right}>
                 <Flex vertical gap={12}>
-                  <Recommendcards
-                    recommendedDestinations={recommendedDestinations}
-                    beachColors={beachColors}
-                    loading={loadingHero}
-                  />
-                  <Card
-                    bordered={false}
-                    style={{
-                      borderRadius: 14,
-                      background: "#ffffff",
-                      boxShadow: "0 6px 18px rgba(148,163,253,0.16)",
-                    }}
-                  >
+                  <Recommendcards recommendedDestinations={[]} beachColors={beachColors} loading={false} />
+
+                  <Card bordered={false} style={{ borderRadius: 14, background: "#ffffff", boxShadow: "0 6px 18px rgba(148,163,253,0.16)" }}>
                     <Flex vertical gap={6}>
-                      <Text
-                        strong
-                        style={{ fontSize: 13, color: "#0f172a" }}
-                      >
+                      <Text strong style={{ fontSize: 13, color: "#0f172a" }}>
                         ¿Por qué reservar aquí?
                       </Text>
-                      <Text
-                        style={{
-                          fontSize: 11,
-                          color: "#6b7280",
-                        }}
-                      >
-                        Información directa, trato cercano y alojamientos
-                        seleccionados especialmente para tus huéspedes.
+                      <Text style={{ fontSize: 11, color: "#6b7280" }}>
+                        Información directa, trato cercano y alojamientos seleccionados especialmente para tus huéspedes.
                       </Text>
                       <Flex gap={6} wrap>
-                        <Tag
-                          color={beachColors.teal}
-                          style={{
-                            borderRadius: 999,
-                            fontSize: 9,
-                            color: "#064e3b",
-                          }}
-                        >
+                        <Tag color={beachColors.teal} style={{ borderRadius: 999, fontSize: 9, color: "#064e3b" }}>
                           Atención personalizada
                         </Tag>
-                        <Tag
-                          color={beachColors.turquoise}
-                          style={{
-                            borderRadius: 999,
-                            fontSize: 9,
-                            color: "#065f46",
-                          }}
-                        >
+                        <Tag color={beachColors.turquoise} style={{ borderRadius: 999, fontSize: 9, color: "#065f46" }}>
                           Reservas seguras
                         </Tag>
-                        <Tag
-                          color={beachColors.sand}
-                          style={{
-                            borderRadius: 999,
-                            fontSize: 9,
-                            color: beachColors.deepBlue,
-                          }}
-                        >
+                        <Tag color={beachColors.sand} style={{ borderRadius: 999, fontSize: 9, color: beachColors.deepBlue }}>
                           Experiencias únicas
                         </Tag>
                       </Flex>
                     </Flex>
                   </Card>
+
                   <Card
                     bordered={false}
                     style={{
@@ -1020,14 +1013,7 @@ function App() {
                     <Flex vertical gap={6}>
                       <Flex align="center" gap={8}>
                         <CustomerServiceOutlined />
-                        <Text
-                          style={{
-                            fontSize: 12,
-                            color: "#eff6ff",
-                          }}
-                        >
-                          ¿Necesitas ayuda con tu reserva?
-                        </Text>
+                        <Text style={{ fontSize: 12, color: "#eff6ff" }}>¿Necesitas ayuda con tu reserva?</Text>
                       </Flex>
                       <Button
                         size="small"
@@ -1062,49 +1048,29 @@ function App() {
             color: "white",
           }}
         >
-          <Flex
-            vertical
-            justify="center"
-            align="center"
-            gap={10}
-            style={{ maxWidth: 900, margin: "0 auto" }}
-          >
-            <Text
-              style={{
-                color: "white",
-                fontSize: 12,
-              }}
-            >
-              © {new Date().getFullYear()} Beach Club · Plataforma de
-              reservas desarrollada a la medida.
+          <Flex vertical justify="center" align="center" gap={10} style={{ maxWidth: 900, margin: "0 auto" }}>
+            <Text style={{ color: "white", fontSize: 12 }}>
+              © {new Date().getFullYear()} Hoteles Frida · Plataforma de reservas desarrollada a la medida.
             </Text>
             <Flex gap={10} wrap justify="center">
-              {[
-                { nombre: "Términos", path: "#" },
-                { nombre: "Privacidad", path: "#" },
-                { nombre: "Contacto", path: "#" },
-                { nombre: "Nosotros", path: "#" },
-              ].map((link, i) => (
-                <a
-                  key={i}
-                  href={link.path}
-                  style={{
-                    color: "white",
-                    fontSize: 11,
-                  }}
-                >
-                  {link.nombre}
-                </a>
-              ))}
+              {[{ nombre: "Términos", path: "#" }, { nombre: "Privacidad", path: "#" }, { nombre: "Contacto", path: "#" }, { nombre: "Nosotros", path: "#" }].map(
+                (link, i) => (
+                  <a key={i} href={link.path} style={{ color: "white", fontSize: 11 }}>
+                    {link.nombre}
+                  </a>
+                )
+              )}
             </Flex>
           </Flex>
         </footer>
 
-        {/* CHAT (componente desacoplado) */}
+        {/* CHAT */}
         <ChatSoporte
           open={openChat}
           onClose={() => setOpenChat(false)}
           isMobile={isMobile}
+          habitacionSeleccionada={habitacionSeleccionada}
+          onFinalizarReserva={handleChatClosedForReserva}
         />
       </div>
     </ConfigProvider>

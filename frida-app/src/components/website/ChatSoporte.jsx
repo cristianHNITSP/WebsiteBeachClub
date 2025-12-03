@@ -1,57 +1,51 @@
-// src/components/ChatSoporte.jsx
 import React, { useState } from "react";
-import {
-  Drawer,
-  Flex,
-  Button,
-  Input,
-  Typography,
-  Space,
-} from "antd";
+import { Drawer, Flex, Button, Input, Typography, Space, Popconfirm } from "antd";
 import {
   CustomerServiceOutlined,
   SendOutlined,
   UserOutlined,
+  CloseOutlined,
 } from "@ant-design/icons";
 import dayjs from "dayjs";
 import "dayjs/locale/es";
-import { beachColors } from "../theme/beachTheme";
+import { beachColors } from "../../theme/beachTheme";
 
 dayjs.locale("es");
-
 const { Text } = Typography;
 
-const ChatSoporte = ({ open, onClose, isMobile }) => {
-  const [messages, setMessages] = useState([
-    {
-      from: "agent",
-      text: "Hola 👋, somos el equipo de reservas. ¿En qué podemos ayudarte?",
-      time: dayjs().format("HH:mm"),
-    },
-  ]);
+const getInitialMessages = () => [
+  { from: "agent", text: "Hola 👋, somos el equipo de reservas. ¿En qué podemos ayudarte?", time: dayjs().format("HH:mm") },
+];
+
+const ChatSoporte = ({
+  open,
+  onClose,
+  isMobile,
+  habitacionSeleccionada,
+  onFinalizarReserva, // ahora SOLO: cerrar chat + limpiar selección (NO backend)
+}) => {
+  const [messages, setMessages] = useState(getInitialMessages);
   const [value, setValue] = useState("");
+
+  const resetChat = () => {
+    setMessages(getInitialMessages());
+    setValue("");
+  };
 
   const handleSend = () => {
     const text = value.trim();
     if (!text) return;
 
     const now = dayjs().format("HH:mm");
-
-    // Mensaje del usuario
-    setMessages((prev) => [
-      ...prev,
-      { from: "user", text, time: now },
-    ]);
+    setMessages((prev) => [...prev, { from: "user", text, time: now }]);
     setValue("");
 
-    // Respuesta automática simulada (remplaza con tu backend cuando quieras)
     setTimeout(() => {
       setMessages((prev) => [
         ...prev,
         {
           from: "agent",
-          text:
-            "Hemos recibido tu mensaje ✅. Un miembro del equipo te responderá en breve.",
+          text: "Hemos recibido tu mensaje ✅. Un miembro del equipo te responderá en breve.",
           time: dayjs().format("HH:mm"),
         },
       ]);
@@ -65,63 +59,78 @@ const ChatSoporte = ({ open, onClose, isMobile }) => {
     }
   };
 
+  const handleDrawerClose = () => {
+    if (onClose) onClose();
+  };
+
+  const handleCerrarConfirmado = async () => {
+    if (onFinalizarReserva) await onFinalizarReserva(); // en App solo limpia state
+    resetChat();
+  };
+
+  const tituloHabitacion =
+    habitacionSeleccionada &&
+    `${habitacionSeleccionada.codigo || ""} · ${habitacionSeleccionada.title || ""}`;
+
   return (
     <Drawer
       open={open}
-      onClose={onClose}
+      onClose={handleDrawerClose}
       placement={isMobile ? "bottom" : "right"}
       height={isMobile ? "70%" : undefined}
       width={isMobile ? "100%" : 360}
       closeIcon={null}
       destroyOnClose={false}
+      maskClosable={true}
       title={
         <Flex align="center" justify="space-between">
           <Flex align="center" gap={8}>
-            <CustomerServiceOutlined
-              style={{ color: beachColors.teal, fontSize: 18 }}
-            />
+            <CustomerServiceOutlined style={{ color: beachColors.teal, fontSize: 18 }} />
             <div>
-              <Text
-                strong
-                style={{ fontSize: 13, display: "block" }}
-              >
+              <Text strong style={{ fontSize: 13, display: "block" }}>
                 Chat con el equipo
               </Text>
-              <Text
-                style={{
-                  fontSize: 10,
-                  color: "#6b7280",
-                }}
-              >
+              <Text style={{ fontSize: 10, color: "#6b7280" }}>
                 Resolvemos dudas sobre reservas, disponibilidad y estancias.
               </Text>
+
+              {tituloHabitacion && (
+                <Text style={{ fontSize: 10, color: "#0f766e", display: "block", marginTop: 2 }}>
+                  Hablando sobre: {tituloHabitacion}
+                </Text>
+              )}
             </div>
           </Flex>
+
+          {habitacionSeleccionada ? (
+            <Popconfirm
+              title="Cerrar chat"
+              description="Si cierras el chat se borrará esta conversación (no afecta el estado de la habitación). ¿Seguro que quieres salir?"
+              okText="Sí, cerrar"
+              cancelText="Seguir en el chat"
+              onConfirm={handleCerrarConfirmado}
+            >
+              <Button shape="circle" size="small" type="text" icon={<CloseOutlined />} style={{ color: "#6b7280" }} />
+            </Popconfirm>
+          ) : (
+            <Button
+              shape="circle"
+              size="small"
+              type="text"
+              icon={<CloseOutlined />}
+              onClick={handleDrawerClose}
+              style={{ color: "#6b7280" }}
+            />
+          )}
         </Flex>
       }
       styles={{
-        header: {
-          padding: 12,
-          borderBottom: "1px solid #e5e7eb",
-          background: "#ffffff",
-        },
-        body: {
-          display: "flex",
-          flexDirection: "column",
-          padding: 10,
-          background: "#f9fafb",
-        },
+        header: { padding: 12, borderBottom: "1px solid #e5e7eb", background: "#ffffff" },
+        body: { display: "flex", flexDirection: "column", padding: 10, background: "#f9fafb" },
       }}
     >
       <Flex vertical style={{ height: "100%", gap: 8 }}>
-        {/* Mensajes */}
-        <div
-          style={{
-            flex: 1,
-            overflowY: "auto",
-            paddingRight: 4,
-          }}
-        >
+        <div style={{ flex: 1, overflowY: "auto", paddingRight: 4 }}>
           {messages.map((msg, i) => {
             const isUser = msg.from === "user";
             return (
@@ -143,35 +152,14 @@ const ChatSoporte = ({ open, onClose, isMobile }) => {
                     boxShadow: isUser
                       ? "0 4px 10px rgba(14,165,233,0.35)"
                       : "0 2px 6px rgba(148,163,253,0.16)",
-                    border: isUser
-                      ? "none"
-                      : "1px solid #e5e7eb",
+                    border: isUser ? "none" : "1px solid #e5e7eb",
                   }}
                 >
-                  <Text
-                    style={{
-                      fontSize: 11,
-                      lineHeight: 1.4,
-                      display: "block",
-                    }}
-                  >
+                  <Text style={{ fontSize: 11, lineHeight: 1.4, display: "block" }}>
                     {msg.text}
                   </Text>
-                  <div
-                    style={{
-                      textAlign: "right",
-                      marginTop: 2,
-                    }}
-                  >
-                    <Text
-                      style={{
-                        fontSize: 8.5,
-                        opacity: 0.7,
-                        color: isUser
-                          ? "#eff6ff"
-                          : "#9ca3af",
-                      }}
-                    >
+                  <div style={{ textAlign: "right", marginTop: 2 }}>
+                    <Text style={{ fontSize: 8.5, opacity: 0.7, color: isUser ? "#eff6ff" : "#9ca3af" }}>
                       {msg.time}
                     </Text>
                   </div>
@@ -181,7 +169,6 @@ const ChatSoporte = ({ open, onClose, isMobile }) => {
           })}
         </div>
 
-        {/* Acciones rápidas */}
         <Space size={6} wrap>
           {[
             "Quiero información de disponibilidad",
@@ -204,7 +191,6 @@ const ChatSoporte = ({ open, onClose, isMobile }) => {
           ))}
         </Space>
 
-        {/* Input */}
         <Flex gap={6} align="center">
           <Input.TextArea
             value={value}
@@ -212,12 +198,7 @@ const ChatSoporte = ({ open, onClose, isMobile }) => {
             onKeyDown={handleKeyDown}
             autoSize={{ minRows: 1, maxRows: 3 }}
             placeholder="Escribe tu mensaje..."
-            style={{
-              borderRadius: 10,
-              fontSize: 11,
-              borderColor: "#e5e7eb",
-              background: "#ffffff",
-            }}
+            style={{ borderRadius: 10, fontSize: 11, borderColor: "#e5e7eb", background: "#ffffff" }}
           />
           <Button
             type="primary"
@@ -232,40 +213,13 @@ const ChatSoporte = ({ open, onClose, isMobile }) => {
           />
         </Flex>
 
-        {/* Pie */}
-        <Flex
-          justify="space-between"
-          align="center"
-          style={{ marginTop: 2 }}
-        >
+        <Flex justify="flex-start" align="center" style={{ marginTop: 2 }}>
           <Flex gap={4} align="center">
-            <UserOutlined
-              style={{
-                fontSize: 10,
-                color: "#9ca3af",
-              }}
-            />
-            <Text
-              style={{
-                fontSize: 9,
-                color: "#9ca3af",
-              }}
-            >
+            <UserOutlined style={{ fontSize: 10, color: "#9ca3af" }} />
+            <Text style={{ fontSize: 9, color: "#9ca3af" }}>
               Operador disponible · Respuesta rápida
             </Text>
           </Flex>
-          <Button
-            type="link"
-            size="small"
-            onClick={onClose}
-            style={{
-              fontSize: 9,
-              padding: 0,
-              color: "#6b7280",
-            }}
-          >
-            Cerrar
-          </Button>
         </Flex>
       </Flex>
     </Drawer>

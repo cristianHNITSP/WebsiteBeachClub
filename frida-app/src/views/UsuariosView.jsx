@@ -1,141 +1,424 @@
 // src/views/UsuariosView.jsx
-import React, { useState } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
+import axios from "@api/axios";
 import {
   Card,
-  Row,
-  Col,
   Alert,
   Space,
-  Input,
-  Select,
-  List,
-  Avatar,
   Tag,
   Typography,
   Button,
   Form,
   Modal,
-  Popconfirm,
   message,
+  Divider,
+  Spin, // 👈 spinner
 } from "antd";
-import { SearchOutlined, TeamOutlined } from "@ant-design/icons";
+import { TeamOutlined, PlusOutlined } from "@ant-design/icons";
 import { beachColors, neutrals } from "../theme/beachTheme";
 
+import UsuariosCreatePanel from "../components/usuarios/UsuariosCreatePanel";
+import UsuariosSummaryBar from "../components/usuarios/UsuariosSummaryBar";
+import UsuariosFiltersBar from "../components/usuarios/UsuariosFiltersBar";
+import UsuariosActiveList from "../components/usuarios/UsuariosActiveList";
+import UsuariosInactiveList from "../components/usuarios/UsuariosInactiveList";
+import UsuarioEditModal from "../components/usuarios/UsuarioEditModal";
+
 const { Text } = Typography;
-const { Option } = Select;
 
 /* =========================================================
-   ROLES DISPONIBLES
+   ROLES DISPONIBLES (BACKEND: administrador | staff)
    ========================================================= */
-
-const ROLES = {
-  manager: "Manager General",
-  recepcion: "Recepción",
-  reservas: "Reservas Online",
-  marketing: "Marketing",
+const ROLE_LABELS = {
+  administrador: "Administrador",
+  staff: "Staff",
 };
 
 /* =========================================================
-   DATOS INICIALES (SIMULACIÓN - LUEGO LOS PUEDES TRAER DE API)
+   HELPERS
    ========================================================= */
 
-const initialUsers = [
-  {
-    key: "1",
-    name: "Laura Sánchez",
-    roleKey: "manager",
-    role: ROLES.manager,
-    email: "laura@beachclub.com",
-    status: "Activo",
-    lastAccess: "Hoy · 08:15",
-    channels: ["PMS", "Email", "WhatsApp"],
-  },
-  {
-    key: "2",
-    name: "Carlos Pérez",
-    roleKey: "recepcion",
-    role: ROLES.recepcion,
-    email: "carlos@beachclub.com",
-    status: "Activo",
-    lastAccess: "Hoy · 07:52",
-    channels: ["PMS", "WhatsApp"],
-  },
-  {
-    key: "3",
-    name: "María Gómez",
-    roleKey: "reservas",
-    role: ROLES.reservas,
-    email: "maria@beachclub.com",
-    status: "Activo",
-    lastAccess: "Ayer · 18:30",
-    channels: ["PMS", "Email"],
-  },
-  {
-    key: "4",
-    name: "Andrés Ruiz",
-    roleKey: "marketing",
-    role: ROLES.marketing,
-    email: "andres@beachclub.com",
-    status: "Pendiente invitación",
-    lastAccess: "-",
-    channels: ["Email"],
-  },
-];
+const formatLastLogin = (iso) => {
+  if (!iso) return "Sin acceso registrado";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "Sin acceso registrado";
+
+  const now = new Date();
+
+  const isSameDay = (a, b) => a.toDateString() === b.toDateString();
+  const yesterday = new Date();
+  yesterday.setDate(now.getDate() - 1);
+
+  const time = d.toLocaleTimeString("es-MX", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+
+  if (isSameDay(d, now)) return `Hoy · ${time}`;
+  if (isSameDay(d, yesterday)) return `Ayer · ${time}`;
+
+  const datePart = d.toLocaleDateString("es-MX", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
+  return `${datePart} · ${time}`;
+};
+
+const mapUserFromApi = (apiUser, currentUser) => {
+  const role = apiUser.role || "staff";
+  return {
+    id: apiUser._id,
+    name: apiUser.name,
+    email: apiUser.email,
+    role,
+    roleLabel: ROLE_LABELS[role] || role,
+    isActive: apiUser.isActive,
+    lastAccess: formatLastLogin(apiUser.lastLogin),
+    createdAt: apiUser.createdAt,
+    updatedAt: apiUser.updatedAt,
+    isSelf:
+      !!currentUser &&
+      (currentUser.id === apiUser._id ||
+        currentUser.email === apiUser.email),
+    channels: [],
+  };
+};
 
 /* =========================================================
    COMPONENTE PRINCIPAL
    ========================================================= */
 
-const UsuariosView = ({ isMobile }) => {
-  const [users, setUsers] = useState(initialUsers);
+const UsuariosView = ({ isMobile, currentUser }) => {
+  const [messageApi, contextHolder] = message.useMessage();
+
+  const [users, setUsers] = useState([]);
+
+  // 🔎 Filtros que ahora se aplican en el BACKEND
   const [userRoleFilter, setUserRoleFilter] = useState("all");
   const [userSearch, setUserSearch] = useState("");
 
   const [modalVisible, setModalVisible] = useState(false);
-  const [editingUser, setEditingUser] = useState(null); // null = crear
+  const [editingUser, setEditingUser] = useState(null);
   const [form] = Form.useForm();
+
+  // Panel de creación
+  const [createPanelOpen, setCreatePanelOpen] = useState(false);
+  const [createForm] = Form.useForm();
+  const [creatingUser, setCreatingUser] = useState(false);
+  const [lastTempPassword, setLastTempPassword] = useState(null);
+
+  // Carga inicial / paginación
+  const [loadingUsers, setLoadingUsers] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [togglingId, setTogglingId] = useState(null);
+  const [fadingId, setFadingId] = useState(null);
+  const [errorMsg, setErrorMsg] = useState("");
+
+  const [offset, setOffset] = useState(0);
+  const [limit] = useState(5); // 5 en 5, alineado con backend
+  const [hasMore, setHasMore] = useState(true);
+
+  const [savingUser, setSavingUser] = useState(false);
+
+  // Debounce para el buscador
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearch(userSearch.trim());
+    }, 400);
+    return () => clearTimeout(handler);
+  }, [userSearch]);
+
+  /* =======================
+     ✅ OPTIMIZACIÓN REQUESTS
+     ======================= */
+  const abortRef = useRef(null);
+  const reqSeqRef = useRef(0);
+  const skipFirstFiltersEffectRef = useRef(true);
+  const lastResetKeyRef = useRef(""); // evita spamear success si por alguna razón se repite
+
+  /* ========== CARGAR LISTA DESDE API (paginada + filtros backend) ========== */
+
+  const fetchUsers = useCallback(
+    async ({ reset = false } = {}) => {
+      // ✅ Cancela request anterior si todavía está en vuelo
+      if (abortRef.current) abortRef.current.abort();
+      const controller = new AbortController();
+      abortRef.current = controller;
+
+      // ✅ Evita que respuestas viejas pisen estado
+      const mySeq = ++reqSeqRef.current;
+
+      if (reset) {
+        setLoadingUsers(true);
+        setOffset(0);
+        setHasMore(true);
+        setUsers([]);
+      } else {
+        if (!hasMore) {
+          messageApi.info("Ya no hay más usuarios para cargar.");
+          return;
+        }
+        setLoadingMore(true);
+      }
+
+      setErrorMsg("");
+      try {
+        const currentOffset = reset ? 0 : offset;
+
+        const params = {
+          offset: currentOffset,
+          limit,
+        };
+
+        if (userRoleFilter !== "all") {
+          params.role = userRoleFilter;
+        }
+
+        if (debouncedSearch) {
+          params.q = debouncedSearch;
+        }
+
+        const res = await axios.get("/api/users", {
+          withCredentials: true,
+          params,
+          signal: controller.signal, // ✅ axios v1 + AbortController
+        });
+
+        // si llegó tarde (vieja), ignorar
+        if (mySeq !== reqSeqRef.current) return;
+
+        const api = res.data;
+        const apiUsers = Array.isArray(api) ? api : api.items || [];
+        const mapped = apiUsers.map((u) => mapUserFromApi(u, currentUser));
+
+        setUsers((prev) =>
+          reset
+            ? mapped
+            : [
+                ...prev,
+                ...mapped.filter((nu) => !prev.some((p) => p.id === nu.id)),
+              ]
+        );
+
+        const nextOffset = currentOffset + apiUsers.length;
+        setOffset(nextOffset);
+
+        if (!Array.isArray(api) && typeof api.hasMore === "boolean") {
+          setHasMore(api.hasMore);
+        } else {
+          setHasMore(false);
+        }
+
+        // ✅ Mantener tu mensaje de éxito, pero sin spam:
+        // solo cuando es reset y el "key" (filtro+search) cambió de verdad.
+        if (reset) {
+          const resetKey = `${userRoleFilter}::${debouncedSearch}`;
+          if (lastResetKeyRef.current !== resetKey) {
+            lastResetKeyRef.current = resetKey;
+            messageApi.success("Usuarios cargados correctamente.");
+          }
+        }
+      } catch (err) {
+        // Abort => no avisar (es normal si el usuario escribe/filtra rápido)
+        if (err?.code === "ERR_CANCELED" || err?.name === "CanceledError") {
+          return;
+        }
+
+        console.error("Error al obtener usuarios:", err);
+        const msg =
+          err.response?.data?.message ||
+          "No se pudieron cargar los usuarios. Inténtalo de nuevo más tarde.";
+        setErrorMsg(msg);
+        messageApi.error(msg);
+      } finally {
+        setLoadingUsers(false);
+        setLoadingMore(false);
+      }
+    },
+    [hasMore, offset, limit, userRoleFilter, debouncedSearch, currentUser, messageApi]
+  );
+
+  // Carga inicial (una vez)
+  useEffect(() => {
+    fetchUsers({ reset: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Cuando cambian filtros -> recargar desde 0
+  // ✅ pero saltar el primer render para que NO se duplique con la carga inicial
+  useEffect(() => {
+    if (skipFirstFiltersEffectRef.current) {
+      skipFirstFiltersEffectRef.current = false;
+      return;
+    }
+    fetchUsers({ reset: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userRoleFilter, debouncedSearch]);
 
   /* ========== DERIVADOS ========== */
 
-  const filteredUsers = users
-    .filter((u) => userRoleFilter === "all" || u.roleKey === userRoleFilter)
-    .filter((u) => {
-      const q = userSearch.trim().toLowerCase();
-      if (!q) return true;
-      return (
-        u.name.toLowerCase().includes(q) ||
-        u.email.toLowerCase().includes(q) ||
-        (u.role || "").toLowerCase().includes(q)
+  const baseFiltered = users; // ya viene filtrado desde backend
+
+  const filteredActiveUsers = baseFiltered.filter((u) => u.isActive);
+  const filteredInactiveUsers = baseFiltered.filter((u) => !u.isActive);
+
+  const activos = users.filter((u) => u.isActive).length;
+  const inactivos = users.filter((u) => !u.isActive).length;
+  const total = users.length;
+  const adminsCount = users.filter((u) => u.role === "administrador").length;
+  const staffCount = users.filter((u) => u.role === "staff").length;
+
+  // 🔄 loading de lista principal (para skeletons)
+  const loadingActiveList = loadingUsers && users.length === 0;
+
+  /* ========== CREAR NUEVO USUARIO (panel dinámico) ========== */
+
+  const toggleCreatePanel = () => {
+    setCreatePanelOpen((prev) => !prev);
+    if (!createPanelOpen) {
+      setLastTempPassword(null);
+      createForm.resetFields();
+      createForm.setFieldsValue({
+        role: "staff",
+      });
+      messageApi.info(
+        "Completa los datos para dar de alta a un nuevo usuario."
       );
-    });
-
-  const activos = users.filter((u) => u.status === "Activo").length;
-  const pendientes = users.filter((u) =>
-    u.status.includes("Pendiente")
-  ).length;
-
-  /* ========== HANDLERS MODAL ========== */
-
-  const abrirModalCrear = () => {
-    setEditingUser(null);
-    form.resetFields();
-    form.setFieldsValue({
-      status: "Pendiente invitación",
-      roleKey: "recepcion",
-      channels: ["PMS"],
-    });
-    setModalVisible(true);
+    }
   };
 
+  const generarPasswordSegura = () => {
+    const chars =
+      "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789!@$%&*?";
+    let pwd = "";
+    for (let i = 0; i < 12; i += 1) {
+      const idx = Math.floor(Math.random() * chars.length);
+      pwd += chars.charAt(idx);
+    }
+    createForm.setFieldsValue({ password: pwd });
+    setLastTempPassword(pwd);
+    messageApi.success("Contraseña segura generada.");
+  };
+
+  const crearUsuario = async () => {
+    try {
+      const values = await createForm.validateFields();
+      const { name, email, role, password } = values;
+
+      setCreatingUser(true);
+      messageApi.loading({
+        content: "Creando usuario...",
+        key: "creatingUser",
+      });
+
+      const res = await axios.post(
+        "/api/users",
+        {
+          name,
+          email,
+          role,
+          password,
+        },
+        { withCredentials: true }
+      );
+
+      const apiUser = res.data?.user || res.data;
+      const mapped = mapUserFromApi(apiUser, currentUser);
+
+      setUsers((prev) => [mapped, ...prev]);
+
+      setCreatePanelOpen(false);
+      createForm.resetFields();
+      setLastTempPassword(null);
+
+      messageApi.success({
+        content: "Usuario creado correctamente.",
+        key: "creatingUser",
+      });
+
+      Modal.success({
+        title: "Usuario creado correctamente",
+        content: (
+          <div style={{ marginTop: 8 }}>
+            <p>
+              Se creó el usuario <strong>{name}</strong> ({email}).
+            </p>
+            <p style={{ marginTop: 6 }}>
+              Comparte estas credenciales iniciales con la persona:
+            </p>
+            <div
+              style={{
+                marginTop: 6,
+                padding: "6px 8px",
+                borderRadius: 8,
+                background: "#111827",
+                color: "#f9fafb",
+                fontFamily:
+                  "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace",
+                fontSize: 12,
+                wordBreak: "break-all",
+              }}
+            >
+              <div>
+                <strong>Correo:&nbsp;</strong>
+                {email}
+              </div>
+              <div>
+                <strong>Contraseña:&nbsp;</strong>
+                {password}
+              </div>
+            </div>
+            <p
+              style={{
+                marginTop: 8,
+                fontSize: 11,
+                color: "#6b7280",
+              }}
+            >
+              Recomienda cambiar la contraseña en su primer inicio de sesión.
+            </p>
+          </div>
+        ),
+        okText: "Entendido",
+        centered: true,
+      });
+    } catch (err) {
+      console.error("Error al crear usuario:", err);
+      messageApi.destroy("creatingUser");
+      if (
+        err.response?.data?.error === "EMAIL_IN_USE" &&
+        err.response?.data?.message
+      ) {
+        messageApi.error(err.response.data.message);
+      } else if (err.response?.data?.message) {
+        messageApi.error(err.response.data.message);
+      } else if (err.name === "Error") {
+      } else {
+        messageApi.error("No se pudo crear el usuario.");
+      }
+    } finally {
+      setCreatingUser(false);
+    }
+  };
+
+  /* ========== MODAL EDITAR ========== */
+
   const abrirModalEditar = (user) => {
+    if (user.isSelf) {
+      messageApi.info(
+        "No puedes editar tu propio usuario desde este panel."
+      );
+      return;
+    }
+
     setEditingUser(user);
     form.resetFields();
     form.setFieldsValue({
       name: user.name,
       email: user.email,
-      roleKey: user.roleKey,
-      status: user.status,
-      channels: user.channels,
+      role: user.role,
     });
     setModalVisible(true);
   };
@@ -147,77 +430,128 @@ const UsuariosView = ({ isMobile }) => {
   };
 
   const guardarUsuario = async () => {
+    if (!editingUser) return;
+
+    const values = await form.validateFields();
+    const { name, email, role } = values;
+
+    const payload = {
+      name,
+      email,
+      role,
+    };
+
+    setSavingUser(true);
+    messageApi.loading({
+      content: "Guardando cambios...",
+      key: "savingUser",
+    });
     try {
-      const values = await form.validateFields();
-      const { name, email, roleKey, status, channels } = values;
-      const roleLabel = ROLES[roleKey] || "Rol sin definir";
+      const res = await axios.put(
+        `/api/users/${editingUser.id}`,
+        payload,
+        { withCredentials: true }
+      );
 
-      if (editingUser) {
-        // UPDATE
-        setUsers((prev) =>
-          prev.map((u) =>
-            u.key === editingUser.key
-              ? {
-                  ...u,
-                  name,
-                  email,
-                  roleKey,
-                  role: roleLabel,
-                  status,
-                  channels: channels || [],
-                }
-              : u
-          )
-        );
-        message.success("Usuario actualizado correctamente.");
-      } else {
-        // CREATE
-        const nuevo = {
-          key: String(Date.now()),
-          name,
-          email,
-          roleKey,
-          role: roleLabel,
-          status: status || "Pendiente invitación",
-          lastAccess: "-",
-          channels: channels || [],
-        };
-        setUsers((prev) => [nuevo, ...prev]);
-        message.success("Usuario invitado / creado correctamente.");
-      }
+      const updatedApiUser = res.data?.user || res.data;
+      const updated = mapUserFromApi(updatedApiUser, currentUser);
 
+      setUsers((prev) =>
+        prev.map((u) => (u.id === updated.id ? updated : u))
+      );
+
+      messageApi.success({
+        content: "Usuario actualizado correctamente.",
+        key: "savingUser",
+      });
       cerrarModal();
     } catch (err) {
-      // Validación incompleta: no hacemos nada especial
+      console.error("Error al actualizar usuario:", err);
+      messageApi.destroy("savingUser");
+      if (
+        err.response?.data?.error === "EMAIL_IN_USE" &&
+        err.response?.data?.message
+      ) {
+        messageApi.error(err.response.data.message);
+      } else {
+        messageApi.error(
+          err.response?.data?.message || "No se pudo guardar el usuario."
+        );
+      }
+    } finally {
+      setSavingUser(false);
     }
   };
 
-  /* ========== ACCIONES RÁPIDAS ========== */
+  /* ========== ACTIVAR / DESACTIVAR ========== */
+
+  const hacerToggleEstado = async (user, nextIsActive) => {
+    setTogglingId(user.id);
+    messageApi.loading({
+      content: nextIsActive
+        ? "Restaurando usuario..."
+        : "Enviando usuario a la papelera...",
+      key: `toggle-${user.id}`,
+    });
+
+    try {
+      const res = await axios.patch(
+        `/api/users/${user.id}/status`,
+        { isActive: nextIsActive },
+        { withCredentials: true }
+      );
+
+      const updatedApiUser = res.data?.user || res.data;
+      const updated = mapUserFromApi(updatedApiUser, currentUser);
+
+      setUsers((prev) =>
+        prev.map((u) => (u.id === updated.id ? updated : u))
+      );
+
+      messageApi.success({
+        content: nextIsActive
+          ? "Usuario activado y restaurado desde la papelera."
+          : "Usuario enviado a la papelera (inactivo).",
+        key: `toggle-${user.id}`,
+      });
+    } catch (err) {
+      console.error("Error al cambiar estado de usuario:", err);
+      messageApi.error(
+        err.response?.data?.message ||
+          "No se pudo actualizar el estado del usuario."
+      );
+    } finally {
+      setTogglingId(null);
+      setFadingId(null);
+    }
+  };
 
   const cambiarEstado = (user) => {
-    let nextStatus = "Activo";
+    if (user.isSelf) {
+      messageApi.info(
+        "No puedes cambiar el estado de tu propio usuario desde aquí."
+      );
+      return;
+    }
 
-    if (user.status === "Activo") nextStatus = "Inactivo";
-    else if (user.status === "Inactivo") nextStatus = "Activo";
-    else if (user.status.includes("Pendiente")) nextStatus = "Activo";
+    const nextIsActive = !user.isActive;
 
-    setUsers((prev) =>
-      prev.map((u) =>
-        u.key === user.key ? { ...u, status: nextStatus } : u
-      )
-    );
-    message.success(`Estado actualizado a "${nextStatus}".`);
+    if (!nextIsActive) {
+      setFadingId(user.id);
+      setTimeout(() => {
+        hacerToggleEstado(user, nextIsActive);
+      }, 220);
+    } else {
+      hacerToggleEstado(user, nextIsActive);
+    }
   };
 
-  const eliminarUsuario = (user) => {
-    setUsers((prev) => prev.filter((u) => u.key !== user.key));
-    message.success("Usuario eliminado.");
-  };
-
-  /* ========== RENDER ========== */
+  /* ========== RENDER (SIN CAMBIOS VISUALES) ========== */
 
   return (
     <>
+      {contextHolder}
+
       <Card
         bordered={false}
         style={{
@@ -250,343 +584,143 @@ const UsuariosView = ({ isMobile }) => {
             >
               {activos} activos
             </Tag>
-            {pendientes > 0 && (
+            {inactivos > 0 && (
               <Tag
-                color={beachColors.coral}
+                color="#e5e7eb"
                 style={{
                   borderRadius: 999,
                   fontSize: 10,
-                  color: "#7f1d1d",
+                  color: "#111827",
                 }}
               >
-                {pendientes} invitación pendiente
+                {inactivos} en papelera
               </Tag>
             )}
           </Space>
         }
         extra={
           <Button
-            type="primary"
+            type={createPanelOpen ? "default" : "primary"}
             size="small"
-            onClick={abrirModalCrear}
+            icon={<PlusOutlined />}
+            onClick={toggleCreatePanel}
             style={{
               borderRadius: 999,
               paddingInline: 14,
-              background: beachColors.teal,
-              borderColor: beachColors.teal,
               fontSize: 11,
+              background: createPanelOpen ? "#ffffff" : beachColors.teal,
+              borderColor: beachColors.teal,
+              color: createPanelOpen ? beachColors.teal : "#ffffff",
             }}
           >
-            Invitar usuario
+            {createPanelOpen ? "Cerrar alta rápida" : "Nuevo usuario"}
           </Button>
         }
       >
-        {/* Filtros superiores */}
-        <Row
-          gutter={[12, 12]}
-          style={{ marginBottom: 12 }}
-          align="middle"
-          justify="space-between"
-        >
-          <Col xs={24} md={12}>
-            <Alert
-              type="info"
-              showIcon
-              style={{ padding: "6px 10px", borderRadius: 8 }}
-              message={
-                <Text style={{ fontSize: 11 }}>
-                  Gestiona accesos por rol. Usa este panel como fuente única de verdad
-                  para quién puede entrar al sistema.
-                </Text>
-              }
-            />
-          </Col>
-          <Col xs={24} md={12}>
-            <Space
-              size={8}
-              style={{
-                width: "100%",
-                justifyContent: isMobile ? "flex-start" : "flex-end",
-                flexWrap: "wrap",
-              }}
-            >
-              <Input
-                size="small"
-                placeholder="Buscar por nombre, correo o rol..."
-                prefix={<SearchOutlined />}
-                value={userSearch}
-                onChange={(e) => setUserSearch(e.target.value)}
-                style={{ width: isMobile ? "100%" : 220 }}
-              />
-              <Select
-                size="small"
-                value={userRoleFilter}
-                onChange={setUserRoleFilter}
-                style={{ width: isMobile ? "100%" : 170 }}
-              >
-                <Option value="all">Todos los roles</Option>
-                <Option value="manager">Manager</Option>
-                <Option value="recepcion">Recepción</Option>
-                <Option value="reservas">Reservas</Option>
-                <Option value="marketing">Marketing</Option>
-              </Select>
-            </Space>
-          </Col>
-        </Row>
+        {errorMsg && (
+          <Alert
+            type="error"
+            showIcon
+            style={{ marginBottom: 12 }}
+            message={errorMsg}
+          />
+        )}
 
-        {/* LISTA DE USUARIOS */}
-        <List
-          dataSource={filteredUsers}
-          split={false}
-          locale={{
-            emptyText: "No hay usuarios que coincidan con el filtro.",
+        {/* 🔄 Spinner global en carga inicial / cambio de filtros con lista vacía */}
+        {loadingUsers && users.length === 0 && (
+          <div
+            style={{
+              width: "100%",
+              display: "flex",
+              justifyContent: "center",
+              marginBottom: 10,
+            }}
+          >
+            <Spin size="small" tip="Cargando usuarios..." />
+          </div>
+        )}
+
+        {/* Panel de creación */}
+        <UsuariosCreatePanel
+          createPanelOpen={createPanelOpen}
+          createForm={createForm}
+          creatingUser={creatingUser}
+          lastTempPassword={lastTempPassword}
+          generarPasswordSegura={generarPasswordSegura}
+          crearUsuario={crearUsuario}
+        />
+
+        {/* Resumen superior */}
+        <UsuariosSummaryBar
+          total={total}
+          adminsCount={adminsCount}
+          staffCount={staffCount}
+          isMobile={isMobile}
+        />
+
+        {/* Filtros (aplicados en backend) */}
+        <UsuariosFiltersBar
+          isMobile={isMobile}
+          userSearch={userSearch}
+          setUserSearch={setUserSearch}
+          userRoleFilter={userRoleFilter}
+          setUserRoleFilter={setUserRoleFilter}
+        />
+
+        <Divider style={{ margin: "8px 0 12px" }} />
+
+        {/* LISTA: ACTIVOS */}
+        <Text
+          style={{
+            fontSize: 11,
+            color: neutrals.textMuted,
+            display: "block",
+            marginBottom: 6,
           }}
-          renderItem={(user) => (
-            <List.Item
-              style={{
-                padding: "8px 6px",
-                marginBottom: 4,
-                borderRadius: 10,
-                border: "1px solid #f1f5f9",
-                display: "flex",
-                flexWrap: "wrap",
-                gap: 8,
-                alignItems: "center",
-                justifyContent: "space-between",
-              }}
+        >
+          Usuarios activos (pueden iniciar sesión en el panel).
+        </Text>
+
+        <UsuariosActiveList
+          filteredActiveUsers={filteredActiveUsers}
+          loading={loadingActiveList} // 🦴 skeletons + loading
+          isMobile={isMobile}
+          fadingId={fadingId}
+          togglingId={togglingId}
+          abrirModalEditar={abrirModalEditar}
+          cambiarEstado={cambiarEstado}
+        />
+
+        {/* Botón “Cargar más” con spinner */}
+        {hasMore && (
+          <div style={{ textAlign: "center", marginTop: 10 }}>
+            <Button
+              size="small"
+              onClick={() => fetchUsers({ reset: false })}
+              loading={loadingMore} // 🔄 spinner en botón
             >
-              {/* Info principal */}
-              <List.Item.Meta
-                avatar={
-                  <Avatar
-                    style={{
-                      backgroundColor: beachColors.teal,
-                      color: "#ffffff",
-                      fontWeight: 600,
-                    }}
-                  >
-                    {user.name.charAt(0)}
-                  </Avatar>
-                }
-                title={
-                  <Space size={6} wrap>
-                    <Text style={{ fontWeight: 500 }}>
-                      {user.name}
-                    </Text>
-                    <Tag
-                      color={beachColors.sand}
-                      style={{
-                        borderRadius: 999,
-                        fontSize: 9,
-                        color: beachColors.deepBlue,
-                      }}
-                    >
-                      {user.role}
-                    </Tag>
-                  </Space>
-                }
-                description={
-                  <Space direction="vertical" size={0}>
-                    <Text
-                      style={{
-                        fontSize: 11,
-                        color: neutrals.textMuted,
-                      }}
-                    >
-                      {user.email}
-                    </Text>
-                    <Text
-                      style={{
-                        fontSize: 10,
-                        color: neutrals.textMuted,
-                      }}
-                    >
-                      Accesos: {user.channels.join(" · ")}
-                    </Text>
-                  </Space>
-                }
-              />
+              Cargar más usuarios
+            </Button>
+          </div>
+        )}
 
-              {/* Acciones y estado */}
-              <Space
-                direction="vertical"
-                align="end"
-                size={4}
-                style={{
-                  minWidth: isMobile ? "100%" : 180,
-                  textAlign: "right",
-                }}
-              >
-                <Tag
-                  color={
-                    user.status === "Activo"
-                      ? beachColors.teal
-                      : user.status.includes("Pendiente")
-                      ? beachColors.coral
-                      : "#9ca3af"
-                  }
-                  style={{
-                    borderRadius: 999,
-                    fontSize: 9,
-                    color:
-                      user.status === "Activo"
-                        ? "#064e3b"
-                        : user.status.includes("Pendiente")
-                        ? "#7f1d1d"
-                        : "#111827",
-                  }}
-                >
-                  {user.status}
-                </Tag>
-                <Text
-                  style={{
-                    fontSize: 10,
-                    color: neutrals.textMuted,
-                  }}
-                >
-                  {user.lastAccess !== "-"
-                    ? `Último acceso: ${user.lastAccess}`
-                    : "Sin acceso registrado"}
-                </Text>
-
-                <Space
-                  size={4}
-                  wrap
-                  style={{
-                    justifyContent: isMobile ? "flex-end" : "flex-end",
-                  }}
-                >
-                  <Button
-                    type="link"
-                    size="small"
-                    onClick={() => abrirModalEditar(user)}
-                    style={{ paddingInline: 4, fontSize: 10 }}
-                  >
-                    Editar
-                  </Button>
-
-                  <Button
-                    type="link"
-                    size="small"
-                    onClick={() => cambiarEstado(user)}
-                    style={{ paddingInline: 4, fontSize: 10 }}
-                  >
-                    {user.status === "Activo"
-                      ? "Desactivar"
-                      : "Activar"}
-                  </Button>
-
-                  <Popconfirm
-                    title="Eliminar usuario"
-                    description="Esta acción no afecta reservas, solo el acceso. ¿Confirmas?"
-                    okText="Sí, eliminar"
-                    cancelText="Cancelar"
-                    onConfirm={() => eliminarUsuario(user)}
-                  >
-                    <Button
-                      type="link"
-                      size="small"
-                      danger
-                      style={{ paddingInline: 4, fontSize: 10 }}
-                    >
-                      Eliminar
-                    </Button>
-                  </Popconfirm>
-                </Space>
-              </Space>
-            </List.Item>
-          )}
+        {/* PAPELERA */}
+        <UsuariosInactiveList
+          filteredInactiveUsers={filteredInactiveUsers}
+          isMobile={isMobile}
+          togglingId={togglingId}
+          cambiarEstado={cambiarEstado}
         />
       </Card>
 
-      {/* MODAL CREAR / EDITAR USUARIO */}
-      <Modal
-        open={modalVisible}
-        title={
-          editingUser
-            ? "Editar usuario"
-            : "Invitar / crear usuario"
-        }
-        onOk={guardarUsuario}
-        onCancel={cerrarModal}
-        okText={editingUser ? "Guardar cambios" : "Crear usuario"}
-        cancelText="Cancelar"
-        centered
-        destroyOnClose
-      >
-        <Form
-          form={form}
-          layout="vertical"
-          preserve={false}
-        >
-          <Form.Item
-            label="Nombre completo"
-            name="name"
-            rules={[
-              { required: true, message: "Ingresa el nombre completo" },
-            ]}
-          >
-            <Input placeholder="Ej: Juan Pérez" />
-          </Form.Item>
-
-          <Form.Item
-            label="Correo"
-            name="email"
-            rules={[
-              { required: true, message: "Ingresa el correo" },
-              { type: "email", message: "Correo no válido" },
-            ]}
-          >
-            <Input placeholder="nombre@hotel.com" />
-          </Form.Item>
-
-          <Form.Item
-            label="Rol"
-            name="roleKey"
-            rules={[
-              { required: true, message: "Selecciona el rol" },
-            ]}
-          >
-            <Select placeholder="Selecciona un rol">
-              <Option value="manager">Manager General</Option>
-              <Option value="recepcion">Recepción</Option>
-              <Option value="reservas">Reservas Online</Option>
-              <Option value="marketing">Marketing</Option>
-            </Select>
-          </Form.Item>
-
-          <Form.Item
-            label="Estado"
-            name="status"
-            rules={[
-              { required: true, message: "Selecciona el estado" },
-            ]}
-          >
-            <Select>
-              <Option value="Activo">Activo</Option>
-              <Option value="Pendiente invitación">
-                Pendiente invitación
-              </Option>
-              <Option value="Inactivo">Inactivo</Option>
-            </Select>
-          </Form.Item>
-
-          <Form.Item label="Accesos a módulos" name="channels">
-            <Select
-              mode="multiple"
-              placeholder="Selecciona los módulos a los que tiene acceso"
-              allowClear
-            >
-              <Option value="PMS">PMS</Option>
-              <Option value="Motor reservas">Motor de reservas</Option>
-              <Option value="Email">Email</Option>
-              <Option value="WhatsApp">WhatsApp</Option>
-              <Option value="Reportes">Reportes</Option>
-              <Option value="Marketing">Marketing</Option>
-            </Select>
-          </Form.Item>
-        </Form>
-      </Modal>
+      {/* MODAL EDITAR */}
+      <UsuarioEditModal
+        modalVisible={modalVisible}
+        guardarUsuario={guardarUsuario}
+        savingUser={savingUser}
+        cerrarModal={cerrarModal}
+        form={form}
+      />
     </>
   );
 };

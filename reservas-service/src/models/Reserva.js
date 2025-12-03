@@ -1,38 +1,75 @@
-const mongoose = require('mongoose');
+const mongoose = require("mongoose");
+
+const ORIGINS = ["manual", "web", "seed", "import"];
+const TYPES = ["stay"];
+
+function genCodigoReserva({ hotel, room, startDate }) {
+  const h =
+    hotel === "casa_frida"
+      ? "CF"
+      : hotel === "cabanas_fridas"
+      ? "CB"
+      : String(hotel || "XX").slice(0, 2).toUpperCase();
+
+  const r = String(room || "0").replace(/\s+/g, "");
+  const d = String(startDate || "").replace(/-/g, ""); // YYYYMMDD
+  const t = Date.now().toString(36).toUpperCase();
+  const rand = Math.random().toString(36).slice(2, 8).toUpperCase();
+  return `${h}-${r}-${d}-${t}-${rand}`;
+}
 
 const ReservaSchema = new mongoose.Schema(
   {
-    codigoReserva: { type: String, required: true, unique: true },
-
-    // Relación con habitación
-    habitacionId: { type: mongoose.Schema.Types.ObjectId, ref: 'Habitacion', required: true },
-    hotelCode: { type: String, required: true },
-    roomNumber: { type: String, required: true },
-
-    // Huésped
-    guestName: { type: String, required: true },
-    guestEmail: { type: String, required: true },
-    guestPhone: { type: String, required: true },
-    guests: { type: Number, default: 1 },
-
-    // Fechas
-    checkIn: { type: Date, required: true },
-    checkOut: { type: Date, required: true },
-
-    status: {
+    codigoReserva: {
       type: String,
-      enum: ['PENDIENTE', 'CONFIRMADA', 'CHECKED_IN', 'CHECKED_OUT', 'CANCELADA', 'NO_SHOW'],
-      default: 'PENDIENTE'
+      required: true,
+      unique: true,
+      index: true,
+      trim: true,
     },
 
-    source: { type: String, default: 'web' },
-    notes: { type: String, default: '' },
+    habitacionId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Habitacion",
+      required: true,
+      index: true,
+    },
 
-    nightlyRate: { type: Number, default: null },
-    totalNights: { type: Number, default: null },
-    totalAmount: { type: Number, default: null }
+    hotel: { type: String, required: true, trim: true, index: true },
+    room: { type: String, required: true, trim: true, index: true },
+
+    type: { type: String, enum: TYPES, default: "stay", index: true },
+
+    startDate: { type: String, required: true, trim: true, index: true },
+    endDate: { type: String, required: true, trim: true, index: true },
+
+    label: { type: String, default: "", trim: true },
+    notes: { type: String, default: "", trim: true },
+    origen: { type: String, enum: ORIGINS, default: "manual", index: true },
+
+    checkinAt: { type: String, default: null, trim: true },
+    checkoutAt: { type: String, default: null, trim: true },
+    paidAt: { type: String, default: null, trim: true },
+
+    // ✅ PAPELERA (soft delete)
+    isDeleted: { type: Boolean, default: false, index: true },
+    deletedAt: { type: Date, default: null, index: true },
   },
-  { timestamps: { createdAt: 'createdAt', updatedAt: 'updatedAt' } }
+  { timestamps: { createdAt: "createdAt", updatedAt: "updatedAt" }, strict: true }
 );
 
-module.exports = mongoose.model('Reserva', ReservaSchema);
+// autogenera si faltara (por seguridad)
+ReservaSchema.pre("validate", function (next) {
+  if (!this.codigoReserva) {
+    this.codigoReserva = genCodigoReserva({
+      hotel: this.hotel,
+      room: this.room,
+      startDate: this.startDate,
+    });
+  }
+  next();
+});
+
+ReservaSchema.index({ hotel: 1, room: 1, startDate: 1, endDate: 1, isDeleted: 1 });
+
+module.exports = mongoose.model("Reserva", ReservaSchema);
