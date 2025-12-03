@@ -14,7 +14,7 @@ export { RateLimiter } from "./rate-limiter";
 export { RequestCache } from "./request-cache";
 export { WebSocketManager, wsManager } from "./websocket-manager";
 
-// APIs específicas
+// APIs específicas - Exportar como namespaces
 export * as habitacionesAPI from "./habitaciones";
 export * as reservasAPI from "./reservas";
 export * as usuariosAPI from "./usuarios";

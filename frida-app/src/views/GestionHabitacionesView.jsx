@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { habitacionesAPI } from "../api/habitaciones";
+import { habitacionesAPI } from "../api";
 import { Card, Form, message, Modal, Table, Tag, Space, Button, Typography } from "antd";
 import dayjs from "dayjs";
 import { ReloadOutlined } from "@ant-design/icons";
@@ -87,11 +87,17 @@ const GestionHabitacionesView = ({ isMobile, currentUser }) => {
         duration: 2,
       });
     } catch (err) {
-      console.error(err);
+      // Ignorar errores de solicitudes duplicadas (sistema funcionando correctamente)
+      if (err.code === "DUPLICATE_REQUEST") {
+        console.log("⚠️ Solicitud duplicada evitada (sistema anti-duplicados funcionando)");
+        return;
+      }
+
+      console.error("❌ Error cargando habitaciones:", err);
       messageApi.open({
         key: "loading-rooms",
         type: "error",
-        content: "No se pudieron cargar las habitaciones. Intenta de nuevo más tarde.",
+        content: err?.response?.data?.message || "No se pudieron cargar las habitaciones. Intenta de nuevo más tarde.",
         duration: 3,
       });
     } finally {

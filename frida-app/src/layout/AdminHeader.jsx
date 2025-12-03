@@ -11,7 +11,7 @@ import {
 
 import { DownOutlined, UserOutlined, HomeOutlined } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
-import { usuariosAPI } from "../api/usuarios";
+import { usuariosAPI } from "../api";
 import { beachColors } from "../theme/beachTheme";
 
 const { Header } = Layout;

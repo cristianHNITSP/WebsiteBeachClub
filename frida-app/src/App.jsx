@@ -1,7 +1,6 @@
 import { useMediaQuery } from "react-responsive";
 import { useState, useEffect } from "react";
-import { wsManager } from "./api/websocket-manager";
-import { habitacionesAPI } from "./api/habitaciones";
+import { wsManager, habitacionesAPI } from "./api";
 
 import {
   ConfigProvider,

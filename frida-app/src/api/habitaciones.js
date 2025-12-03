@@ -11,7 +11,7 @@ const cache = new RequestCache();
 const ENDPOINTS = {
   PUBLIC_HABITACIONES: "/api/habitaciones/public",
   HABITACIONES: "/api/habitaciones",
-  HABITACIONES_LIST: "/api/habitaciones/list",
+  HABITACIONES_LIST: "/api/habitaciones/gestor.admin",
 };
 
 /**

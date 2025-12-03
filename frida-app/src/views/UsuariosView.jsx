@@ -1,6 +1,6 @@
 // src/views/UsuariosView.jsx
 import { useState, useEffect, useRef, useCallback } from "react";
-import { usuariosAPI } from "../api/usuarios";
+import { usuariosAPI } from "../api";
 import {
   Card,
   Alert,
