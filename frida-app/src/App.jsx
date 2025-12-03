@@ -647,7 +647,7 @@ function App({ currentUser }) {
                 </Button>
                 <Button
                   ghost
-                  href="/panel.web/login.panel.web"
+                  href="/hotelesfrida.app/panel.web/login.panel.web"
                   style={{
                     borderRadius: 999,
                     borderColor: "#ffffff",
