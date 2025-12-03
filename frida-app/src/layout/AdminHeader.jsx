@@ -11,7 +11,7 @@ import {
 
 import { DownOutlined, UserOutlined, HomeOutlined } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
-import axios from "axios";
+import { usuariosAPI } from "../api/usuarios";
 import { beachColors } from "../theme/beachTheme";
 
 const { Header } = Layout;
@@ -32,7 +32,7 @@ const AdminHeader = ({ isMobile, currentUser }) => {
 
       case "logout":
         try {
-          await axios.post("/api/auth/logout", {}, { withCredentials: true });
+          await usuariosAPI.logoutUsuario();
 
           window.localStorage.removeItem("panelAdminActiveTab");
 
@@ -52,7 +52,6 @@ const AdminHeader = ({ isMobile, currentUser }) => {
 
   const managerMenu = {
     items: [
-      { key: "profile", label: "Perfil" },
       { key: "settings", label: "Configuración" },
       { key: "logout", label: "Cerrar sesión" },
     ],
@@ -107,7 +106,7 @@ const AdminHeader = ({ isMobile, currentUser }) => {
               boxShadow: "0 4px 10px rgba(15,23,42,0.22)",
             }}
           >
-            BC
+            HF
           </div>
           <Flex vertical style={{ lineHeight: 1.1 }}>
             <Text
@@ -117,7 +116,7 @@ const AdminHeader = ({ isMobile, currentUser }) => {
                 fontWeight: 600,
               }}
             >
-              Beach Club
+              Hoteles Frida
             </Text>
             {!isMobile && (
               <Text
@@ -138,7 +137,7 @@ const AdminHeader = ({ isMobile, currentUser }) => {
           align="center"
           style={{ flexShrink: 0 }}
         >
-          {/* 👇 Botón para ir al sitio público "/" heredando currentUser */}
+          {/*Botón para ir al sitio público "/" heredando currentUser */}
           <Button
             size={isMobile ? "small" : "middle"}
             icon={<HomeOutlined />}

@@ -1,7 +1,7 @@
-import axios from "axios";
 import { useMediaQuery } from "react-responsive";
 import { useState, useEffect } from "react";
-import { io } from "socket.io-client";
+import { wsManager } from "./api/websocket-manager";
+import { habitacionesAPI } from "./api/habitaciones";
 
 import {
   ConfigProvider,
@@ -48,8 +48,6 @@ const { Option } = Select;
 
 const backgroundColor = "#f8fafc";
 const borderColor = "#e2e8f0";
-
-const WS_URL = import.meta.env.VITE_RESERVAS_WS_URL || "http://localhost:4002";
 
 const treeData = [
   {
@@ -124,29 +122,20 @@ function App({ currentUser }) {
   // Habitación activa (solo para contexto del chat)
   const [habitacionSeleccionada, setHabitacionSeleccionada] = useState(null);
 
-  // 🔌 WebSocket
+  // 🔌 WebSocket - Conexión centralizada
   useEffect(() => {
-    const socket = io(WS_URL, {
-      transports: ["websocket"],
-      withCredentials: true,
-    });
+    // Conectar al servicio de reservas
+    const socket = wsManager.connect("reservas");
 
-    socket.on("connect", () => {
-      console.log("✅ Conectado a WebSocket reservas-service:", socket.id);
-    });
-
-    socket.on("disconnect", () => {
-      console.log("🔌 Desconectado de WebSocket reservas-service");
-    });
-
-    socket.on("habitaciones:init", (data) => {
+    // Listeners de habitaciones
+    wsManager.on("reservas", "habitaciones:init", (data) => {
       if (Array.isArray(data)) {
         setHabitaciones(data);
         setLoadingHabitaciones(false);
       }
     });
 
-    socket.on("habitaciones:created", (room) => {
+    wsManager.on("reservas", "habitaciones:created", (room) => {
       if (!room || !room._id) return;
       setHabitaciones((prev) => {
         const exists = prev.some((h) => h._id === room._id);
@@ -155,45 +144,46 @@ function App({ currentUser }) {
       });
     });
 
-    socket.on("habitaciones:updated", (room) => {
+    wsManager.on("reservas", "habitaciones:updated", (room) => {
       if (!room || !room._id) return;
       setHabitaciones((prev) => prev.map((h) => (h._id === room._id ? { ...h, ...room } : h)));
     });
 
-    socket.on("habitaciones:deleted", (payload) => {
+    wsManager.on("reservas", "habitaciones:deleted", (payload) => {
       const deleteId = payload?._id || payload?.id;
       if (!deleteId) return;
       setHabitaciones((prev) => prev.filter((h) => h._id !== deleteId));
     });
 
-    socket.on("habitaciones:error", (payload) => {
+    wsManager.on("reservas", "habitaciones:error", (payload) => {
       console.error("WS habitaciones:error", payload);
       messageApi.error(payload?.message || "Ocurrió un error en tiempo real.");
     });
 
-    socket.on("habitaciones:trashed", (payload) => {
-  const id = payload?._id || payload?.id;
-  if (!id) return;
-  setHabitaciones((prev) => prev.filter((h) => h._id !== id));
-});
+    wsManager.on("reservas", "habitaciones:trashed", (payload) => {
+      const id = payload?._id || payload?.id;
+      if (!id) return;
+      setHabitaciones((prev) => prev.filter((h) => h._id !== id));
+    });
 
-socket.on("habitaciones:deleted_permanent", (payload) => {
-  const id = payload?._id || payload?.id;
-  if (!id) return;
-  setHabitaciones((prev) => prev.filter((h) => h._id !== id));
-});
+    wsManager.on("reservas", "habitaciones:deleted_permanent", (payload) => {
+      const id = payload?._id || payload?.id;
+      if (!id) return;
+      setHabitaciones((prev) => prev.filter((h) => h._id !== id));
+    });
 
-// opcional: si llega restored, puedes refrescar o insertar si cabe
-socket.on("habitaciones:restored", (room) => {
-  // en público, mejor re-sync con HTTP si quieres exactitud:
-  // cargarHabitaciones(pagination.page, false);  // si lo haces, cuida dependencias del useEffect
-});
-
-
-    return () => socket.disconnect();
+    return () => {
+      wsManager.off("reservas", "habitaciones:init");
+      wsManager.off("reservas", "habitaciones:created");
+      wsManager.off("reservas", "habitaciones:updated");
+      wsManager.off("reservas", "habitaciones:deleted");
+      wsManager.off("reservas", "habitaciones:error");
+      wsManager.off("reservas", "habitaciones:trashed");
+      wsManager.off("reservas", "habitaciones:deleted_permanent");
+    };
   }, [messageApi]);
 
-  // HTTP paginado
+  // HTTP paginado - Usar API centralizada
   const cargarHabitaciones = async (page = 1, showToast = false) => {
     try {
       setLoadingHabitaciones(true);
@@ -201,11 +191,8 @@ socket.on("habitaciones:restored", (room) => {
 
       const limit = pagination.limit || 5;
 
-      const response = await axios.get("/api/habitaciones/public", {
-        params: { page, limit },
-      });
+      const payload = await habitacionesAPI.fetchPublicHabitaciones(page, limit);
 
-      const payload = response.data || {};
       const items = Array.isArray(payload.items) ? payload.items : [];
 
       setHabitaciones(items);
@@ -331,7 +318,7 @@ socket.on("habitaciones:restored", (room) => {
               />
               <div style={{ lineHeight: 1.1 }}>
                 <Title level={4} style={{ margin: 0, color: "#ffffff", fontWeight: 700, letterSpacing: 0.3 }}>
-                  Beach Club
+                  Hoteles Frida
                 </Title>
                 <Text style={{ fontSize: 10, color: "rgba(241,245,249,0.9)" }}>
                   Reservas directas con un solo clic
@@ -649,7 +636,7 @@ socket.on("habitaciones:restored", (room) => {
         >
           <Flex vertical justify="center" align="center" gap={10} style={{ maxWidth: 900, margin: "0 auto" }}>
             <Text style={{ color: "white", fontSize: 12 }}>
-              © {new Date().getFullYear()} Beach Club · Plataforma de reservas desarrollada a la medida.
+              © {new Date().getFullYear()} Hoteles Frida · Plataforma de reservas desarrollada a la medida.
             </Text>
             <Flex gap={10} wrap justify="center">
               {[{ nombre: "Términos", path: "#" }, { nombre: "Privacidad", path: "#" }, { nombre: "Contacto", path: "#" }, { nombre: "Nosotros", path: "#" }].map(

@@ -1,7 +1,12 @@
-// src/components/habitaciones/HabitacionesTable.jsx
-import React from "react";
 import { Table, Space, Typography, Badge, Button, Popconfirm, Tag, Grid, Skeleton } from "antd";
-import { EditOutlined, DeleteOutlined, HomeOutlined, HeartFilled, RollbackOutlined } from "@ant-design/icons";
+import {
+  EditOutlined,
+  DeleteOutlined,
+  HomeOutlined,
+  HeartFilled,
+  RollbackOutlined,
+  HistoryOutlined,
+} from "@ant-design/icons";
 import {
   getCapacityLabel,
   getEstadoMeta,
@@ -25,6 +30,7 @@ const HabitacionesTable = ({
   onRestore,
   onDeletePermanent,
   deletingRoomId,
+  onViewFutureReservations, // ✅ NEW
 }) => {
   const screens = useBreakpoint();
   const isMobile = !screens.md;
@@ -39,9 +45,7 @@ const HabitacionesTable = ({
           <Space size={6}>
             <HomeOutlined style={{ fontSize: 13, color: beachColors.deepBlue }} />
             <Text style={{ fontWeight: 600, color: neutrals.textMain, fontSize: 12 }}>{codigo}</Text>
-            {record.isDeleted && (
-              <Tag style={{ borderRadius: 999, fontSize: 10, marginLeft: 6 }}>Papelera</Tag>
-            )}
+            {record.isDeleted && <Tag style={{ borderRadius: 999, fontSize: 10, marginLeft: 6 }}>Papelera</Tag>}
           </Space>
           <Text style={{ fontSize: 10, color: neutrals.textMuted }}>{record.title}</Text>
         </Space>
@@ -66,7 +70,7 @@ const HabitacionesTable = ({
       title: "Tipo",
       dataIndex: "roomType",
       key: "roomType",
-      width: 150,
+      width: 100,
       responsive: ["md"],
       render: (roomType) => <Text style={{ fontSize: 11, color: neutrals.textMuted }}>{roomType}</Text>,
     },
@@ -142,11 +146,14 @@ const HabitacionesTable = ({
       title: "Estado",
       dataIndex: "inventoryStatus",
       key: "inventoryStatus",
-      width: 130,
+      width: 100,
       render: (estado, record) => {
         const meta = getEstadoMeta(estado);
         return (
-          <Tag color={meta.color} style={{ borderRadius: 999, fontSize: 10, color: meta.textColor, opacity: record.isDeleted ? 0.65 : 1 }}>
+          <Tag
+            color={meta.color}
+            style={{ borderRadius: 999, fontSize: 10, color: meta.textColor, opacity: record.isDeleted ? 0.65 : 1 }}
+          >
             {meta.label}
           </Tag>
         );
@@ -156,10 +163,29 @@ const HabitacionesTable = ({
       title: "Acciones",
       key: "acciones",
       align: "right",
-      width: isMobile ? 210 : 260,
-      render: (_, record) =>
-        canManageRooms ? (
+      width: isMobile ? 260 : 360,
+      render: (_, record) => {
+        const viewBtn = (
+          <Button
+            size="small"
+            type="text"
+            icon={<HistoryOutlined />}
+            onClick={() => onViewFutureReservations?.(record)}
+            disabled={loading}
+            style={{ color: beachColors.teal }}
+          >
+            Reservas futuras
+          </Button>
+        );
+
+        if (!canManageRooms) {
+          return <Space size={4}>{viewBtn}</Space>;
+        }
+
+        return (
           <Space size={4}>
+            {viewBtn}
+
             {!record.isDeleted ? (
               <>
                 <Button
@@ -232,9 +258,8 @@ const HabitacionesTable = ({
               </>
             )}
           </Space>
-        ) : (
-          <Text style={{ fontSize: 10, color: neutrals.textMuted }}>Sin permisos</Text>
-        ),
+        );
+      },
     },
   ];
 

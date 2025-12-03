@@ -1,5 +1,4 @@
 // src/components/habitaciones/HabitacionesFilters.jsx
-import React from "react";
 import { Flex, Input, Select, Button, Space } from "antd";
 import { FilterOutlined, CloseCircleOutlined } from "@ant-design/icons";
 import { SEDES, INVENTORY_STATES, PAPELERA_OPTIONS, beachTheme as beachColors } from "./helpers";

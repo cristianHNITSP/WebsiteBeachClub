@@ -1,5 +1,5 @@
 // src/router/RouterApp.jsx
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   BrowserRouter as Router,
   Routes,

@@ -1,4 +1,4 @@
-import React from "react";
+
 import { Row, Col, Typography, Skeleton } from "antd";
 import { beachTheme as beachColors, neutralsTheme as neutrals } from "./helpers";
 

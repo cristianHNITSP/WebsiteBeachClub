@@ -10,6 +10,9 @@ version: '3.9'
 
 #sudo docker compose logs -f beachclub-users-service
 #sudo docker compose logs -f beachclub-reservas-service
+
+# sudo docker logs -f beachclub-reservas-service
+
 services:
   #MongoDB BeachClub
   beachclub-mongo:

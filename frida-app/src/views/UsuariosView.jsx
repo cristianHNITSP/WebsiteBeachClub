@@ -1,6 +1,6 @@
 // src/views/UsuariosView.jsx
-import React, { useState, useEffect, useRef, useCallback } from "react";
-import axios from "axios";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { usuariosAPI } from "../api/usuarios";
 import {
   Card,
   Alert,
@@ -176,20 +176,11 @@ const UsuariosView = ({ isMobile, currentUser }) => {
           params.role = userRoleFilter;
         }
 
-        if (debouncedSearch) {
+        if (debouncedSearch?.trim()) {
           params.q = debouncedSearch;
         }
 
-        const res = await axios.get("/api/users", {
-          withCredentials: true,
-          params,
-          signal: controller.signal, // ✅ axios v1 + AbortController
-        });
-
-        // si llegó tarde (vieja), ignorar
-        if (mySeq !== reqSeqRef.current) return;
-
-        const api = res.data;
+        const api = await usuariosAPI.fetchUsuarios(params);
         const apiUsers = Array.isArray(api) ? api : api.items || [];
         const mapped = apiUsers.map((u) => mapUserFromApi(u, currentUser));
 
@@ -313,19 +304,13 @@ const UsuariosView = ({ isMobile, currentUser }) => {
         key: "creatingUser",
       });
 
-      const res = await axios.post(
-        "/api/users",
-        {
-          name,
-          email,
-          role,
-          password,
-        },
-        { withCredentials: true }
-      );
-
-      const apiUser = res.data?.user || res.data;
-      const mapped = mapUserFromApi(apiUser, currentUser);
+      const apiUser = await usuariosAPI.createUsuario({
+        name,
+        email,
+        role,
+        password,
+      });
+      const mapped = mapUserFromApi(apiUser?.user || apiUser, currentUser);
 
       setUsers((prev) => [mapped, ...prev]);
 
@@ -447,14 +432,8 @@ const UsuariosView = ({ isMobile, currentUser }) => {
       key: "savingUser",
     });
     try {
-      const res = await axios.put(
-        `/api/users/${editingUser.id}`,
-        payload,
-        { withCredentials: true }
-      );
-
-      const updatedApiUser = res.data?.user || res.data;
-      const updated = mapUserFromApi(updatedApiUser, currentUser);
+      const updatedApiUser = await usuariosAPI.updateUsuario(editingUser.id, payload);
+      const updated = mapUserFromApi(updatedApiUser?.user || updatedApiUser, currentUser);
 
       setUsers((prev) =>
         prev.map((u) => (u.id === updated.id ? updated : u))
@@ -495,14 +474,8 @@ const UsuariosView = ({ isMobile, currentUser }) => {
     });
 
     try {
-      const res = await axios.patch(
-        `/api/users/${user.id}/status`,
-        { isActive: nextIsActive },
-        { withCredentials: true }
-      );
-
-      const updatedApiUser = res.data?.user || res.data;
-      const updated = mapUserFromApi(updatedApiUser, currentUser);
+      const updatedApiUser = await usuariosAPI.toggleUsuarioStatus(user.id, nextIsActive);
+      const updated = mapUserFromApi(updatedApiUser?.user || updatedApiUser, currentUser);
 
       setUsers((prev) =>
         prev.map((u) => (u.id === updated.id ? updated : u))
