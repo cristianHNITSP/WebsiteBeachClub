@@ -667,7 +667,7 @@ function App({ currentUser }) {
                 <Button type="text" icon={<MenuOutlined style={{ color: "#ffffff" }} />} onClick={() => setOpenFiltrosMovil(true)} />
                 <Button
                   size="small"
-                  href="/panel.web/login.panel.web"
+                  href="/hotelesfrida.app/panel.web/login.panel.web"
                   style={{
                     borderRadius: 999,
                     paddingInline: 12,

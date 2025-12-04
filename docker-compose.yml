@@ -5,6 +5,10 @@ version: "3.9"
 # prod:   sudo docker compose --profile prod up --build -d
 # down:   sudo docker compose down --remove-orphans
 
+#sudo docker exec -it beachclub-users-service-prod node src/seed/seed-users.js
+#sudo docker exec -it beachclub-reservas-service-prod node src/seed/seed-data.js
+
+
 services:
   # =========================
   # FRIDA APP (DEV - Vite)
