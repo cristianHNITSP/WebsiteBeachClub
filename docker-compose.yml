@@ -1,17 +1,9 @@
-version: '3.9'
+version: "3.9"
 
 # Comandos útiles BeachClub:
-# dev:    sudo docker compose --profile dev up --build
-# dev -d: sudo docker compose --profile dev up --build -d
-# down:   sudo docker compose --profile dev down
-
-#sudo docker compose --profile dev exec beachclub-users-service npm run seed
-#sudo docker compose --profile dev exec beachclub-reservas-service npm run seed
-
-#sudo docker compose logs -f beachclub-users-service
-#sudo docker compose logs -f beachclub-reservas-service
-
-# sudo docker logs -f beachclub-reservas-service
+# dev:    sudo docker compose --profile dev  up --build
+# prod:   sudo docker compose --profile prod up --build -d
+# down:   sudo docker compose down --remove-orphans
 
 services:
   # =========================
@@ -25,18 +17,12 @@ services:
       - ./frida-app:/app
       - /app/node_modules
     ports:
-      - "5175:5173" # host 5175 -> contenedor 5173
+      - "5175:5173"
     environment:
       NODE_ENV: development
-
-      # Para Vite proxy (vite.config.js usa estas)
       VITE_RESERVAS_TARGET: "http://beachclub-reservas-service:4002"
       VITE_USERS_TARGET: "http://beachclub-users-service:4001"
       VITE_EVENTS_TARGET: "http://host.docker.internal:5050"
-
-      # Tu .env actual trae esto en localhost; en docker no sirve:
-      # lo dejamos vacío para que el socket use el mismo origen (recomendado),
-      # o si tu código lo exige, apunta al HOST publicado:
       VITE_RESERVAS_WS_URL: ""
     extra_hosts:
       - "host.docker.internal:host-gateway"
@@ -54,9 +40,9 @@ services:
       context: ./frida-app
       dockerfile: Dockerfile
       target: prod
-    container_name: frida-app
+    container_name: frida-app-prod
     ports:
-      - "4200:80" # host 4200 -> contenedor 80 (no choca con RSBO 80)
+      - "4200:80"
     extra_hosts:
       - "host.docker.internal:host-gateway"
     restart: unless-stopped
@@ -70,8 +56,9 @@ services:
   beachclub-mongo:
     image: mongo:6
     container_name: beachclub-mongo
+    # Seguridad: no lo expongas público. Si quieres acceso local para debug, déjalo en 127.0.0.1
     ports:
-      - "27029:27017"
+      - "127.0.0.1:27029:27017"
     environment:
       MONGO_INITDB_ROOT_USERNAME: root
       MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD}
@@ -92,80 +79,112 @@ services:
     environment:
       ME_CONFIG_MONGODB_URL: mongodb://root:${MONGO_PASSWORD}@beachclub-mongo:27017/
       ME_CONFIG_BASICAUTH_USERNAME: beachclubapp
-      ME_CONFIG_BASICAUTH_PASSWORD: admin1234
+      ME_CONFIG_BASICAUTH_PASSWORD: ${ME_PASSWORD:-change_me}
       ME_CONFIG_SITE_BASEURL: "/"
     depends_on:
       - beachclub-mongo
-    restart: always
+    restart: unless-stopped
     networks:
       - beachclub-net
     profiles: ["dev"]
 
-  # =========================
-  # Users service (dev/prod)
-  # =========================
-  beachclub-users-service:
+  # ======================================================
+  # USERS SERVICE (DEV) -> alias: beachclub-users-service
+  # ======================================================
+  beachclub-users-service-dev:
     build:
       context: ./users-service
-    container_name: beachclub-users-service
+    container_name: beachclub-users-service-dev
     env_file:
       - ./users-service/.env
     environment:
+      NODE_ENV: development
       MONGO_URI: "mongodb://root:${MONGO_PASSWORD}@beachclub-mongo:27017/beachclub_auth?authSource=admin"
-      NODE_ENV: ${BEACHCLUB_NODE_ENV:-development}
     depends_on:
       - beachclub-mongo
-    networks:
-      - beachclub-net
     ports:
       - "4101:4001"
-    restart: always
-    profiles: ["dev", "prod"]
     volumes:
       - ./users-service:/app
       - /app/node_modules
-    command:
-      - sh
-      - -c
-      - |
-        if [ "$NODE_ENV" = "production" ]; then
-          npm start
-        else
-          npm run dev
-        fi
+    command: sh -c "npm run dev"
+    restart: unless-stopped
+    profiles: ["dev"]
+    networks:
+      beachclub-net:
+        aliases:
+          - beachclub-users-service
 
-  # =========================
-  # Reservas service (dev/prod)
-  # =========================
-  beachclub-reservas-service:
+  # ==========================================
+  # USERS SERVICE (PROD) -> nombre esperado
+  # ==========================================
+  beachclub-users-service:
+    build:
+      context: ./users-service
+    container_name: beachclub-users-service-prod
+    env_file:
+      - ./users-service/.env
+    environment:
+      NODE_ENV: production
+      MONGO_URI: "mongodb://root:${MONGO_PASSWORD}@beachclub-mongo:27017/beachclub_auth?authSource=admin"
+    depends_on:
+      - beachclub-mongo
+    # En prod NO hace falta publicar el puerto (Nginx lo proxyfía). Si lo quieres para debug local:
+    ports:
+      - "127.0.0.1:4101:4001"
+    restart: unless-stopped
+    profiles: ["prod"]
+    networks:
+      - beachclub-net
+
+  # ==========================================================
+  # RESERVAS SERVICE (DEV) -> alias: beachclub-reservas-service
+  # ==========================================================
+  beachclub-reservas-service-dev:
     build:
       context: ./reservas-service
-    container_name: beachclub-reservas-service
+    container_name: beachclub-reservas-service-dev
     env_file:
       - ./reservas-service/.env
     environment:
+      NODE_ENV: development
       MONGO_URI: "mongodb://root:${MONGO_PASSWORD}@beachclub-mongo:27017/beachclub_reservas?authSource=admin"
-      NODE_ENV: ${BEACHCLUB_NODE_ENV:-development}
     depends_on:
       - beachclub-mongo
-    networks:
-      - beachclub-net
     ports:
       - "4102:4002"
-    restart: always
-    profiles: ["dev", "prod"]
     volumes:
       - ./reservas-service:/app
       - /app/node_modules
-    command:
-      - sh
-      - -c
-      - |
-        if [ "$NODE_ENV" = "production" ]; then
-          npm start
-        else
-          npm run dev
-        fi
+    command: sh -c "npm run dev"
+    restart: unless-stopped
+    profiles: ["dev"]
+    networks:
+      beachclub-net:
+        aliases:
+          - beachclub-reservas-service
+
+  # ==========================================
+  # RESERVAS SERVICE (PROD) -> nombre esperado
+  # ==========================================
+  beachclub-reservas-service:
+    build:
+      context: ./reservas-service
+    container_name: beachclub-reservas-service-prod
+    env_file:
+      - ./reservas-service/.env
+    environment:
+      NODE_ENV: production
+      MONGO_URI: "mongodb://root:${MONGO_PASSWORD}@beachclub-mongo:27017/beachclub_reservas?authSource=admin"
+    depends_on:
+      - beachclub-mongo
+    # En prod NO hace falta publicar el puerto (Nginx lo proxyfía). Si lo quieres para debug local:
+    ports:
+      - "127.0.0.1:4102:4002"
+    restart: unless-stopped
+    profiles: ["prod"]
+    networks:
+      - beachclub-net
 
 networks:
   beachclub-net:
@@ -174,4 +193,3 @@ networks:
 volumes:
   beachclub-mongo-data:
     driver: local
-
