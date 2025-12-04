@@ -53,7 +53,18 @@ const { Option } = Select;
 const backgroundColor = "#f8fafc";
 const borderColor = "#e2e8f0";
 
-const WS_URL = import.meta.env.VITE_RESERVAS_WS_URL || "http://localhost:4002";
+let WS_URL = import.meta.env.VITE_RESERVAS_WS_URL;
+
+// Si no está definida (vacío, null, undefined…)
+if (!WS_URL || WS_URL.trim() === "") {
+  if (location.hostname !== "localhost" && location.hostname !== "127.0.0.1") {
+    // Estamos en PRODUCCIÓN
+    WS_URL = `${location.origin}`;
+  } else {
+    // Estamos en DESARROLLO
+    WS_URL = "http://localhost:4002";
+  }
+}
 
 /** ================= helpers ================= */
 const toArrayCheckedKeys = (checkedKeys) => {
