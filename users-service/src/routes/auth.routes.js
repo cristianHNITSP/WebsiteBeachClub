@@ -8,7 +8,7 @@ const Role = require('../models/Role');
 const router = express.Router();
 
 /**
- * Helper: obtiene el token desde Authorization o cookie
+ * Helper: obtiene token desde Authorization o Cookie
  */
 function getTokenFromRequest(req) {
   const authHeader = req.headers.authorization;
@@ -24,7 +24,6 @@ function getTokenFromRequest(req) {
 /**
  * POST /api/auth/login
  */
-// routes/auth.routes.js
 router.post('/login', async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -52,32 +51,24 @@ router.post('/login', async (req, res) => {
       });
     }
 
-    // 🚫 Usuario inactivo: NO generar token, NO dejar entrar
     if (!user.isActive) {
       return res.status(403).json({
         error: 'USER_INACTIVE',
-        message:
-          'Tu usuario está inactivo. Contacta al administrador del sistema para reactivar tu acceso.'
+        message: 'Tu usuario está inactivo. Contacta al administrador.'
       });
-    }
-
-    if (!Array.isArray(user.tokens)) {
-      user.tokens = [];
     }
 
     if (!process.env.JWT_SECRET) {
-      console.error('❌ JWT_SECRET no está definido en las variables de entorno');
+      console.error("⚠️ Falta JWT_SECRET en .env");
       return res.status(500).json({
-        error: 'SERVER_MISCONFIG',
-        message: 'Configuración del servidor incompleta.'
+        error: 'SERVER_CONFIG',
+        message: 'Configuración de servidor incompleta.'
       });
     }
 
-    // 🔎 Buscar el rol del usuario y sus permisos
     const roleDoc = await Role.findOne({ key: user.role });
     const permissions = roleDoc?.permissions || [];
 
-    // ✨ Payload con permisos embebidos
     const payload = {
       id: user._id.toString(),
       email: user.email,
@@ -89,18 +80,21 @@ router.post('/login', async (req, res) => {
       expiresIn: process.env.JWT_EXPIRES_IN || '8h'
     });
 
+    // Guardar token en DB (historial 10 max)
+    user.tokens = Array.isArray(user.tokens) ? user.tokens : [];
     user.tokens.push({ token });
-    if (user.tokens.length > 10) {
-      user.tokens = user.tokens.slice(-10);
-    }
+    user.tokens = user.tokens.slice(-10);
+
     user.lastLogin = new Date();
     await user.save();
 
+    // ✅ COOKIE FUNCIONAL EN HTTP
     res.cookie('auth_token', token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: process.env.NODE_ENV === 'production' ? 'strict' : 'lax',
-      maxAge: 8 * 60 * 60 * 1000
+      secure: false,          // 🔥 HTTP => debe ser false
+      sameSite: 'lax',        // 🔥 compatible con HTTP
+      path: '/',
+      maxAge: 8 * 60 * 60 * 1000,
     });
 
     return res.json({
@@ -110,10 +104,8 @@ router.post('/login', async (req, res) => {
       role: user.role,
       isActive: user.isActive,
       lastLogin: user.lastLogin,
-      createdAt: user.createdAt,
-      updatedAt: user.updatedAt,
-      permissions, // 👈 para el frontend
-      token        // 👈 token actual de esta sesión
+      permissions,
+      token
     });
   } catch (err) {
     console.error('[auth/login] Error:', err);
@@ -130,37 +122,14 @@ router.post('/login', async (req, res) => {
 router.get('/me', async (req, res) => {
   try {
     const token = getTokenFromRequest(req);
-
     if (!token) {
       return res.status(401).json({
         error: 'NO_TOKEN',
-        message: 'No autorizado: token no proporcionado.'
+        message: 'No autorizado.'
       });
     }
 
-    if (!process.env.JWT_SECRET) {
-      console.error('❌ JWT_SECRET no está definido en las variables de entorno');
-      return res.status(500).json({
-        error: 'SERVER_MISCONFIG',
-        message: 'Configuración del servidor incompleta.'
-      });
-    }
-
-    let decoded;
-    try {
-      decoded = jwt.verify(token, process.env.JWT_SECRET);
-    } catch (err) {
-      if (err.name === 'TokenExpiredError') {
-        return res.status(401).json({
-          error: 'TOKEN_EXPIRED',
-          message: 'Sesión expirada.'
-        });
-      }
-      return res.status(401).json({
-        error: 'INVALID_TOKEN',
-        message: 'Token inválido.'
-      });
-    }
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
     const user = await User.findById(decoded.id).select('+tokens');
     if (!user) {
@@ -170,11 +139,8 @@ router.get('/me', async (req, res) => {
       });
     }
 
-    // Volver a cargar permisos desde la colección Role
     const roleDoc = await Role.findOne({ key: user.role });
     const permissions = roleDoc?.permissions || [];
-
-    const matchingToken = user.tokens?.find(t => t.token === token) || null;
 
     return res.json({
       id: user._id,
@@ -183,17 +149,16 @@ router.get('/me', async (req, res) => {
       role: user.role,
       isActive: user.isActive,
       lastLogin: user.lastLogin,
-      createdAt: user.createdAt,
-      updatedAt: user.updatedAt,
       permissions,
       token,
-      tokenInStore: !!matchingToken
+      tokenInStore: user.tokens?.some(t => t.token === token)
     });
+
   } catch (err) {
     console.error('[auth/me] Error:', err);
     return res.status(500).json({
       error: 'INTERNAL_ERROR',
-      message: 'Error interno en /auth/me.'
+      message: 'Error interno.'
     });
   }
 });
@@ -204,30 +169,31 @@ router.get('/me', async (req, res) => {
 router.post('/logout', async (req, res) => {
   try {
     const token = getTokenFromRequest(req);
+
     if (!token) {
-      return res.status(400).json({
-        error: 'NO_TOKEN',
-        message: 'No hay token en la cookie ni en el header.'
-      });
+      return res.status(400).json({ error: "NO_TOKEN" });
     }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     const user = await User.findById(decoded.id).select('+tokens');
+
     if (user) {
       user.tokens = user.tokens.filter(t => t.token !== token);
       await user.save();
     }
 
-    res.clearCookie('auth_token', {
+    res.clearCookie("auth_token", {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: process.env.NODE_ENV === 'production' ? 'strict' : 'lax'
+      secure: false,   // 🔥 HTTP
+      sameSite: "lax",
+      path: "/",
     });
 
-    return res.json({ message: 'Sesión cerrada correctamente' });
+    return res.json({ message: "Sesión cerrada correctamente" });
+
   } catch (err) {
-    console.error('[auth/logout] Error:', err);
-    return res.status(500).json({ error: 'INTERNAL_ERROR' });
+    console.error("[auth/logout] Error:", err);
+    return res.status(500).json({ error: "INTERNAL_ERROR" });
   }
 });
 
