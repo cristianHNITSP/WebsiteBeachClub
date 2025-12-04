@@ -8,8 +8,11 @@ RUN npm ci || npm install
 COPY . .
 
 # (Opcional) si quieres inyectar API URL en build:
-ARG VITE_API_URL
-ENV VITE_API_URL=$VITE_API_URL
+ARG VITE_API_BASE
+ENV VITE_API_BASE=$VITE_API_BASE
+
+ARG VITE_RESERVAS_WS_URL
+ENV VITE_RESERVAS_WS_URL=$VITE_RESERVAS_WS_URL
 
 RUN npm run build
 
