@@ -34,6 +34,7 @@ services:
 
   # =========================
   # FRIDA APP (PROD - Nginx)
+  #  - Solo local (127.0.0.1) para publicarlo con Nginx del host (80/443)
   # =========================
   frida-app:
     build:
@@ -42,13 +43,16 @@ services:
       target: prod
     container_name: frida-app-prod
     ports:
-      - "4200:80"
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
+      - "127.0.0.1:4200:80"
     restart: unless-stopped
     profiles: ["prod"]
     networks:
       - beachclub-net
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/ >/dev/null 2>&1 || exit 1"]
+      interval: 20s
+      timeout: 5s
+      retries: 10
 
   # =========================
   # MongoDB BeachClub
@@ -56,7 +60,6 @@ services:
   beachclub-mongo:
     image: mongo:6
     container_name: beachclub-mongo
-    # Seguridad: no lo expongas público. Si quieres acceso local para debug, déjalo en 127.0.0.1
     ports:
       - "127.0.0.1:27029:27017"
     environment:
@@ -67,6 +70,11 @@ services:
     restart: always
     networks:
       - beachclub-net
+    healthcheck:
+      test: ["CMD-SHELL", "mongosh --quiet --eval 'db.runCommand({ ping: 1 })' || exit 1"]
+      interval: 20s
+      timeout: 10s
+      retries: 10
 
   # =========================
   # Mongo Express (DEV only)
@@ -116,7 +124,7 @@ services:
           - beachclub-users-service
 
   # ==========================================
-  # USERS SERVICE (PROD) -> nombre esperado
+  # USERS SERVICE (PROD)
   # ==========================================
   beachclub-users-service:
     build:
@@ -129,7 +137,6 @@ services:
       MONGO_URI: "mongodb://root:${MONGO_PASSWORD}@beachclub-mongo:27017/beachclub_auth?authSource=admin"
     depends_on:
       - beachclub-mongo
-    # En prod NO hace falta publicar el puerto (Nginx lo proxyfía). Si lo quieres para debug local:
     ports:
       - "127.0.0.1:4101:4001"
     restart: unless-stopped
@@ -165,7 +172,7 @@ services:
           - beachclub-reservas-service
 
   # ==========================================
-  # RESERVAS SERVICE (PROD) -> nombre esperado
+  # RESERVAS SERVICE (PROD)
   # ==========================================
   beachclub-reservas-service:
     build:
@@ -178,7 +185,6 @@ services:
       MONGO_URI: "mongodb://root:${MONGO_PASSWORD}@beachclub-mongo:27017/beachclub_reservas?authSource=admin"
     depends_on:
       - beachclub-mongo
-    # En prod NO hace falta publicar el puerto (Nginx lo proxyfía). Si lo quieres para debug local:
     ports:
       - "127.0.0.1:4102:4002"
     restart: unless-stopped
