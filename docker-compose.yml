@@ -44,6 +44,8 @@ services:
     container_name: frida-app-prod
     ports:
       - "127.0.0.1:4200:80"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     restart: unless-stopped
     profiles: ["prod"]
     networks:
