@@ -1,5 +1,5 @@
-// src/components/website/HeroCarousel.jsx
-import { useState, useEffect } from "react";
+// frida-app/src/components/website/HeroCarousel.jsx
+import { useState, useEffect, useMemo } from "react";
 import axios from "@api/axios";
 import {
   Carousel,
@@ -31,6 +31,18 @@ const { useBreakpoint } = Grid;
 const getId = (obj) => obj?._id || obj?.id || null;
 const isBadId = (id) => !id || id === "undefined";
 
+/** ✅ Normaliza imgs para evitar ORB */
+const normalizeImg = (img) => {
+  const s = String(img || "").trim();
+  if (!s) return s;
+
+  if (/^(https?:)?\/\//i.test(s) || s.startsWith("data:") || s.startsWith("blob:")) return s;
+  if (s.startsWith("/uploads/")) return s;
+  if (s.startsWith("uploads/")) return `/${s}`;
+  if (s.startsWith("/")) return s;
+  return `/uploads/${s}`;
+};
+
 const HeroCarousel = ({ currentUser }) => {
   const screens = useBreakpoint();
   const isMobile = !screens.md;
@@ -51,20 +63,16 @@ const HeroCarousel = ({ currentUser }) => {
     const fetchSlides = async () => {
       try {
         setLoading(true);
-
         const { data } = await axios.get("/api/hero-slides/public");
 
         if (!isMounted) return;
 
         const raw = Array.isArray(data) ? data : (data?.items || []);
         const normalized = raw
-          .map((s) => ({ ...s, _id: getId(s) }))
+          .map((s) => ({ ...s, _id: getId(s), img: normalizeImg(s?.img) }))
           .filter((s) => !isBadId(s._id));
 
-        const sorted = [...normalized].sort(
-          (a, b) => (a.order || 0) - (b.order || 0)
-        );
-
+        const sorted = [...normalized].sort((a, b) => (a.order || 0) - (b.order || 0));
         setSlides(sorted);
       } catch (err) {
         console.error("Error cargando hero-slides:", err);
@@ -80,20 +88,29 @@ const HeroCarousel = ({ currentUser }) => {
     };
   }, []);
 
-  const carouselSlide = (slide) => ({
-    height: isMobile ? "280px" : "360px",
-    width: "100%",
-    display: "flex",
-    alignItems: "flex-end",
-    padding: isMobile ? 16 : 24,
-    color: "#ffffff",
-    backgroundImage: `linear-gradient(to top, rgba(15,23,42,0.82), rgba(15,23,42,0.08)), url(${slide.img})`,
-    backgroundSize: "cover",
-    backgroundPosition: "center",
-    boxShadow: "0 14px 40px rgba(15,23,42,0.35)",
-    position: "relative",
-    overflow: "hidden",
-  });
+  const carouselSlide = useMemo(() => {
+    return (slide) => {
+      const imgUrl = normalizeImg(slide?.img);
+      const bg = imgUrl
+        ? `linear-gradient(to top, rgba(15,23,42,0.82), rgba(15,23,42,0.08)), url("${imgUrl}")`
+        : `linear-gradient(to top, rgba(15,23,42,0.82), rgba(15,23,42,0.30))`;
+
+      return {
+        height: isMobile ? "280px" : "360px",
+        width: "100%",
+        display: "flex",
+        alignItems: "flex-end",
+        padding: isMobile ? 16 : 24,
+        color: "#ffffff",
+        backgroundImage: bg,
+        backgroundSize: "cover",
+        backgroundPosition: "center",
+        boxShadow: "0 14px 40px rgba(15,23,42,0.35)",
+        position: "relative",
+        overflow: "hidden",
+      };
+    };
+  }, [isMobile]);
 
   const handleFieldChange = async (slideId, field, value) => {
     if (isBadId(slideId)) {
@@ -105,11 +122,17 @@ const HeroCarousel = ({ currentUser }) => {
 
     // optimista
     setSlides((prev) =>
-      prev.map((s) => (s._id === slideId ? { ...s, [field]: value } : s))
+      prev.map((s) =>
+        s._id === slideId
+          ? { ...s, [field]: field === "img" ? normalizeImg(value) : value }
+          : s
+      )
     );
 
     try {
-      await axios.put(`/api/hero-slides/${slideId}`, { [field]: value });
+      await axios.put(`/api/hero-slides/${slideId}`, {
+        [field]: field === "img" ? normalizeImg(value) : value,
+      });
       message.success("Hero actualizado");
     } catch (err) {
       console.error("Error actualizando hero-slide:", err);
@@ -134,15 +157,13 @@ const HeroCarousel = ({ currentUser }) => {
       message.warning("La URL de la imagen no puede estar vacía.");
       return;
     }
-    await handleFieldChange(slideId, "img", url);
+    await handleFieldChange(slideId, "img", normalizeImg(url));
     setEditingImageId(null);
   };
 
   const handleAddSlide = async () => {
     const nextOrder =
-      slides.length > 0
-        ? Math.max(...slides.map((s) => s.order || 0)) + 1
-        : 1;
+      slides.length > 0 ? Math.max(...slides.map((s) => s.order || 0)) + 1 : 1;
 
     const payload = {
       title: "Nuevo slide hero",
@@ -156,9 +177,11 @@ const HeroCarousel = ({ currentUser }) => {
     };
 
     try {
-      const { data } = await axios.post("/api/hero-slides", payload);
+      const { data } = await axios.post("/api/hero-slides", {
+        ...payload,
+        img: normalizeImg(payload.img),
+      });
 
-      // soporta respuesta {..slide} o {slide: ..}
       const slide = data?.slide ? data.slide : data;
       const id = getId(slide);
 
@@ -167,7 +190,7 @@ const HeroCarousel = ({ currentUser }) => {
         return;
       }
 
-      const normalized = { ...slide, _id: id };
+      const normalized = { ...slide, _id: id, img: normalizeImg(slide?.img) };
 
       setSlides((prev) =>
         [...prev, normalized].sort((a, b) => (a.order || 0) - (b.order || 0))
@@ -235,12 +258,7 @@ const HeroCarousel = ({ currentUser }) => {
 
         {isAdmin && (
           <div style={{ marginTop: 10, display: "flex", justifyContent: "flex-end" }}>
-            <Button
-              size="small"
-              type="dashed"
-              icon={<PlusOutlined />}
-              onClick={handleAddSlide}
-            >
+            <Button size="small" type="dashed" icon={<PlusOutlined />} onClick={handleAddSlide}>
               Añadir primer slide
             </Button>
           </div>
@@ -318,7 +336,7 @@ const HeroCarousel = ({ currentUser }) => {
                   >
                     {editingImageId !== slide._id ? (
                       <>
-                        <Tooltip title="Cambiar URL de la imagen">
+                        <Tooltip title="Cambiar URL de la imagen (o filename: foto.jpg)">
                           <button
                             type="button"
                             onClick={() => startEditImage(slide)}
@@ -390,7 +408,7 @@ const HeroCarousel = ({ currentUser }) => {
                         }}
                       >
                         <Text style={{ fontSize: 10, color: "rgba(226,232,240,0.9)" }}>
-                          Pega la nueva URL de la imagen y presiona Enter
+                          Pega la URL (o filename) y presiona Enter
                         </Text>
                         <Search
                           size="small"
@@ -471,13 +489,7 @@ const HeroCarousel = ({ currentUser }) => {
                   </Text>
 
                   <Flex gap={8} style={{ marginTop: 8 }}>
-                    <StarFilled
-                      style={{
-                        color: beachColors.sunset,
-                        fontSize: 14,
-                        flexShrink: 0,
-                      }}
-                    />
+                    <StarFilled style={{ color: beachColors.sunset, fontSize: 14, flexShrink: 0 }} />
                     <Text
                       style={{
                         fontSize: isMobile ? 11 : 12,
@@ -516,12 +528,7 @@ const HeroCarousel = ({ currentUser }) => {
 
         {isAdmin && (
           <div style={{ marginTop: 10, display: "flex", justifyContent: "flex-end" }}>
-            <Button
-              size="small"
-              type="dashed"
-              icon={<PlusOutlined />}
-              onClick={handleAddSlide}
-            >
+            <Button size="small" type="dashed" icon={<PlusOutlined />} onClick={handleAddSlide}>
               Añadir slide
             </Button>
           </div>

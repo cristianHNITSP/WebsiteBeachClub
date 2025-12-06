@@ -74,11 +74,15 @@ if (!WS_URL || WS_URL.trim() === "") {
 /** ================= helpers ================= */
 const toArrayCheckedKeys = (checkedKeys) => {
   if (Array.isArray(checkedKeys)) return checkedKeys;
-  if (checkedKeys && Array.isArray(checkedKeys.checked)) return checkedKeys.checked;
+  if (checkedKeys && Array.isArray(checkedKeys.checked))
+    return checkedKeys.checked;
   return [];
 };
 
-const normalizeStr = (s) => String(s || "").trim().toLowerCase();
+const normalizeStr = (s) =>
+  String(s || "")
+    .trim()
+    .toLowerCase();
 const isYmd = (s) => /^\d{4}-\d{2}-\d{2}$/.test(String(s || ""));
 
 const roomMatchesFilters = (room, filters) => {
@@ -184,10 +188,19 @@ function App({ currentUser }) {
     const rooms = Array.isArray(habitaciones) ? habitaciones : [];
 
     const uniq = (arr) =>
-      [...new Set(arr.filter(Boolean).map((x) => String(x).trim()).filter(Boolean))].sort();
+      [
+        ...new Set(
+          arr
+            .filter(Boolean)
+            .map((x) => String(x).trim())
+            .filter(Boolean)
+        ),
+      ].sort();
 
     const roomTypes = uniq(rooms.map((r) => r?.roomType));
-    const amenities = uniq(rooms.flatMap((r) => (Array.isArray(r?.amenities) ? r.amenities : [])));
+    const amenities = uniq(
+      rooms.flatMap((r) => (Array.isArray(r?.amenities) ? r.amenities : []))
+    );
     const locations = uniq(rooms.map((r) => r?.location));
 
     return [
@@ -201,7 +214,13 @@ function App({ currentUser }) {
         key: "group:type",
         children: roomTypes.length
           ? roomTypes.map((t) => ({ title: t, key: `t:${t}` }))
-          : [{ title: <Text type="secondary">Sin datos</Text>, key: "t:__empty", disabled: true }],
+          : [
+              {
+                title: <Text type="secondary">Sin datos</Text>,
+                key: "t:__empty",
+                disabled: true,
+              },
+            ],
       },
       {
         title: (
@@ -213,7 +232,13 @@ function App({ currentUser }) {
         key: "group:amenities",
         children: amenities.length
           ? amenities.map((a) => ({ title: a, key: `a:${a}` }))
-          : [{ title: <Text type="secondary">Sin datos</Text>, key: "a:__empty", disabled: true }],
+          : [
+              {
+                title: <Text type="secondary">Sin datos</Text>,
+                key: "a:__empty",
+                disabled: true,
+              },
+            ],
       },
       {
         title: (
@@ -225,7 +250,13 @@ function App({ currentUser }) {
         key: "group:location",
         children: locations.length
           ? locations.map((l) => ({ title: l, key: `l:${l}` }))
-          : [{ title: <Text type="secondary">Sin datos</Text>, key: "l:__empty", disabled: true }],
+          : [
+              {
+                title: <Text type="secondary">Sin datos</Text>,
+                key: "l:__empty",
+                disabled: true,
+              },
+            ],
       },
     ];
   }, [habitaciones]);
@@ -274,7 +305,7 @@ function App({ currentUser }) {
 
     socket.on("connect", () => {
       console.log("✅ WS conectado:", socket.id);
-      emitQuery({ showToast: false }); // ✅ carga inicial desde WS (no axios)
+      emitQuery({ showToast: false });
     });
 
     socket.on("disconnect", () => {
@@ -362,27 +393,25 @@ function App({ currentUser }) {
 
   /** ================= debounce: cuando cambien filtros => re-query WS ================= */
   useEffect(() => {
-    const t = setTimeout(() => {
-      emitQuery({ showToast: false });
-    }, 250);
+    const t = setTimeout(() => emitQuery({ showToast: false }), 250);
     return () => clearTimeout(t);
   }, [filters, emitQuery]);
 
   /** ================= aplicar filtros desde Tree (keys dinámicos) ================= */
   const applyTreeCheckedKeys = (keys) => {
-    const arr = toArrayCheckedKeys(keys).filter((k) => !String(k).endsWith("__empty"));
+    const arr = toArrayCheckedKeys(keys).filter(
+      (k) => !String(k).endsWith("__empty")
+    );
     setCheckedKeys(arr);
 
     const roomTypes = arr
       .filter((k) => String(k).startsWith("t:"))
       .map((k) => String(k).slice(2))
       .filter(Boolean);
-
     const amenities = arr
       .filter((k) => String(k).startsWith("a:"))
       .map((k) => String(k).slice(2))
       .filter(Boolean);
-
     const locations = arr
       .filter((k) => String(k).startsWith("l:"))
       .map((k) => String(k).slice(2))
@@ -392,7 +421,7 @@ function App({ currentUser }) {
     setFilters((prev) => ({ ...prev, roomTypes, amenities, locations }));
   };
 
-  /** ✅ limpiar DE VERDAD (tree + header + filtros) */
+  /** ✅ limpiar DE VERDAD */
   const clearFilters = () => {
     setCheckedKeys([]);
     setSearchText("");
@@ -415,19 +444,22 @@ function App({ currentUser }) {
     messageApi.success("Filtros limpiados.");
   };
 
-  /** ================= buscar (desktop / móvil) ================= */
+  /** ================= buscar ================= */
   const runSearch = (payload) => {
     const q = String(payload?.q ?? "").trim();
     const startDate = payload?.startDate || null;
     const endDate = payload?.endDate || null;
     const g = String(payload?.guests || "2");
 
-    // ✅ sincroniza también el header (para que no “se quede pegado” visualmente)
     setSearchText(q);
     setGuests(g);
 
     const hasRange = isYmd(startDate) && isYmd(endDate);
-    setDates(hasRange ? [dayjs(startDate, "YYYY-MM-DD"), dayjs(endDate, "YYYY-MM-DD")] : null);
+    setDates(
+      hasRange
+        ? [dayjs(startDate, "YYYY-MM-DD"), dayjs(endDate, "YYYY-MM-DD")]
+        : null
+    );
 
     setPagination((p) => ({ ...p, page: 1 }));
 
@@ -499,9 +531,9 @@ function App({ currentUser }) {
     setHabitacionSeleccionada(room);
 
     const numero = "9993676541";
-    const texto = `Hola, me interesa la habitación ${room.codigo || ""} - ${room.title || ""} en ${
-      room.location || "su propiedad"
-    }. ¿Podrían darme más información?`;
+    const texto = `Hola, me interesa la habitación ${room.codigo || ""} - ${
+      room.title || ""
+    } en ${room.location || "su propiedad"}. ¿Podrían darme más información?`;
 
     const url = `https://wa.me/${numero}?text=${encodeURIComponent(texto)}`;
     window.open(url, "_blank", "noopener,noreferrer");
@@ -526,7 +558,11 @@ function App({ currentUser }) {
   const panelStyles = {
     left: { background: "#f1f5f9", borderRight: `1px solid ${borderColor}` },
     center: { background: "#ffffff", padding: 16 },
-    right: { background: "#f8fafc", borderLeft: `1px solid ${borderColor}`, padding: 12 },
+    right: {
+      background: "#f8fafc",
+      borderLeft: `1px solid ${borderColor}`,
+      padding: 12,
+    },
   };
 
   const hasDateFilter = isYmd(filters.startDate) && isYmd(filters.endDate);
@@ -538,7 +574,8 @@ function App({ currentUser }) {
           colorPrimary: beachColors.oceanBlue,
           colorLink: beachColors.oceanBlue,
           borderRadius: 10,
-          fontFamily: '-apple-system, BlinkMacSystemFont, system-ui, "SF Pro Text", sans-serif',
+          fontFamily:
+            '-apple-system, BlinkMacSystemFont, system-ui, "SF Pro Text", sans-serif',
         },
       }}
     >
@@ -552,7 +589,12 @@ function App({ currentUser }) {
 
         {/* HEADER */}
         <header style={headerStyle}>
-          <Flex justify="space-between" align="center" gap={16} style={{ maxWidth: 1400, margin: "0 auto" }}>
+          <Flex
+            justify="space-between"
+            align="center"
+            gap={16}
+            style={{ maxWidth: 1400, margin: "0 auto" }}
+          >
             <Flex align="center" gap={10}>
               <img
                 src={withBase("beachclub.svg")}
@@ -565,7 +607,15 @@ function App({ currentUser }) {
                 }}
               />
               <div style={{ lineHeight: 1.1 }}>
-                <Title level={4} style={{ margin: 0, color: "#ffffff", fontWeight: 700, letterSpacing: 0.3 }}>
+                <Title
+                  level={4}
+                  style={{
+                    margin: 0,
+                    color: "#ffffff",
+                    fontWeight: 700,
+                    letterSpacing: 0.3,
+                  }}
+                >
                   Hoteles Frida
                 </Title>
                 <Text style={{ fontSize: 10, color: "rgba(241,245,249,0.9)" }}>
@@ -595,7 +645,11 @@ function App({ currentUser }) {
                   onPressEnter={handleSearchClick}
                   allowClear
                   placeholder="Destino, ciudad o alojamiento"
-                  prefix={<EnvironmentOutlined style={{ color: beachColors.turquoise }} />}
+                  prefix={
+                    <EnvironmentOutlined
+                      style={{ color: beachColors.turquoise }}
+                    />
+                  }
                   style={{
                     flex: 1,
                     borderRadius: 10,
@@ -613,7 +667,11 @@ function App({ currentUser }) {
                   allowClear
                 />
 
-                <Select value={guests} onChange={setGuests} style={{ width: 150, borderRadius: 10, height: 40 }}>
+                <Select
+                  value={guests}
+                  onChange={setGuests}
+                  style={{ width: 150, borderRadius: 10, height: 40 }}
+                >
                   <Option value="1">1 adulto</Option>
                   <Option value="2">2 adultos</Option>
                   <Option value="3">3 adultos</Option>
@@ -637,7 +695,11 @@ function App({ currentUser }) {
                   Buscar
                 </Button>
 
-                <Button icon={<ReloadOutlined />} onClick={clearFilters} style={{ borderRadius: 12, height: 40 }}>
+                <Button
+                  icon={<ReloadOutlined />}
+                  onClick={clearFilters}
+                  style={{ borderRadius: 12, height: 40 }}
+                >
                   Limpiar
                 </Button>
               </Flex>
@@ -672,8 +734,16 @@ function App({ currentUser }) {
 
             {isMobile && (
               <Space size={8} align="center">
-                <Button type="text" icon={<SearchOutlined style={{ color: "#ffffff" }} />} onClick={() => setOpenBuscadorMovil(true)} />
-                <Button type="text" icon={<MenuOutlined style={{ color: "#ffffff" }} />} onClick={() => setOpenFiltrosMovil(true)} />
+                <Button
+                  type="text"
+                  icon={<SearchOutlined style={{ color: "#ffffff" }} />}
+                  onClick={() => setOpenBuscadorMovil(true)}
+                />
+                <Button
+                  type="text"
+                  icon={<MenuOutlined style={{ color: "#ffffff" }} />}
+                  onClick={() => setOpenFiltrosMovil(true)}
+                />
                 <Button
                   size="small"
                   href={withBase("panel.web/login.panel.web")}
@@ -704,8 +774,12 @@ function App({ currentUser }) {
             onclose={() => setOpenBuscadorMovil(false)}
             initialQuery={filters.q}
             initialDates={{
-              startDate: filters.startDate ? dayjs(filters.startDate, "YYYY-MM-DD") : null,
-              endDate: filters.endDate ? dayjs(filters.endDate, "YYYY-MM-DD") : null,
+              startDate: filters.startDate
+                ? dayjs(filters.startDate, "YYYY-MM-DD")
+                : null,
+              endDate: filters.endDate
+                ? dayjs(filters.endDate, "YYYY-MM-DD")
+                : null,
             }}
             initialGuests={filters.guests}
             onClear={() => {
@@ -718,7 +792,6 @@ function App({ currentUser }) {
             }}
           />
 
-          {/* Drawer filtros mobile */}
           <Drawer
             title="Filtrar tu estancia"
             placement="right"
@@ -738,33 +811,48 @@ function App({ currentUser }) {
               <Card size="small" style={{ borderRadius: 12 }}>
                 <Flex vertical gap={8}>
                   <Flex align="center" gap={8}>
-                    <CalendarOutlined style={{ color: beachColors.oceanBlue }} />
+                    <CalendarOutlined
+                      style={{ color: beachColors.oceanBlue }}
+                    />
                     <Text strong>Disponibilidad</Text>
                   </Flex>
 
                   <Text style={{ fontSize: 11, color: "#64748b" }}>
-                    Este filtro funciona cuando el backend WS envía <b>available</b> según fechas.
+                    Este filtro funciona cuando el backend WS envía{" "}
+                    <b>available</b> según fechas.
                   </Text>
 
                   <Flex wrap gap={6}>
                     <Tag color={hasDateFilter ? "green" : "default"}>
-                      {hasDateFilter ? `${filters.startDate} → ${filters.endDate}` : "Sin rango"}
+                      {hasDateFilter
+                        ? `${filters.startDate} → ${filters.endDate}`
+                        : "Sin rango"}
                     </Tag>
                     <Tag color="blue">{filters.guests} huésped(es)</Tag>
-                    {hasDateFilter && filters.onlyAvailable ? <Tag color="green">Solo disponibles</Tag> : null}
+                    {hasDateFilter && filters.onlyAvailable ? (
+                      <Tag color="green">Solo disponibles</Tag>
+                    ) : null}
                   </Flex>
                 </Flex>
               </Card>
 
               <Flex gap={8}>
-                <Button block onClick={clearFilters} style={{ borderRadius: 10 }}>
+                <Button
+                  block
+                  onClick={clearFilters}
+                  style={{ borderRadius: 10 }}
+                >
                   Limpiar
                 </Button>
                 <Button
                   type="primary"
                   block
                   icon={<FilterOutlined />}
-                  style={{ borderRadius: 10, background: beachColors.teal, borderColor: beachColors.teal }}
+                  style={{
+                    borderRadius: 10,
+                    background: beachColors.teal,
+                    borderColor: beachColors.teal,
+                  }}
                   onClick={() => {
                     emitQuery({ showToast: true });
                     setOpenFiltrosMovil(false);
@@ -783,21 +871,44 @@ function App({ currentUser }) {
           </Drawer>
 
           {isMobile && (
-            <FloatButton.Group shape="circle" style={{ right: 18, bottom: 90 }} icon={<CommentOutlined />}>
-              <FloatButton icon={<CustomerServiceOutlined />} onClick={() => setOpenChat(true)} />
+            <FloatButton.Group
+              shape="circle"
+              style={{ right: 18, bottom: 90 }}
+              icon={<CommentOutlined />}
+            >
+              <FloatButton
+                icon={<CustomerServiceOutlined />}
+                onClick={() => setOpenChat(true)}
+              />
             </FloatButton.Group>
           )}
 
           <Splitter
             layout={isMobile ? "vertical" : "horizontal"}
-            style={{ height: isMobile ? "auto" : "calc(100vh - 160px)", border: "none" }}
+            style={{
+              height: isMobile ? "auto" : "calc(100vh - 160px)",
+              border: "none",
+            }}
           >
             {!isMobile && (
-              <Splitter.Panel defaultSize="20%" min="18%" max="24%" style={panelStyles.left}>
+              <Splitter.Panel
+                defaultSize="18%"
+                min="18%"
+                max="20%"
+                style={panelStyles.left}
+                collapsible={{ start: true, end: true }}
+              >
                 <Flex vertical style={{ padding: 14, gap: 14 }}>
                   <Flex align="center" gap={8}>
                     <FilterOutlined style={{ color: beachColors.deepBlue }} />
-                    <Title level={4} style={{ margin: 0, color: beachColors.deepBlue, fontSize: 16 }}>
+                    <Title
+                      level={4}
+                      style={{
+                        margin: 0,
+                        color: beachColors.deepBlue,
+                        fontSize: 16,
+                      }}
+                    >
                       Filtros
                     </Title>
                   </Flex>
@@ -814,18 +925,25 @@ function App({ currentUser }) {
                   <Card size="small" style={{ borderRadius: 12 }}>
                     <Flex vertical gap={8}>
                       <Flex align="center" gap={8}>
-                        <CalendarOutlined style={{ color: beachColors.oceanBlue }} />
+                        <CalendarOutlined
+                          style={{ color: beachColors.oceanBlue }}
+                        />
                         <Text strong>Disponibilidad (fechas)</Text>
                       </Flex>
                       <Text style={{ fontSize: 11, color: "#64748b" }}>
-                        Se usa cuando el WS te manda <b>available</b> según el rango.
+                        Se usa cuando el WS te manda <b>available</b> según el
+                        rango.
                       </Text>
                       <Flex wrap gap={6}>
                         <Tag color={hasDateFilter ? "green" : "default"}>
-                          {hasDateFilter ? `${filters.startDate} → ${filters.endDate}` : "Sin rango"}
+                          {hasDateFilter
+                            ? `${filters.startDate} → ${filters.endDate}`
+                            : "Sin rango"}
                         </Tag>
                         <Tag color="blue">{filters.guests} huésped(es)</Tag>
-                        {hasDateFilter && filters.onlyAvailable ? <Tag color="green">Solo disponibles</Tag> : null}
+                        {hasDateFilter && filters.onlyAvailable ? (
+                          <Tag color="green">Solo disponibles</Tag>
+                        ) : null}
                       </Flex>
                     </Flex>
                   </Card>
@@ -837,81 +955,70 @@ function App({ currentUser }) {
                     <Button
                       type="primary"
                       icon={<FilterOutlined />}
-                      style={{ borderRadius: 10, background: beachColors.teal, borderColor: beachColors.teal }}
+                      style={{
+                        borderRadius: 10,
+                        background: beachColors.teal,
+                        borderColor: beachColors.teal,
+                      }}
                       onClick={() => emitQuery({ showToast: true })}
                       loading={loadingHabitaciones}
                     >
                       Aplicar
                     </Button>
                   </Flex>
-
-                  <Card size="small" style={{ borderRadius: 12, background: "#ffffff" }}>
-                    <Flex vertical gap={6}>
-                      <Text strong style={{ fontSize: 12 }}>
-                        Activos:
-                      </Text>
-                      <Flex wrap gap={6}>
-                        {filters.q ? <Tag color={beachColors.turquoise}>Buscar: {filters.q}</Tag> : null}
-                        {filters.roomTypes.map((t) => (
-                          <Tag key={t} color={beachColors.sand} style={{ color: beachColors.deepBlue }}>
-                            {t}
-                          </Tag>
-                        ))}
-                        {filters.amenities.map((a) => (
-                          <Tag key={a} color={beachColors.coral}>
-                            {a}
-                          </Tag>
-                        ))}
-                        {filters.locations.map((l) => (
-                          <Tag key={l} color={beachColors.turquoise} style={{ color: "#064e3b" }}>
-                            {l}
-                          </Tag>
-                        ))}
-                        {hasDateFilter ? (
-                          <Tag color="green">
-                            {filters.startDate} → {filters.endDate}
-                          </Tag>
-                        ) : null}
-
-                        {!filters.q &&
-                        !filters.roomTypes.length &&
-                        !filters.amenities.length &&
-                        !filters.locations.length &&
-                        !hasDateFilter ? (
-                          <Text type="secondary" style={{ fontSize: 11 }}>
-                            Sin filtros
-                          </Text>
-                        ) : null}
-                      </Flex>
-                    </Flex>
-                  </Card>
                 </Flex>
               </Splitter.Panel>
             )}
 
             <Splitter.Panel
-              defaultSize={isMobile ? "100%" : "55%"}
-              min={isMobile ? "100%" : "50%"}
+              defaultSize={isMobile ? "100%" : "52%"}
+              min={isMobile ? "100%" : "52%"}
               style={panelStyles.center}
             >
-              <Flex vertical gap={18} style={{ maxWidth: 900, margin: "0 auto" }}>
+              <Flex
+                vertical
+                gap={18}
+                style={{ maxWidth: 900, margin: "0 auto" }}
+              >
                 <HeroCarousel currentUser={currentUser} />
 
-                <Flex justify="space-between" align="center" wrap gap={8} style={{ marginTop: 4 }}>
+                <Flex
+                  justify="space-between"
+                  align="center"
+                  wrap
+                  gap={8}
+                  style={{ marginTop: 4 }}
+                >
                   <Flex gap={10} align="center">
-                    <Title level={4} style={{ margin: 0, fontSize: 18, color: "#0f172a", fontWeight: 600 }}>
+                    <Title
+                      level={4}
+                      style={{
+                        margin: 0,
+                        fontSize: 18,
+                        color: "#0f172a",
+                        fontWeight: 600,
+                      }}
+                    >
                       Alojamientos disponibles
                     </Title>
 
                     <Tooltip title="Resultados después de aplicar filtros">
-                      <Tag color={filteredCards.length ? "blue" : "default"} style={{ borderRadius: 999 }}>
+                      <Tag
+                        color={filteredCards.length ? "blue" : "default"}
+                        style={{ borderRadius: 999 }}
+                      >
                         {filteredCards.length} resultado(s)
                       </Tag>
                     </Tooltip>
 
                     {hasDateFilter && (
-                      <Tag color={filters.onlyAvailable ? "green" : "default"} style={{ borderRadius: 999 }}>
-                        {filters.onlyAvailable ? "Solo disponibles" : "Incluye ocupadas"}
+                      <Tag
+                        color={filters.onlyAvailable ? "green" : "default"}
+                        style={{ borderRadius: 999 }}
+                      >
+                        {filters.onlyAvailable
+                          ? "Solo disponibles"
+                          : "Incluye ocupadas"}
                       </Tag>
                     )}
                   </Flex>
@@ -931,7 +1038,11 @@ function App({ currentUser }) {
                       <Button
                         size="small"
                         type="text"
-                        icon={<CommentOutlined style={{ color: beachColors.teal }} />}
+                        icon={
+                          <CommentOutlined
+                            style={{ color: beachColors.teal }}
+                          />
+                        }
                         onClick={() => setOpenChat(true)}
                       >
                         Asistencia
@@ -942,7 +1053,10 @@ function App({ currentUser }) {
 
                 {error ? (
                   <Card style={{ borderRadius: 14 }}>
-                    <Text type="danger">Error al cargar habitaciones: {error?.message || "desconocido"}</Text>
+                    <Text type="danger">
+                      Error al cargar habitaciones:{" "}
+                      {error?.message || "desconocido"}
+                    </Text>
                   </Card>
                 ) : null}
 
@@ -966,10 +1080,17 @@ function App({ currentUser }) {
                       }
                     />
                     <Flex justify="center" gap={10} style={{ marginTop: 10 }}>
-                      <Button onClick={clearFilters} style={{ borderRadius: 999 }}>
+                      <Button
+                        onClick={clearFilters}
+                        style={{ borderRadius: 999 }}
+                      >
                         Limpiar filtros
                       </Button>
-                      <Button type="primary" onClick={() => emitQuery({ showToast: true })} style={{ borderRadius: 999 }}>
+                      <Button
+                        type="primary"
+                        onClick={() => emitQuery({ showToast: true })}
+                        style={{ borderRadius: 999 }}
+                      >
                         Reintentar
                       </Button>
                     </Flex>
@@ -988,19 +1109,11 @@ function App({ currentUser }) {
               </Flex>
             </Splitter.Panel>
 
-            {!isMobile && (
-              <Splitter.Panel defaultSize="25%" min="20%" max="32%" style={panelStyles.right}>
+        <Splitter.Panel defaultSize="30%" min="30%" max="30%" style={panelStyles.right}>
                 <Flex vertical gap={12}>
                   <Recommendcards recommendedDestinations={[]} beachColors={beachColors} loading={false} />
 
-                  <Card
-                    bordered={false}
-                    style={{
-                      borderRadius: 14,
-                      background: "#ffffff",
-                      boxShadow: "0 6px 18px rgba(148,163,253,0.16)",
-                    }}
-                  >
+                  <Card bordered={false} style={{ borderRadius: 14, background: "#ffffff", boxShadow: "0 6px 18px rgba(148,163,253,0.16)" }}>
                     <Flex vertical gap={6}>
                       <Text strong style={{ fontSize: 13, color: "#0f172a" }}>
                         ¿Por qué reservar aquí?
@@ -1012,16 +1125,10 @@ function App({ currentUser }) {
                         <Tag color={beachColors.teal} style={{ borderRadius: 999, fontSize: 9, color: "#064e3b" }}>
                           Atención personalizada
                         </Tag>
-                        <Tag
-                          color={beachColors.turquoise}
-                          style={{ borderRadius: 999, fontSize: 9, color: "#065f46" }}
-                        >
+                        <Tag color={beachColors.turquoise} style={{ borderRadius: 999, fontSize: 9, color: "#065f46" }}>
                           Reservas seguras
                         </Tag>
-                        <Tag
-                          color={beachColors.sand}
-                          style={{ borderRadius: 999, fontSize: 9, color: beachColors.deepBlue }}
-                        >
+                        <Tag color={beachColors.sand} style={{ borderRadius: 999, fontSize: 9, color: beachColors.deepBlue }}>
                           Experiencias únicas
                         </Tag>
                       </Flex>
@@ -1061,7 +1168,6 @@ function App({ currentUser }) {
                   </Card>
                 </Flex>
               </Splitter.Panel>
-            )}
           </Splitter>
         </main>
 
@@ -1074,9 +1180,16 @@ function App({ currentUser }) {
             color: "white",
           }}
         >
-          <Flex vertical justify="center" align="center" gap={10} style={{ maxWidth: 900, margin: "0 auto" }}>
+          <Flex
+            vertical
+            justify="center"
+            align="center"
+            gap={10}
+            style={{ maxWidth: 900, margin: "0 auto" }}
+          >
             <Text style={{ color: "white", fontSize: 12 }}>
-              © {new Date().getFullYear()} Hoteles Frida · Plataforma de reservas desarrollada a la medida.
+              © {new Date().getFullYear()} Hoteles Frida · Plataforma de
+              reservas desarrollada a la medida.
             </Text>
             <Flex gap={10} wrap justify="center">
               {[
@@ -1085,7 +1198,11 @@ function App({ currentUser }) {
                 { nombre: "Contacto", path: "#" },
                 { nombre: "Nosotros", path: "#" },
               ].map((link, i) => (
-                <a key={i} href={link.path} style={{ color: "white", fontSize: 11 }}>
+                <a
+                  key={i}
+                  href={link.path}
+                  style={{ color: "white", fontSize: 11 }}
+                >
                   {link.nombre}
                 </a>
               ))}
@@ -1093,7 +1210,6 @@ function App({ currentUser }) {
           </Flex>
         </footer>
 
-        {/* CHAT */}
         <ChatSoporte
           open={openChat}
           onClose={() => setOpenChat(false)}
