@@ -28,9 +28,12 @@ const { Title, Text } = Typography;
 const { Search } = Input;
 const { useBreakpoint } = Grid;
 
+const getId = (obj) => obj?._id || obj?.id || null;
+const isBadId = (id) => !id || id === "undefined";
+
 const HeroCarousel = ({ currentUser }) => {
   const screens = useBreakpoint();
-  const isMobile = !screens.md; // < md = móvil / tablet chica
+  const isMobile = !screens.md;
 
   const [loading, setLoading] = useState(true);
   const [slides, setSlides] = useState([]);
@@ -42,24 +45,27 @@ const HeroCarousel = ({ currentUser }) => {
     (currentUser.role === "administrador" ||
       currentUser.permissions?.includes("manage_rooms"));
 
-  // Cargar slides desde el backend
   useEffect(() => {
     let isMounted = true;
 
     const fetchSlides = async () => {
       try {
         setLoading(true);
+
         const { data } = await axios.get("/api/hero-slides/public");
+
         if (!isMounted) return;
 
-        if (Array.isArray(data) && data.length > 0) {
-          const sorted = [...data].sort(
-            (a, b) => (a.order || 0) - (b.order || 0)
-          );
-          setSlides(sorted);
-        } else {
-          setSlides([]);
-        }
+        const raw = Array.isArray(data) ? data : (data?.items || []);
+        const normalized = raw
+          .map((s) => ({ ...s, _id: getId(s) }))
+          .filter((s) => !isBadId(s._id));
+
+        const sorted = [...normalized].sort(
+          (a, b) => (a.order || 0) - (b.order || 0)
+        );
+
+        setSlides(sorted);
       } catch (err) {
         console.error("Error cargando hero-slides:", err);
         setSlides([]);
@@ -90,7 +96,14 @@ const HeroCarousel = ({ currentUser }) => {
   });
 
   const handleFieldChange = async (slideId, field, value) => {
-    // Actualización optimista
+    if (isBadId(slideId)) {
+      message.error("No se pudo guardar: ID inválido.");
+      return;
+    }
+
+    const previous = slides;
+
+    // optimista
     setSlides((prev) =>
       prev.map((s) => (s._id === slideId ? { ...s, [field]: value } : s))
     );
@@ -101,11 +114,17 @@ const HeroCarousel = ({ currentUser }) => {
     } catch (err) {
       console.error("Error actualizando hero-slide:", err);
       message.error("No se pudo guardar el cambio");
+      setSlides(previous);
     }
   };
 
   const startEditImage = (slide) => {
-    setEditingImageId(slide._id);
+    const id = getId(slide);
+    if (isBadId(id)) {
+      message.error("Slide inválido (sin ID).");
+      return;
+    }
+    setEditingImageId(id);
     setTempImgUrl(slide.img || "");
   };
 
@@ -115,7 +134,6 @@ const HeroCarousel = ({ currentUser }) => {
       message.warning("La URL de la imagen no puede estar vacía.");
       return;
     }
-
     await handleFieldChange(slideId, "img", url);
     setEditingImageId(null);
   };
@@ -139,11 +157,22 @@ const HeroCarousel = ({ currentUser }) => {
 
     try {
       const { data } = await axios.post("/api/hero-slides", payload);
+
+      // soporta respuesta {..slide} o {slide: ..}
+      const slide = data?.slide ? data.slide : data;
+      const id = getId(slide);
+
+      if (isBadId(id)) {
+        message.error("El backend creó un slide sin ID válido. Revisa respuesta del POST.");
+        return;
+      }
+
+      const normalized = { ...slide, _id: id };
+
       setSlides((prev) =>
-        [...prev, data].sort(
-          (a, b) => (a.order || 0) - (b.order || 0)
-        )
+        [...prev, normalized].sort((a, b) => (a.order || 0) - (b.order || 0))
       );
+
       message.success("Nuevo slide creado");
     } catch (err) {
       console.error("Error creando hero-slide:", err);
@@ -152,6 +181,11 @@ const HeroCarousel = ({ currentUser }) => {
   };
 
   const handleDeleteSlide = async (slideId) => {
+    if (isBadId(slideId)) {
+      message.error("No se pudo eliminar: ID inválido.");
+      return;
+    }
+
     const previous = slides;
     setSlides((prev) => prev.filter((s) => s._id !== slideId));
 
@@ -161,7 +195,6 @@ const HeroCarousel = ({ currentUser }) => {
     } catch (err) {
       console.error("Error eliminando hero-slide:", err);
       message.error("No se pudo eliminar el slide");
-      // revertimos si falla
       setSlides(previous);
     }
   };
@@ -199,14 +232,9 @@ const HeroCarousel = ({ currentUser }) => {
             {isAdmin && " Crea uno nuevo para comenzar."}
           </Text>
         </Card>
+
         {isAdmin && (
-          <div
-            style={{
-              marginTop: 10,
-              display: "flex",
-              justifyContent: "flex-end",
-            }}
-          >
+          <div style={{ marginTop: 10, display: "flex", justifyContent: "flex-end" }}>
             <Button
               size="small"
               type="dashed"
@@ -223,7 +251,6 @@ const HeroCarousel = ({ currentUser }) => {
 
   return (
     <div>
-      {/* Chip modo edición: en móvil va fuera del hero */}
       {isAdmin && isMobile && (
         <div
           style={{
@@ -247,7 +274,6 @@ const HeroCarousel = ({ currentUser }) => {
       )}
 
       <div style={{ position: "relative" }}>
-        {/* En escritorio el chip va flotando sobre el hero */}
         {isAdmin && !isMobile && (
           <div
             style={{
@@ -273,22 +299,15 @@ const HeroCarousel = ({ currentUser }) => {
           </div>
         )}
 
-        <Carousel
-          autoplay
-          dots
-          arrows={!isMobile}
-          style={{ width: "100%" }}
-          autoplaySpeed={5500}
-        >
+        <Carousel autoplay dots arrows={!isMobile} style={{ width: "100%" }} autoplaySpeed={5500}>
           {slides.map((slide) => (
             <div key={slide._id}>
               <div style={carouselSlide(slide)}>
-                {/* Controles por slide (imagen + eliminar) */}
                 {isAdmin && (
                   <div
                     style={{
                       position: "absolute",
-                      top: isMobile ? 10 : 12, // en móvil ya no compite con el chip global
+                      top: isMobile ? 10 : 12,
                       left: isMobile ? 10 : 16,
                       zIndex: 6,
                       display: "flex",
@@ -329,14 +348,11 @@ const HeroCarousel = ({ currentUser }) => {
                           <Popconfirm
                             title="Eliminar slide"
                             description="Esta acción no se puede deshacer."
-                            onConfirm={() => handleDeleteSlide(slide._id)}
+                            onConfirm={() => slide?._id && handleDeleteSlide(slide._id)}
                             okText="Sí, eliminar"
                             cancelText="Cancelar"
                             placement={isMobile ? "top" : "right"}
-                            overlayStyle={{
-                              maxWidth: 320,
-                              whiteSpace: "normal",
-                            }}
+                            overlayStyle={{ maxWidth: 320, whiteSpace: "normal" }}
                           >
                             <button
                               type="button"
@@ -373,12 +389,7 @@ const HeroCarousel = ({ currentUser }) => {
                           maxWidth: 320,
                         }}
                       >
-                        <Text
-                          style={{
-                            fontSize: 10,
-                            color: "rgba(226,232,240,0.9)",
-                          }}
-                        >
+                        <Text style={{ fontSize: 10, color: "rgba(226,232,240,0.9)" }}>
                           Pega la nueva URL de la imagen y presiona Enter
                         </Text>
                         <Search
@@ -388,10 +399,7 @@ const HeroCarousel = ({ currentUser }) => {
                           onSearch={() => saveImageUrl(slide._id)}
                           enterButton="Guardar"
                           allowClear
-                          style={{
-                            marginTop: 4,
-                            fontSize: 11,
-                          }}
+                          style={{ marginTop: 4, fontSize: 11 }}
                         />
                         <Text
                           style={{
@@ -409,13 +417,7 @@ const HeroCarousel = ({ currentUser }) => {
                   </div>
                 )}
 
-                {/* Contenido principal del slide */}
-                <div
-                  style={{
-                    maxWidth: isMobile ? "100%" : 420,
-                    wordBreak: "break-word",
-                  }}
-                >
+                <div style={{ maxWidth: isMobile ? "100%" : 420, wordBreak: "break-word" }}>
                   <Tag
                     color={beachColors.turquoise}
                     style={{
@@ -427,8 +429,7 @@ const HeroCarousel = ({ currentUser }) => {
                       paddingInline: 12,
                     }}
                   >
-                    {slide.badgeText ||
-                      "Reservas directas · Mejor atención"}
+                    {slide.badgeText || "Reservas directas · Mejor atención"}
                   </Tag>
 
                   <Title
@@ -443,8 +444,7 @@ const HeroCarousel = ({ currentUser }) => {
                     }}
                     editable={
                       isAdmin && {
-                        onChange: (value) =>
-                          handleFieldChange(slide._id, "title", value),
+                        onChange: (value) => handleFieldChange(slide._id, "title", value),
                         tooltip: "Editar título del slide",
                       }
                     }
@@ -462,8 +462,7 @@ const HeroCarousel = ({ currentUser }) => {
                     }}
                     editable={
                       isAdmin && {
-                        onChange: (value) =>
-                          handleFieldChange(slide._id, "subtitle", value),
+                        onChange: (value) => handleFieldChange(slide._id, "subtitle", value),
                         tooltip: "Editar subtítulo",
                       }
                     }
@@ -502,12 +501,10 @@ const HeroCarousel = ({ currentUser }) => {
                           textDecoration: "underline dotted",
                         }}
                         editable={{
-                          onChange: (value) =>
-                            handleFieldChange(slide._id, "badgeText", value),
+                          onChange: (value) => handleFieldChange(slide._id, "badgeText", value),
                         }}
                       >
-                        {slide.badgeText ||
-                          "Reservas directas · Mejor atención"}
+                        {slide.badgeText || "Reservas directas · Mejor atención"}
                       </Text>
                     </Tooltip>
                   )}
@@ -517,15 +514,8 @@ const HeroCarousel = ({ currentUser }) => {
           ))}
         </Carousel>
 
-        {/* Botón general para añadir slides (solo admin) */}
         {isAdmin && (
-          <div
-            style={{
-              marginTop: 10,
-              display: "flex",
-              justifyContent: "flex-end",
-            }}
-          >
+          <div style={{ marginTop: 10, display: "flex", justifyContent: "flex-end" }}>
             <Button
               size="small"
               type="dashed"

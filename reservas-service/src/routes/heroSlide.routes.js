@@ -134,10 +134,19 @@ router.post(
 router.delete(
   "/:id",
   authMiddleware,
-  requirePermissions(["manage_rooms"]),
+  requirePermissions(["manage_rooms"]), // o el permiso que uses para hero-slides
   async (req, res) => {
     try {
       const { id } = req.params;
+
+      // ✅ evita CastError cuando llega undefined / basura / id inválido
+      if (!id || id === "undefined" || !mongoose.Types.ObjectId.isValid(id)) {
+        return res.status(400).json({
+          error: "INVALID_ID",
+          message: "ID inválido para eliminar hero-slide.",
+        });
+      }
+
       const slide = await HeroSlide.findByIdAndDelete(id);
 
       if (!slide) {
@@ -147,7 +156,7 @@ router.delete(
         });
       }
 
-      return res.json({ message: "HeroSlide eliminado" });
+      return res.json({ message: "HeroSlide eliminado", id });
     } catch (err) {
       console.error("[DELETE /hero-slides/:id] Error:", err);
       return res.status(500).json({
