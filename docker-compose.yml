@@ -8,26 +8,29 @@ version: "3.9"
 #sudo docker exec -it beachclub-users-service-prod node src/seed/seed-users.js
 #sudo docker exec -it beachclub-reservas-service-prod node src/seed/seed-data.js
 
+#sudo docker exec -it beachclub-users-service-dev node src/seed/seed-users.js
+#sudo docker exec -it beachclub-reservas-service-dev node src/seed/seed-data.js
+
 
 services:
   # =========================
   # FRIDA APP (DEV - Vite)
   # =========================
   frida-app-dev:
-    image: node:18-alpine
+    image: node:22-alpine
     container_name: frida-app-dev
     working_dir: /app
     volumes:
       - ./frida-app:/app
       - /app/node_modules
     ports:
-      - "5175:5173"
+      - "127.0.0.1:5175:5173"   
     environment:
       NODE_ENV: development
       VITE_RESERVAS_TARGET: "http://beachclub-reservas-service:4002"
       VITE_USERS_TARGET: "http://beachclub-users-service:4001"
       VITE_EVENTS_TARGET: "http://host.docker.internal:5050"
-      VITE_RESERVAS_WS_URL: ""
+      VITE_RESERVAS_WS_URL: "http://localhost:4102"
     extra_hosts:
       - "host.docker.internal:host-gateway"
     command: sh -c "npm install && npm run dev -- --host 0.0.0.0 --port 5173"
