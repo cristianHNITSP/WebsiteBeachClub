@@ -1,5 +1,5 @@
 # ====== BUILD ======
-FROM node:18-alpine AS build
+FROM node:22-alpine AS build
 WORKDIR /app
 
 COPY package.json package-lock.json* ./
@@ -7,24 +7,21 @@ RUN npm ci || npm install
 
 COPY . .
 
-# (Opcional) si quieres inyectar API URL en build:
-ARG VITE_API_BASE
-ENV VITE_API_BASE=$VITE_API_BASE
-
+# (si usas variables VITE por build args, déjalas como ya las tengas)
 ARG VITE_RESERVAS_WS_URL
+ARG VITE_RESERVAS_TARGET
+ARG VITE_USERS_TARGET
+ARG VITE_EVENTS_TARGET
+
 ENV VITE_RESERVAS_WS_URL=$VITE_RESERVAS_WS_URL
+ENV VITE_RESERVAS_TARGET=$VITE_RESERVAS_TARGET
+ENV VITE_USERS_TARGET=$VITE_USERS_TARGET
+ENV VITE_EVENTS_TARGET=$VITE_EVENTS_TARGET
 
 RUN npm run build
 
-# ====== RUNTIME (NGINX) ======
+# ====== RUNTIME ======
 FROM nginx:alpine AS prod
 WORKDIR /usr/share/nginx/html
-
-# Nginx config para SPA (history fallback)
 COPY nginx.conf /etc/nginx/conf.d/default.conf
-
-# Copia el build
 COPY --from=build /app/dist ./
-
-EXPOSE 80
-CMD ["nginx", "-g", "daemon off;"]
