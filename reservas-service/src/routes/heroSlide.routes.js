@@ -131,21 +131,31 @@ router.post(
 /**
  * (Opcional) DELETE /api/hero-slides/:id
  */
-import mongoose from "mongoose";
+router.delete(
+  "/:id",
+  authMiddleware,
+  requirePermissions(["manage_rooms"]),
+  async (req, res) => {
+    try {
+      const { id } = req.params;
+      const slide = await HeroSlide.findByIdAndDelete(id);
 
-// ...
-router.delete("/hero-slides/:id", async (req, res) => {
-  const { id } = req.params;
+      if (!slide) {
+        return res.status(404).json({
+          error: "NOT_FOUND",
+          message: "HeroSlide no encontrado.",
+        });
+      }
 
-  if (!id || id === "undefined" || !mongoose.Types.ObjectId.isValid(id)) {
-    return res.status(400).json({ message: "ID inválido" });
+      return res.json({ message: "HeroSlide eliminado" });
+    } catch (err) {
+      console.error("[DELETE /hero-slides/:id] Error:", err);
+      return res.status(500).json({
+        error: "INTERNAL_ERROR",
+        message: "No se pudo eliminar el hero-slide.",
+      });
+    }
   }
-
-  const deleted = await HeroSlide.findByIdAndDelete(id);
-  if (!deleted) return res.status(404).json({ message: "No encontrado" });
-
-  return res.json({ ok: true });
-});
-
+);
 
 module.exports = router;
