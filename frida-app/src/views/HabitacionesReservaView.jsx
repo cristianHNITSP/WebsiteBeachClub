@@ -45,6 +45,7 @@ import {
   RestOutlined,
 } from "@ant-design/icons";
 import { beachColors, neutrals } from "../theme/beachTheme";
+import RoomGridCalendar from "../components/reservas/RoomGridCalendar";
 
 dayjs.locale("es");
 
@@ -1003,11 +1004,7 @@ const PanelProgramacionManual = ({ esMobile, onCreated, filtroHotel, messageApi 
           </Form.Item>
 
           {/* NUEVO: pago como checkbox con copy más claro */}
-          <Form.Item
-            name="pagada"
-            valuePropName="checked"
-            style={{ marginRight: esMobile ? 0 : 6, marginBottom: 6 }}
-          >
+          <Form.Item name="pagada" valuePropName="checked" style={{ marginRight: esMobile ? 0 : 6, marginBottom: 6 }}>
             <Checkbox>Reserva pagada (monto total liquidado)</Checkbox>
           </Form.Item>
 
@@ -1060,7 +1057,8 @@ const CambiosFechasTab = ({ filtroHotel, esMobile }) => {
 
       const res = await axios.get(RESERVAS_DATE_CHANGES_ENDPOINT, { params });
       const raw = res?.data?.data || [];
-      setRows(Array.isArray(raw) ? raw : []);
+      const arr = Array.isArray(raw) ? raw : [];
+      setRows(arr);
       messageApi.success({ content: "Listo.", key });
     } catch (e) {
       console.error(e);
@@ -1092,9 +1090,7 @@ const CambiosFechasTab = ({ filtroHotel, esMobile }) => {
             <span style={{ fontWeight: 600, color: neutrals.textMain }}>
               {getHotelLabel(r.hotel)} · Hab {r.room}
             </span>
-            <span style={{ fontSize: 11, color: neutrals.textMuted }}>
-              Reserva: {r.codigoReserva || "—"}
-            </span>
+            <span style={{ fontSize: 11, color: neutrals.textMuted }}>Reserva: {r.codigoReserva || "—"}</span>
           </div>
         ),
       },
@@ -1104,27 +1100,18 @@ const CambiosFechasTab = ({ filtroHotel, esMobile }) => {
         render: (_, r) => (
           <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
             <div>
-              <Tag
-                color={r.action === "checkout_trim" ? "red" : "blue"}
-                style={{ borderRadius: 999 }}
-              >
-                {r.action === "checkout_trim"
-                  ? "Check-out (recorte)"
-                  : "Edición de fechas"}
+              <Tag color={r.action === "checkout_trim" ? "red" : "blue"} style={{ borderRadius: 999 }}>
+                {r.action === "checkout_trim" ? "Check-out (recorte)" : "Edición de fechas"}
               </Tag>
             </div>
             <div style={{ fontSize: 11 }}>
               <div style={{ color: neutrals.textMuted }}>
                 Antes:{" "}
-                <b style={{ color: neutrals.textMain }}>
-                  {fmtRange(r.oldStartDate, r.oldEndDate)}
-                </b>
+                <b style={{ color: neutrals.textMain }}>{fmtRange(r.oldStartDate, r.oldEndDate)}</b>
               </div>
               <div style={{ color: neutrals.textMuted }}>
                 Después:{" "}
-                <b style={{ color: neutrals.textMain }}>
-                  {fmtRange(r.newStartDate, r.newEndDate)}
-                </b>
+                <b style={{ color: neutrals.textMain }}>{fmtRange(r.newStartDate, r.newEndDate)}</b>
               </div>
             </div>
           </div>
@@ -1137,8 +1124,7 @@ const CambiosFechasTab = ({ filtroHotel, esMobile }) => {
         width: 260,
         render: (arr) => {
           const list = Array.isArray(arr) ? arr : [];
-          if (!list.length)
-            return <span style={{ color: neutrals.textMuted }}>—</span>;
+          if (!list.length) return <span style={{ color: neutrals.textMuted }}>—</span>;
 
           const preview = list.slice(0, 4);
           const rest = list.length - preview.length;
@@ -1232,9 +1218,7 @@ const CambiosFechasTab = ({ filtroHotel, esMobile }) => {
         </div>
 
         <Table
-          rowKey={(r) =>
-            String(r?._id || r?.id || `${r?.createdAt}-${r?.reservaId}`)
-          }
+          rowKey={(r) => String(r?._id || r?.id || `${r?.createdAt}-${r?.reservaId}`)}
           columns={columns}
           dataSource={rows}
           loading={loading}
@@ -1267,7 +1251,7 @@ const PapeleraTab = ({ filtroHotel, esMobile, onRestored }) => {
     if (filtroHotel !== "all") params.hotel = filtroHotel;
     if (range?.[0] && range?.[1]) {
       params.from = range[0].startOf("day").format(DATE_FMT);
-      params.to = range[1].startOf("day").format(DATE_FMT);
+      params.to = range[1].endOf("day").format(DATE_FMT);
     }
     if (q?.trim()) params.q = q.trim();
 
@@ -1384,9 +1368,7 @@ const PapeleraTab = ({ filtroHotel, esMobile, onRestored }) => {
             <span style={{ fontWeight: 600, color: neutrals.textMain }}>
               {getHotelLabel(r.hotel)} · Hab {r.room}
             </span>
-            <span style={{ fontSize: 11, color: neutrals.textMuted }}>
-              {recortar(r.label || "—", 60)}
-            </span>
+            <span style={{ fontSize: 11, color: neutrals.textMuted }}>{recortar(r.label || "—", 60)}</span>
           </div>
         ),
       },
@@ -1406,10 +1388,8 @@ const PapeleraTab = ({ filtroHotel, esMobile, onRestored }) => {
         width: 140,
         render: (_, r) => {
           const b = r?.billing;
-          if (!b)
-            return <span style={{ color: neutrals.textMuted }}>—</span>;
-          const invalid =
-            Number(b?.total) <= 0 || Number(b?.pricePerDay) <= 0;
+          if (!b) return <span style={{ color: neutrals.textMuted }}>—</span>;
+          const invalid = Number(b?.total) <= 0 || Number(b?.pricePerDay) <= 0;
           return (
             <span
               style={{
@@ -1547,9 +1527,7 @@ const PapeleraTab = ({ filtroHotel, esMobile, onRestored }) => {
         </div>
 
         <Table
-          rowKey={(r) =>
-            String(r?._id || r?.id || `${r?.deletedAt}-${r?.room}-${r?.startDate}`)
-          }
+          rowKey={(r) => String(r?._id || r?.id || `${r?.deletedAt}-${r?.room}-${r?.startDate}`)}
           columns={columns}
           dataSource={rows}
           loading={loading}
@@ -1725,9 +1703,7 @@ const HabitacionesReservaView = ({ isMobile: forzarMobile }) => {
 
   const patchEventoLocal = (id, patch) => {
     const sid = String(id);
-    setEventos((prev) =>
-      prev.map((e) => (getEventId(e) !== sid ? e : { ...e, ...patch }))
-    );
+    setEventos((prev) => prev.map((e) => (getEventId(e) !== sid ? e : { ...e, ...patch })));
   };
 
   const runAction = async ({
@@ -1798,8 +1774,7 @@ const HabitacionesReservaView = ({ isMobile: forzarMobile }) => {
       loadingText: "Marcando entrada…",
       okText: "Entrada registrada.",
       failText: "No pudimos marcar la entrada.",
-      fn: async () =>
-        (await axios.patch(`${RESERVAS_ENDPOINT}/${eventoId}/checkin`))?.data?.data,
+      fn: async () => (await axios.patch(`${RESERVAS_ENDPOINT}/${eventoId}/checkin`))?.data?.data,
       afterSuccess: (data) => data && patchEventoLocal(eventoId, data),
     });
 
@@ -1810,8 +1785,7 @@ const HabitacionesReservaView = ({ isMobile: forzarMobile }) => {
       loadingText: "Marcando salida…",
       okText: "Salida registrada.",
       failText: "No pudimos marcar la salida.",
-      fn: async () =>
-        (await axios.patch(`${RESERVAS_ENDPOINT}/${eventoId}/checkout`))?.data?.data,
+      fn: async () => (await axios.patch(`${RESERVAS_ENDPOINT}/${eventoId}/checkout`))?.data?.data,
       afterSuccess: (data) => data && patchEventoLocal(eventoId, data),
     });
 
@@ -1822,8 +1796,7 @@ const HabitacionesReservaView = ({ isMobile: forzarMobile }) => {
       loadingText: "Marcando como pagada…",
       okText: "Marcada como pagada.",
       failText: "No pudimos marcarla como pagada.",
-      fn: async () =>
-        (await axios.patch(`${RESERVAS_ENDPOINT}/${eventoId}/paid`))?.data?.data,
+      fn: async () => (await axios.patch(`${RESERVAS_ENDPOINT}/${eventoId}/paid`))?.data?.data,
       afterSuccess: (data) => data && patchEventoLocal(eventoId, data),
     });
 
@@ -1834,8 +1807,7 @@ const HabitacionesReservaView = ({ isMobile: forzarMobile }) => {
       loadingText: "Quitando marca de pago…",
       okText: "Listo: queda como pendiente",
       failText: "No pudimos cambiar el estado de pago.",
-      fn: async () =>
-        (await axios.patch(`${RESERVAS_ENDPOINT}/${eventoId}/unpaid`))?.data?.data,
+      fn: async () => (await axios.patch(`${RESERVAS_ENDPOINT}/${eventoId}/unpaid`))?.data?.data,
       afterSuccess: (data) => data && patchEventoLocal(eventoId, data),
     });
 
@@ -1853,8 +1825,7 @@ const HabitacionesReservaView = ({ isMobile: forzarMobile }) => {
       loadingText: "Moviendo a papelera…",
       okText: "Listo: se movió a la papelera",
       failText: "No pudimos moverla a la papelera.",
-      fn: async () =>
-        (await axios.patch(`${RESERVAS_ENDPOINT}/${sid}/trash`))?.data?.data,
+      fn: async () => (await axios.patch(`${RESERVAS_ENDPOINT}/${sid}/trash`))?.data?.data,
       afterSuccess: () => {
         setEventos((prev) => prev.filter((e) => getEventId(e) !== sid));
         closeAllPopovers();
@@ -1864,8 +1835,7 @@ const HabitacionesReservaView = ({ isMobile: forzarMobile }) => {
 
   const requestEditDates = (evento) => {
     if (!evento || evento.type !== "stay") return;
-    if (evento.checkoutAt)
-      return messageApi.warning("Esa reserva ya tiene salida. No se puede cambiar.");
+    if (evento.checkoutAt) return messageApi.warning("Esa reserva ya tiene salida. No se puede cambiar.");
 
     const eid = getEventId(evento);
     setEditModal({
@@ -1883,10 +1853,8 @@ const HabitacionesReservaView = ({ isMobile: forzarMobile }) => {
     const start = editModal.start?.startOf("day");
     const end = editModal.end?.startOf("day");
     if (!start || !end) return messageApi.warning("Elige un rango válido.");
-    if (end.isBefore(start, "day"))
-      return messageApi.warning("La salida no puede ser antes de la entrada.");
-    if (evento.checkoutAt)
-      return messageApi.warning("Esa reserva ya tiene salida. No se puede cambiar.");
+    if (end.isBefore(start, "day")) return messageApi.warning("La salida no puede ser antes de la entrada.");
+    if (evento.checkoutAt) return messageApi.warning("Esa reserva ya tiene salida. No se puede cambiar.");
 
     if (evento.checkinAt) {
       const originalStart = dayjs(evento.startDate).startOf("day");
@@ -1894,9 +1862,7 @@ const HabitacionesReservaView = ({ isMobile: forzarMobile }) => {
         return messageApi.warning("Ya tiene entrada, solo puedes cambiar la salida.");
       const checkin = dayjs(evento.checkinAt).startOf("day");
       if (end.isBefore(checkin, "day"))
-        return messageApi.warning(
-          "La salida no puede ser antes de la entrada registrada."
-        );
+        return messageApi.warning("La salida no puede ser antes de la entrada registrada.");
     }
 
     const startStr = start.format(DATE_FMT);
@@ -2004,8 +1970,7 @@ const HabitacionesReservaView = ({ isMobile: forzarMobile }) => {
     const fechaStr = valor.format(DATE_FMT);
     const lista = eventos.filter(
       (e) =>
-        eventoCubreFecha(e, fechaStr) &&
-        (filtroHotel === "all" || e.hotel === filtroHotel)
+        eventoCubreFecha(e, fechaStr) && (filtroHotel === "all" || e.hotel === filtroHotel)
     );
     if (!lista.length) return null;
 
@@ -2139,6 +2104,127 @@ const HabitacionesReservaView = ({ isMobile: forzarMobile }) => {
     );
   };
 
+  const calendarViewTabs = [
+{
+  key: "classic",
+  label: "Vista por días",
+  children: (
+    <RoomGridCalendar
+      eventos={eventos}
+      filtroHotel={filtroHotel}
+      compacto={esMobileFinal}
+      loading={loadingEventos}
+      // mismas acciones que el calendario moderno
+      onCheckin={marcarCheckin}
+      onCheckout={marcarCheckout}
+      onPaid={marcarPagado}
+      onUnpaid={marcarPendientePago}
+      onDelete={eliminarEvento}
+      onRequestEditDates={requestEditDates}
+      pending={pending}
+      // control global de popovers (compartido con ambas vistas)
+      isMobileUI={esMobileFinal}
+      openPopoverKey={openPopoverKey}
+      onPopoverToggle={setPopoverOpenSafe}
+      onPopoverLock={setPopoverLocked}
+      onCloseAllPopovers={closeAllPopovers}
+    />
+  ),
+},
+
+    {
+      key: "modern",
+      label: "Vista Calendario",
+      children: (
+        <div
+          style={{
+            overflowX: compacto ? "auto" : "visible",
+            paddingBottom: compacto ? 4 : 0,
+          }}
+        >
+          <Spin spinning={loadingEventos} tip="Cargando…" style={{ width: "100%" }}>
+            <div
+              style={{
+                minWidth: compacto ? 620 : "auto",
+                opacity: loadingEventos ? 0.7 : 1,
+              }}
+            >
+              <Calendar
+                fullscreen={false}
+                defaultValue={dayjs()}
+                dateCellRender={renderCeldaFecha}
+                headerRender={({ value, onChange }) => {
+                  const meses = [];
+                  for (let i = 0; i < 12; i++) meses.push(value.clone().month(i).format("MMM"));
+
+                  return (
+                    <div
+                      style={{
+                        padding: "4px 8px 12px",
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        gap: 8,
+                        flexWrap: "wrap",
+                      }}
+                    >
+                      <Text
+                        style={{
+                          fontWeight: 600,
+                          color: neutrals.textMain,
+                          fontSize: 13,
+                        }}
+                      >
+                        {value.format("MMMM YYYY")}
+                      </Text>
+
+                      <Space size={6} wrap>
+                        <Select
+                          size="small"
+                          value={value.month()}
+                          onChange={(mes) => onChange(value.clone().month(mes))}
+                          style={{ width: 110 }}
+                        >
+                          {meses.map((nombreMes, indice) => (
+                            <Option key={indice} value={indice}>
+                              {nombreMes}
+                            </Option>
+                          ))}
+                        </Select>
+
+                        <Select
+                          size="small"
+                          value={value.year()}
+                          onChange={(anio) => onChange(value.clone().year(anio))}
+                          style={{ width: 90 }}
+                        >
+                          {[2024, 2025, 2026].map((anio) => (
+                            <Option key={anio} value={anio}>
+                              {anio}
+                            </Option>
+                          ))}
+                        </Select>
+
+                        <Button
+                          size="small"
+                          type="text"
+                          onClick={closeAllPopovers}
+                          style={{ color: neutrals.textMuted }}
+                        >
+                          Cerrar tooltips
+                        </Button>
+                      </Space>
+                    </div>
+                  );
+                }}
+              />
+            </div>
+          </Spin>
+        </div>
+      ),
+    },
+  ];
+
   const tabsItems = [
     {
       key: "calendario",
@@ -2152,105 +2238,21 @@ const HabitacionesReservaView = ({ isMobile: forzarMobile }) => {
             messageApi={messageApi}
           />
 
-          <div
-            style={{
-              overflowX: compacto ? "auto" : "visible",
-              paddingBottom: compacto ? 4 : 0,
-            }}
-          >
-            <Spin spinning={loadingEventos} tip="Cargando…" style={{ width: "100%" }}>
-              <div
-                style={{
-                  minWidth: compacto ? 620 : "auto",
-                  opacity: loadingEventos ? 0.7 : 1,
-                }}
-              >
-                <Calendar
-                  fullscreen={false}
-                  defaultValue={dayjs()}
-                  dateCellRender={renderCeldaFecha}
-                  headerRender={({ value, onChange }) => {
-                    const meses = [];
-                    for (let i = 0; i < 12; i++)
-                      meses.push(value.clone().month(i).format("MMM"));
-
-                    return (
-                      <div
-                        style={{
-                          padding: "4px 8px 12px",
-                          display: "flex",
-                          justifyContent: "space-between",
-                          alignItems: "center",
-                          gap: 8,
-                          flexWrap: "wrap",
-                        }}
-                      >
-                        <Text
-                          style={{
-                            fontWeight: 600,
-                            color: neutrals.textMain,
-                            fontSize: 13,
-                          }}
-                        >
-                          {value.format("MMMM YYYY")}
-                        </Text>
-
-                        <Space size={6} wrap>
-                          <Select
-                            size="small"
-                            value={value.month()}
-                            onChange={(mes) =>
-                              onChange(value.clone().month(mes))
-                            }
-                            style={{ width: 110 }}
-                          >
-                            {meses.map((nombreMes, indice) => (
-                              <Option key={indice} value={indice}>
-                                {nombreMes}
-                              </Option>
-                            ))}
-                          </Select>
-
-                          <Select
-                            size="small"
-                            value={value.year()}
-                            onChange={(anio) =>
-                              onChange(value.clone().year(anio))
-                            }
-                            style={{ width: 90 }}
-                          >
-                            {[2024, 2025, 2026].map((anio) => (
-                              <Option key={anio} value={anio}>
-                                {anio}
-                              </Option>
-                            ))}
-                          </Select>
-
-                          <Button
-                            size="small"
-                            type="text"
-                            onClick={closeAllPopovers}
-                            style={{ color: neutrals.textMuted }}
-                          >
-                            Cerrar tooltips
-                          </Button>
-                        </Space>
-                      </div>
-                    );
-                  }}
-                />
-              </div>
-            </Spin>
-          </div>
+          <Tabs
+            size="small"
+            defaultActiveKey="classic"
+            items={calendarViewTabs}
+            destroyInactiveTabPane={false}
+            style={{ marginTop: 8 }}
+            onChange={() => closeAllPopovers()}
+          />
         </>
       ),
     },
     {
       key: "cambios",
       label: "Cambios de fechas",
-      children: (
-        <CambiosFechasTab filtroHotel={filtroHotel} esMobile={esMobileFinal} />
-      ),
+      children: <CambiosFechasTab filtroHotel={filtroHotel} esMobile={esMobileFinal} />,
     },
 
     //NUEVO TAB: PAPELERA
