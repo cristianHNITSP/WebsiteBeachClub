@@ -19,18 +19,18 @@ import ConfigModal from "../components/admin/ConfigModal";
 const { Header } = Layout;
 const { Text } = Typography;
 
-const AdminHeader = ({ isMobile, currentUser }) => {
+const AdminHeader = ({ isMobile, currentUser, onCurrentUserUpdated }) => {
   const navigate = useNavigate();
+  const [demoOpen, setDemoOpen] = useState(false);
 
   const handleMenuClick = async ({ key }) => {
     switch (key) {
       case "profile":
         message.info("Vista de perfil en construcción.");
         break;
+
       case "settings":
-        // abrir demo de configuración
         setDemoOpen(true);
-        break;
         break;
 
       case "logout":
@@ -61,12 +61,9 @@ const AdminHeader = ({ isMobile, currentUser }) => {
     onClick: handleMenuClick,
   };
 
-  const [demoOpen, setDemoOpen] = useState(false);
-
   const displayName = currentUser?.name || "Manager Admin";
 
   const goToPublicSite = () => {
-    // Si hay currentUser, lo mandamos en el state; si no, navegamos limpio
     if (currentUser) {
       navigate("/", { state: { currentUser } });
     } else {
@@ -142,7 +139,7 @@ const AdminHeader = ({ isMobile, currentUser }) => {
           align="center"
           style={{ flexShrink: 0 }}
         >
-          {/*Botón para ir al sitio público "/" heredando currentUser */}
+          {/* Botón para ir al sitio público "/" heredando currentUser */}
           <Button
             size={isMobile ? "small" : "middle"}
             icon={<HomeOutlined />}
@@ -190,7 +187,14 @@ const AdminHeader = ({ isMobile, currentUser }) => {
           </Dropdown>
         </Space>
       </Flex>
-      <ConfigModal open={demoOpen} onClose={() => setDemoOpen(false)} />
+
+      {/* Modal de configuración */}
+      <ConfigModal
+        open={demoOpen}
+        currentUser={currentUser}
+        onClose={() => setDemoOpen(false)}
+        onUserUpdated={onCurrentUserUpdated}
+      />
     </Header>
   );
 };

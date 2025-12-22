@@ -25,7 +25,11 @@ router.use((req, res, next) => {
     user: req.user?.id || req.user?._id || req.user?.email,
   });
   res.on("finish", () => {
-    rlog(`-> ${res.statusCode} (${Date.now() - t0}ms) ${req.method} ${req.originalUrl}`);
+    rlog(
+      `-> ${res.statusCode} (${Date.now() - t0}ms) ${req.method} ${
+        req.originalUrl
+      }`
+    );
   });
   next();
 });
@@ -69,12 +73,20 @@ async function findConflict({ hotel, room, startDate, endDate, excludeId }) {
   if (excludeId) q._id = { $ne: excludeId };
 
   const candidates = await Reserva.find(q).select("startDate endDate").lean();
-  return candidates.find((r) => rangesOverlap(startDate, endDate, r.startDate, r.endDate)) || null;
+  return (
+    candidates.find((r) =>
+      rangesOverlap(startDate, endDate, r.startDate, r.endDate)
+    ) || null
+  );
 }
 
 function isRoomUnavailable(hab) {
   const s = hab?.inventoryStatus;
-  return s === "Bloqueada" || s === "Mantenimiento" || s === "Fuera de servicio";
+  return (
+    s === "Bloqueada" ||
+    s === "Mantenimiento" ||
+    s === "Fuera de servicio"
+  );
 }
 
 /* ===================== BILLING (desde Habitacion) ===================== */
@@ -101,7 +113,9 @@ function computeBilling({ price, offer, startDate, endDate }) {
   const hasDiscount = disc !== null && disc > 0;
 
   const totalBeforeDiscount = round2(price * days);
-  const total = hasDiscount ? round2(totalBeforeDiscount * (1 - disc / 100)) : totalBeforeDiscount;
+  const total = hasDiscount
+    ? round2(totalBeforeDiscount * (1 - disc / 100))
+    : totalBeforeDiscount;
 
   return {
     days,
@@ -112,6 +126,13 @@ function computeBilling({ price, offer, startDate, endDate }) {
   };
 }
 
+/**
+ * Mapea Reserva -> DTO para el frontend
+ * Incluye:
+ *  - roomMeta: { price, offer }
+ *  - billing: cálculo dinámico desde Habitacion (por si cambias precio/oferta)
+ *  - totalAmount: snapshot guardado en la reserva (si existe), o billing.total como fallback
+ */
 function toEventDto(r, habMeta = null) {
   const habitacionId = r?.habitacionId ? String(r.habitacionId) : null;
 
@@ -119,10 +140,29 @@ function toEventDto(r, habMeta = null) {
     typeof habMeta?.price === "number" && Number.isFinite(habMeta.price)
       ? habMeta.price
       : null;
-
   const offer = habMeta?.offer || null;
 
-  const billing = price !== null ? computeBilling({ price, offer, startDate: r.startDate, endDate: r.endDate }) : null;
+  const billing =
+    price !== null
+      ? computeBilling({
+          price,
+          offer,
+          startDate: r.startDate,
+          endDate: r.endDate,
+        })
+      : null;
+
+  const storedTotal =
+    typeof r.totalAmount === "number" && Number.isFinite(r.totalAmount)
+      ? round2(r.totalAmount)
+      : null;
+
+  const totalAmount =
+    storedTotal !== null
+      ? storedTotal
+      : billing
+      ? round2(billing.total)
+      : null;
 
   return {
     id: String(r._id),
@@ -141,8 +181,11 @@ function toEventDto(r, habMeta = null) {
     checkoutAt: r.checkoutAt || null,
     paidAt: r.paidAt || null,
 
-    roomMeta: habMeta ? { price: habMeta.price, offer: habMeta.offer || null } : null,
+    roomMeta: habMeta
+      ? { price: habMeta.price, offer: habMeta.offer || null }
+      : null,
     billing,
+    totalAmount,
 
     isDeleted: !!r.isDeleted,
     deletedAt: r.deletedAt || null,
@@ -159,7 +202,11 @@ function listDatesInclusive(startDate, endDate) {
   const s = parseDateUTC(startDate);
   const e = parseDateUTC(endDate || startDate);
   const out = [];
-  for (let d = new Date(s); d.getTime() <= e.getTime(); d = new Date(d.getTime() + 86400000)) {
+  for (
+    let d = new Date(s);
+    d.getTime() <= e.getTime();
+    d = new Date(d.getTime() + 86400000)
+  ) {
     out.push(d.toISOString().slice(0, 10));
   }
   return out;
@@ -171,7 +218,16 @@ function calcRemovedDates(oldStart, oldEnd, newStart, newEnd) {
   return oldList.filter((x) => !newSet.has(x));
 }
 
-async function logDateChange({ req, reserva, action, oldStartDate, oldEndDate, newStartDate, newEndDate, removedDates }) {
+async function logDateChange({
+  req,
+  reserva,
+  action,
+  oldStartDate,
+  oldEndDate,
+  newStartDate,
+  newEndDate,
+  removedDates,
+}) {
   await ReservaDateChangeLog.create({
     reservaId: reserva._id,
     codigoReserva: reserva.codigoReserva || "",
@@ -210,7 +266,9 @@ router.get(
       if (hotel) hq.hotelCode = hotel;
 
       if (q && String(q).trim()) {
-        const s = String(q).trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        const s = String(q)
+          .trim()
+          .replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
         hq.$or = [
           { roomNumber: { $regex: s, $options: "i" } },
           { codigo: { $regex: s, $options: "i" } },
@@ -219,7 +277,9 @@ router.get(
       }
 
       const rooms = await Habitacion.find(hq)
-        .select("_id codigo hotelCode roomNumber title inventoryStatus price offer")
+        .select(
+          "_id codigo hotelCode roomNumber title inventoryStatus price offer"
+        )
         .sort({ hotelCode: 1, roomNumber: 1 })
         .lean();
 
@@ -234,7 +294,9 @@ router.get(
         rq.startDate = { $lte: endDate };
         rq.endDate = { $gte: startDate };
 
-        const reservas = await Reserva.find(rq).select("hotel room startDate endDate").lean();
+        const reservas = await Reserva.find(rq)
+          .select("hotel room startDate endDate")
+          .lean();
 
         for (const r of reservas) {
           if (rangesOverlap(startDate, endDate, r.startDate, r.endDate)) {
@@ -253,7 +315,9 @@ router.get(
 
       const result = rooms
         .map((hab) => {
-          const roomKey = `${hab.hotelCode}__${String(hab.roomNumber || hab.codigo)}`;
+          const roomKey = `${hab.hotelCode}__${String(
+            hab.roomNumber || hab.codigo
+          )}`;
           const blockedByBooking = hasRange ? reservedSet.has(roomKey) : false;
 
           return {
@@ -283,7 +347,7 @@ router.get(
 
 /**
  * GET /api/reservas  (activos)
- * ✅ billing siempre desde Habitacion
+ * billing siempre desde Habitacion
  */
 router.get(
   "/",
@@ -307,14 +371,26 @@ router.get(
 
       const reservas = await Reserva.find(q).sort({ startDate: 1 }).lean();
 
-      const habIds = [...new Set(reservas.map((r) => String(r.habitacionId || "")).filter(Boolean))];
+      const habIds = [
+        ...new Set(
+          reservas
+            .map((r) => String(r.habitacionId || ""))
+            .filter(Boolean)
+        ),
+      ];
       const habs = habIds.length
-        ? await Habitacion.find({ _id: { $in: habIds } }).select("_id price offer").lean()
+        ? await Habitacion.find({ _id: { $in: habIds } })
+            .select("_id price offer")
+            .lean()
         : [];
       const habMap = new Map(habs.map((h) => [String(h._id), h]));
 
       rlog("GET /reservas ok", { count: reservas.length, hotel: hotel || "all" });
-      res.json({ data: reservas.map((r) => toEventDto(r, habMap.get(String(r.habitacionId)))) });
+      res.json({
+        data: reservas.map((r) =>
+          toEventDto(r, habMap.get(String(r.habitacionId)))
+        ),
+      });
     } catch (err) {
       rerr("[GET /reservas] Error:", err);
       res.status(500).json({ error: "INTERNAL_ERROR" });
@@ -324,7 +400,7 @@ router.get(
 
 /**
  * GET /api/reservas/trash (papelera)
- * ✅ billing siempre desde Habitacion
+ * billing siempre desde Habitacion
  */
 router.get(
   "/trash",
@@ -348,14 +424,29 @@ router.get(
 
       const reservas = await Reserva.find(q).sort({ deletedAt: -1 }).lean();
 
-      const habIds = [...new Set(reservas.map((r) => String(r.habitacionId || "")).filter(Boolean))];
+      const habIds = [
+        ...new Set(
+          reservas
+            .map((r) => String(r.habitacionId || ""))
+            .filter(Boolean)
+        ),
+      ];
       const habs = habIds.length
-        ? await Habitacion.find({ _id: { $in: habIds } }).select("_id price offer").lean()
+        ? await Habitacion.find({ _id: { $in: habIds } })
+            .select("_id price offer")
+            .lean()
         : [];
       const habMap = new Map(habs.map((h) => [String(h._id), h]));
 
-      rlog("GET /reservas/trash ok", { count: reservas.length, hotel: hotel || "all" });
-      res.json({ data: reservas.map((r) => toEventDto(r, habMap.get(String(r.habitacionId)))) });
+      rlog("GET /reservas/trash ok", {
+        count: reservas.length,
+        hotel: hotel || "all",
+      });
+      res.json({
+        data: reservas.map((r) =>
+          toEventDto(r, habMap.get(String(r.habitacionId)))
+        ),
+      });
     } catch (err) {
       rerr("[GET /reservas/trash] Error:", err);
       res.status(500).json({ error: "INTERNAL_ERROR" });
@@ -365,7 +456,7 @@ router.get(
 
 /**
  * GET /api/reservas/date-changes
- * ✅ ver fechas eliminadas / cambios
+ * ver fechas eliminadas / cambios
  */
 router.get(
   "/date-changes",
@@ -379,12 +470,19 @@ router.get(
       if (hotel) q.hotel = hotel;
 
       if (isDateStr(from) || isDateStr(to)) {
-        const gte = isDateStr(from) ? new Date(`${from}T00:00:00.000Z`) : new Date("1970-01-01T00:00:00.000Z");
-        const lte = isDateStr(to) ? new Date(`${to}T23:59:59.999Z`) : new Date("2999-12-31T23:59:59.999Z");
+        const gte = isDateStr(from)
+          ? new Date(`${from}T00:00:00.000Z`)
+          : new Date("1970-01-01T00:00:00.000Z");
+        const lte = isDateStr(to)
+          ? new Date(`${to}T23:59:59.999Z`)
+          : new Date("2999-12-31T23:59:59.999Z");
         q.createdAt = { $gte: gte, $lte: lte };
       }
 
-      const logs = await ReservaDateChangeLog.find(q).sort({ createdAt: -1 }).limit(400).lean();
+      const logs = await ReservaDateChangeLog.find(q)
+        .sort({ createdAt: -1 })
+        .limit(400)
+        .lean();
       res.json({ data: logs });
     } catch (err) {
       rerr("[GET /reservas/date-changes] Error:", err);
@@ -394,9 +492,402 @@ router.get(
 );
 
 /**
+ * GET /api/reservas/stats/mensuales
+ * Stats de los últimos N meses (por defecto 6):
+ *  - roomsRented: cantidad de reservas que inician en ese mes
+ *  - revenue: suma de totalAmount de esas reservas
+ *  - nightsBooked / nights: noches ocupadas en el mes
+ *  - totalRoomNights / availableRoomNights: habitaciones * días del mes
+ *  - occupancyPct: noches ocupadas / noches disponibles
+ *  - avgStayNights: estancia promedio (noches) de reservas que inician en el mes
+ *  - avgLeadTimeDays: días de anticipación promedio (startDate - createdAt)
+ *  - weekdayBreakdown: % de noches por día de la semana (mon..sun)
+ *  - roomTypeBreakdown: [{ roomType, roomsRented, occupancyPct }]
+ *  - channels: método de reservación (con count y revenue)
+ */
+router.get(
+  "/stats/mensuales",
+  authMiddleware,
+  requirePermissions(["view_reservations"]),
+  async (req, res) => {
+    try {
+      const monthsRaw = parseInt(req.query.months, 10);
+      const months = Math.min(Math.max(monthsRaw || 6, 1), 24);
+
+      // Inicio de mes actual
+      const now = new Date();
+      const startOfCurrentMonth = new Date(
+        now.getFullYear(),
+        now.getMonth(),
+        1
+      );
+
+      const monthConfigs = [];
+      for (let i = months - 1; i >= 0; i--) {
+        const d = new Date(
+          startOfCurrentMonth.getFullYear(),
+          startOfCurrentMonth.getMonth() - i,
+          1
+        );
+        const year = d.getFullYear();
+        const monthIndex = d.getMonth(); // 0-11
+
+        const month = String(monthIndex + 1).padStart(2, "0");
+        const startStr = `${year}-${month}-01`;
+
+        const nextMonth = new Date(year, monthIndex + 1, 1);
+        const endDt = new Date(nextMonth.getTime() - 1);
+        const endStr = `${endDt.getFullYear()}-${String(
+          endDt.getMonth() + 1
+        ).padStart(2, "0")}-${String(endDt.getDate()).padStart(2, "0")}`;
+
+        const daysInMonth = endDt.getDate();
+
+        const label = new Intl.DateTimeFormat("es-MX", {
+          month: "short",
+          year: "numeric",
+        }).format(d);
+
+        const key = `${year}-${month}`;
+
+        monthConfigs.push({
+          key,
+          year,
+          monthIndex,
+          startStr,
+          endStr,
+          daysInMonth,
+          label,
+        });
+      }
+
+      if (!monthConfigs.length) {
+        return res.json({
+          data: {
+            months: [],
+            channels: { totalReservations: 0, byChannel: [] },
+          },
+        });
+      }
+
+      const globalStart = monthConfigs[0].startStr;
+      const globalEnd = monthConfigs[monthConfigs.length - 1].endStr;
+
+      const [reservas, totalRooms] = await Promise.all([
+        Reserva.find({
+          isDeleted: false,
+          type: "stay",
+          startDate: { $lte: globalEnd },
+          endDate: { $gte: globalStart },
+        })
+          .select(
+            "startDate endDate totalAmount origen habitacionId hotel room createdAt"
+          )
+          .lean(),
+        Habitacion.countDocuments({ isDeleted: { $ne: true } }),
+      ]);
+
+      // Para reservas sin totalAmount usamos price/offer de la habitación
+      const habIds = [
+        ...new Set(
+          reservas
+            .map((r) => String(r.habitacionId || ""))
+            .filter((x) => x && x !== "undefined")
+        ),
+      ];
+
+      let habMap = new Map();
+      if (habIds.length) {
+        const habs = await Habitacion.find({ _id: { $in: habIds } })
+          .select("_id price offer roomType tipoHabitacion title codigo")
+          .lean();
+        habMap = new Map(habs.map((h) => [String(h._id), h]));
+      }
+
+      // Base por mes
+      const baseMonths = {};
+      for (const mc of monthConfigs) {
+        baseMonths[mc.key] = {
+          key: mc.key,
+          label: mc.label,
+          year: mc.year,
+          month: mc.monthIndex + 1,
+          startDate: mc.startStr,
+          endDate: mc.endStr,
+          roomsRented: 0,
+          revenue: 0,
+          nightsBooked: 0,
+          totalRoomNights: totalRooms * mc.daysInMonth,
+          occupancyPct: 0,
+          // para métricas derivadas
+          weekdayNights: {
+            mon: 0,
+            tue: 0,
+            wed: 0,
+            thu: 0,
+            fri: 0,
+            sat: 0,
+            sun: 0,
+          },
+          roomTypes: {}, // roomType -> { rooms, nights }
+          stayNightsSum: 0,
+          stayCount: 0,
+          leadTimeSum: 0,
+          leadTimeCount: 0,
+        };
+      }
+
+      const channelCounts = new Map();
+      const channelRevenue = new Map();
+
+      const clampDateStr = (str, minStr, maxStr) => {
+        if (str < minStr) return minStr;
+        if (str > maxStr) return maxStr;
+        return str;
+      };
+
+      const normalizeChannel = (origen) => {
+        const raw = String(origen || "directo").toLowerCase();
+        if (raw.includes("booking")) return "Booking";
+        if (raw.includes("expedia")) return "Expedia";
+        if (raw.includes("whatsapp") || raw.includes("wa")) return "WhatsApp";
+        if (raw.includes("facebook") || raw.includes("fb")) return "Facebook";
+        if (
+          raw.includes("direct") ||
+          raw.includes("web") ||
+          raw.includes("manual")
+        )
+          return "Directo";
+        return "Otros";
+      };
+
+      const weekdayKeyFromDate = (d) => {
+        // getUTCDay: 0=Dom, 1=Lun, ... 6=Sab
+        const dow = d.getUTCDay();
+        switch (dow) {
+          case 1:
+            return "mon";
+          case 2:
+            return "tue";
+          case 3:
+            return "wed";
+          case 4:
+            return "thu";
+          case 5:
+            return "fri";
+          case 6:
+            return "sat";
+          case 0:
+          default:
+            return "sun";
+        }
+      };
+
+      for (const r of reservas) {
+        const start = r.startDate;
+        const end = r.endDate || r.startDate;
+
+        const habMeta = habMap.get(String(r.habitacionId || ""));
+        const roomTypeName = habMeta
+          ? habMeta.roomType ||
+            habMeta.tipoHabitacion ||
+            habMeta.title ||
+            habMeta.codigo ||
+            "General"
+          : "General";
+
+        let totalAmount =
+          typeof r.totalAmount === "number" && Number.isFinite(r.totalAmount)
+            ? round2(r.totalAmount)
+            : null;
+
+        if (
+          totalAmount === null &&
+          habMeta &&
+          typeof habMeta.price === "number"
+        ) {
+          const billing = computeBilling({
+            price: habMeta.price,
+            offer: habMeta.offer || null,
+            startDate: start,
+            endDate: end,
+          });
+          totalAmount = billing.total;
+        }
+
+        const chan = normalizeChannel(r.origen);
+        channelCounts.set(chan, (channelCounts.get(chan) || 0) + 1);
+        if (totalAmount !== null) {
+          channelRevenue.set(
+            chan,
+            round2((channelRevenue.get(chan) || 0) + totalAmount)
+          );
+        }
+
+        // Para estancia y lead time (se usan cuando la reserva inicia en un mes)
+        const stayNightsTotal = daysInclusive(start, end);
+        let leadDays = null;
+        if (r.createdAt) {
+          const createdDt =
+            r.createdAt instanceof Date
+              ? r.createdAt
+              : new Date(r.createdAt);
+          const startDt = parseDateUTC(start);
+          const diffMs = startDt.getTime() - createdDt.getTime();
+          const diffDays = Math.floor(diffMs / 86400000);
+          leadDays = diffDays >= 0 ? diffDays : 0;
+        }
+
+        // Recorremos meses para ver en cuáles se solapa la reserva
+        for (const mc of monthConfigs) {
+          if (!rangesOverlap(start, end, mc.startStr, mc.endStr)) continue;
+
+          const m = baseMonths[mc.key];
+
+          const effectiveStart = clampDateStr(start, mc.startStr, mc.endStr);
+          const effectiveEnd = clampDateStr(end, mc.startStr, mc.endStr);
+
+          // Contabilizar noches + día de la semana + noches por tipo de habitación
+          let d = parseDateUTC(effectiveStart);
+          const endDt = parseDateUTC(effectiveEnd);
+
+          while (d.getTime() <= endDt.getTime()) {
+            m.nightsBooked += 1;
+
+            const wdKey = weekdayKeyFromDate(d);
+            if (m.weekdayNights[wdKey] !== undefined) {
+              m.weekdayNights[wdKey] += 1;
+            }
+
+            // noches por tipo
+            if (!m.roomTypes[roomTypeName]) {
+              m.roomTypes[roomTypeName] = { rooms: 0, nights: 0 };
+            }
+            m.roomTypes[roomTypeName].nights += 1;
+
+            d = new Date(d.getTime() + 86400000);
+          }
+
+          // Contamos la reserva como "rentada" en el mes en el que inicia
+          if (start >= mc.startStr && start <= mc.endStr) {
+            m.roomsRented += 1;
+            if (totalAmount !== null) {
+              m.revenue = round2(m.revenue + totalAmount);
+            }
+
+            // estancia promedio (noches)
+            if (stayNightsTotal > 0) {
+              m.stayNightsSum += stayNightsTotal;
+              m.stayCount += 1;
+            }
+
+            // lead time promedio
+            if (leadDays !== null) {
+              m.leadTimeSum += leadDays;
+              m.leadTimeCount += 1;
+            }
+
+            // rooms por tipo (solo cuenta 1 vez por reserva)
+            if (!m.roomTypes[roomTypeName]) {
+              m.roomTypes[roomTypeName] = { rooms: 0, nights: 0 };
+            }
+            m.roomTypes[roomTypeName].rooms += 1;
+          }
+        }
+      }
+
+      const monthsOut = Object.values(baseMonths).map((m) => {
+        const occ =
+          m.totalRoomNights > 0
+            ? Math.round((m.nightsBooked / m.totalRoomNights) * 100)
+            : 0;
+
+        // % de noches por día de la semana
+        const weekdayBreakdown = {};
+        const totalNights = m.nightsBooked || 0;
+        for (const k of Object.keys(m.weekdayNights)) {
+          const nightsForDay = m.weekdayNights[k] || 0;
+          weekdayBreakdown[k] =
+            totalNights > 0
+              ? Math.round((nightsForDay * 100) / totalNights)
+              : 0;
+        }
+
+        // Breakdown por tipo de habitación
+        const roomTypeBreakdown = Object.entries(m.roomTypes).map(
+          ([roomType, info]) => ({
+            roomType,
+            roomsRented: info.rooms || 0,
+            occupancyPct:
+              totalNights > 0
+                ? Math.round((info.nights * 100) / totalNights)
+                : 0,
+          })
+        );
+
+        roomTypeBreakdown.sort((a, b) => b.roomsRented - a.roomsRented);
+
+        const avgStayNights =
+          m.stayCount > 0 ? round2(m.stayNightsSum / m.stayCount) : 0;
+        const avgLeadTimeDays =
+          m.leadTimeCount > 0 ? round2(m.leadTimeSum / m.leadTimeCount) : 0;
+
+        return {
+          key: m.key,
+          label: m.label,
+          year: m.year,
+          month: m.month,
+          startDate: m.startDate,
+          endDate: m.endDate,
+          roomsRented: m.roomsRented,
+          revenue: round2(m.revenue),
+          nightsBooked: m.nightsBooked,
+          nights: m.nightsBooked, // alias para el frontend
+          totalRoomNights: m.totalRoomNights,
+          availableRoomNights: m.totalRoomNights, // alias para el frontend
+          occupancyPct: occ,
+          avgStayNights,
+          avgLeadTimeDays,
+          weekdayBreakdown,
+          roomTypeBreakdown,
+        };
+      });
+
+      monthsOut.sort((a, b) =>
+        a.startDate < b.startDate ? -1 : a.startDate > b.startDate ? 1 : 0
+      );
+
+      const channelsOut = {
+        totalReservations: reservas.length,
+        byChannel: Array.from(channelCounts.entries()).map(
+          ([channel, count]) => ({
+            channel,
+            count,
+            revenue: round2(channelRevenue.get(channel) || 0),
+          })
+        ),
+      };
+
+      return res.json({
+        data: {
+          months: monthsOut,
+          channels: channelsOut,
+        },
+      });
+    } catch (err) {
+      rerr("[GET /reservas/stats/mensuales] Error:", err);
+      return res
+        .status(500)
+        .json({ error: "INTERNAL_ERROR", message: err.message });
+    }
+  }
+);
+
+/**
  * POST /api/reservas
- * ✅ soporta "paid: true" para crear marcada como pagada
- * ✅ billing viene de Habitacion (no snapshot)
+ * soporta "paid: true" para crear marcada como pagada
+ * billing viene de Habitacion (no snapshot)
+ * totalAmount se guarda en la reserva como snapshot
  */
 router.post(
   "/",
@@ -404,29 +895,55 @@ router.post(
   requirePermissions(["manage_reservations"]),
   async (req, res) => {
     try {
-      const { habitacionId, startDate, endDate, label, notes, origen, paid } = req.body;
+      const { habitacionId, startDate, endDate, label, notes, origen, paid } =
+        req.body;
 
       if (!habitacionId || !isDateStr(startDate) || !isDateStr(endDate)) {
-        return fail(res, 400, "VALIDATION_ERROR", "habitacionId, startDate y endDate (YYYY-MM-DD) son obligatorios.");
+        return fail(
+          res,
+          400,
+          "VALIDATION_ERROR",
+          "habitacionId, startDate y endDate (YYYY-MM-DD) son obligatorios."
+        );
       }
       if (endDate < startDate) {
-        return fail(res, 400, "INVALID_DATES", "endDate no puede ser menor que startDate.");
+        return fail(
+          res,
+          400,
+          "INVALID_DATES",
+          "endDate no puede ser menor que startDate."
+        );
       }
 
       // ✅ NO permitir reservas en fechas pasadas (referencia: America/Merida)
       const hoy = todayMeridaStr(); // YYYY-MM-DD
       if (startDate < hoy) {
-        return fail(res, 400, "PAST_DATES", "No se pueden crear reservas en fechas pasadas.");
+        return fail(
+          res,
+          400,
+          "PAST_DATES",
+          "No se pueden crear reservas en fechas pasadas."
+        );
       }
-      // (opcional pero consistente) si tu operación también prohíbe rangos totalmente pasados:
       if (endDate < hoy) {
-        return fail(res, 400, "PAST_DATES", "No se pueden crear reservas que terminen en fechas pasadas.");
+        return fail(
+          res,
+          400,
+          "PAST_DATES",
+          "No se pueden crear reservas que terminen en fechas pasadas."
+        );
       }
 
       const hab = await Habitacion.findById(habitacionId).lean();
-      if (!hab || hab.isDeleted) return fail(res, 400, "INVALID_ROOM", "Habitación no encontrada.");
+      if (!hab || hab.isDeleted)
+        return fail(res, 400, "INVALID_ROOM", "Habitación no encontrada.");
       if (isRoomUnavailable(hab)) {
-        return fail(res, 400, "ROOM_UNAVAILABLE", `No se puede reservar: habitación en estado ${hab.inventoryStatus}.`);
+        return fail(
+          res,
+          400,
+          "ROOM_UNAVAILABLE",
+          `No se puede reservar: habitación en estado ${hab.inventoryStatus}.`
+        );
       }
 
       const hotel = hab.hotelCode;
@@ -434,15 +951,37 @@ router.post(
 
       const conflict = await findConflict({ hotel, room, startDate, endDate });
       if (conflict) {
-        rlog("POST /reservas conflict", { hotel, room, startDate, endDate, conflictId: String(conflict._id) });
+        rlog("POST /reservas conflict", {
+          hotel,
+          room,
+          startDate,
+          endDate,
+          conflictId: String(conflict._id),
+        });
         return res.status(409).json({
           error: "CONFLICT",
           message: "Conflicto: ya existe una reserva en ese rango.",
-          conflict: { id: String(conflict._id), startDate: conflict.startDate, endDate: conflict.endDate },
+          conflict: {
+            id: String(conflict._id),
+            startDate: conflict.startDate,
+            endDate: conflict.endDate,
+          },
         });
       }
 
       const isPaid = paid === true || String(paid) === "true";
+
+      // Calculamos snapshot de totalAmount desde Habitacion
+      let totalAmount = null;
+      if (typeof hab.price === "number" && Number.isFinite(hab.price)) {
+        const billing = computeBilling({
+          price: hab.price,
+          offer: hab.offer || null,
+          startDate,
+          endDate,
+        });
+        totalAmount = billing.total;
+      }
 
       const reserva = await Reserva.create({
         habitacionId,
@@ -455,13 +994,21 @@ router.post(
         notes: notes || "",
         origen: origen || "manual",
         paidAt: isPaid ? hoy : null,
+        totalAmount,
       });
 
-      rlog("POST /reservas created", { id: String(reserva._id), hotel, room, startDate, endDate, paid: isPaid });
+      rlog("POST /reservas created", {
+        id: String(reserva._id),
+        hotel,
+        room,
+        startDate,
+        endDate,
+        paid: isPaid,
+        totalAmount,
+      });
 
-      // ✅ Responder con billing desde Habitacion
-      const habMeta = await Habitacion.findById(reserva.habitacionId).select("_id price offer").lean();
-      res.status(201).json({ data: toEventDto(reserva.toObject(), habMeta) });
+      // ✅ Responder con billing desde Habitacion (ya la tenemos en `hab`)
+      res.status(201).json({ data: toEventDto(reserva.toObject(), hab) });
     } catch (err) {
       rerr("[POST /reservas] Error:", err);
       res.status(400).json({ error: "BAD_REQUEST", details: err.message });
@@ -469,10 +1016,10 @@ router.post(
   }
 );
 
-
 /**
  * PATCH /api/reservas/:id/dates
  * ✅ guarda log con removedDates
+ * ✅ recalcula totalAmount
  */
 router.patch(
   "/:id/dates",
@@ -482,22 +1029,53 @@ router.patch(
     try {
       const { startDate, endDate } = req.body;
 
-      if (!isDateStr(startDate) || !isDateStr(endDate)) return fail(res, 400, "VALIDATION_ERROR", "startDate/endDate inválidos.");
-      if (endDate < startDate) return fail(res, 400, "INVALID_DATES", "endDate < startDate.");
+      if (!isDateStr(startDate) || !isDateStr(endDate))
+        return fail(res, 400, "VALIDATION_ERROR", "startDate/endDate inválidos.");
+      if (endDate < startDate)
+        return fail(res, 400, "INVALID_DATES", "endDate < startDate.");
 
       const reserva = await Reserva.findById(req.params.id);
-      if (!reserva || reserva.isDeleted) return fail(res, 404, "NOT_FOUND", "Reserva no encontrada.");
+      if (!reserva || reserva.isDeleted)
+        return fail(res, 404, "NOT_FOUND", "Reserva no encontrada.");
 
-      if (reserva.checkoutAt) return fail(res, 400, "FORBIDDEN", "No se pueden cambiar fechas: ya tiene check-out.");
-      if (reserva.checkinAt && startDate !== reserva.startDate) return fail(res, 400, "FORBIDDEN", "No se puede cambiar startDate: ya existe check-in.");
-      if (reserva.checkinAt && endDate < reserva.checkinAt) return fail(res, 400, "INVALID_DATES", "endDate no puede ser menor que la fecha de check-in.");
+      if (reserva.checkoutAt)
+        return fail(
+          res,
+          400,
+          "FORBIDDEN",
+          "No se pueden cambiar fechas: ya tiene check-out."
+        );
+      if (reserva.checkinAt && startDate !== reserva.startDate)
+        return fail(
+          res,
+          400,
+          "FORBIDDEN",
+          "No se puede cambiar startDate: ya existe check-in."
+        );
+      if (reserva.checkinAt && endDate < reserva.checkinAt)
+        return fail(
+          res,
+          400,
+          "INVALID_DATES",
+          "endDate no puede ser menor que la fecha de check-in."
+        );
 
-      const conflict = await findConflict({ hotel: reserva.hotel, room: reserva.room, startDate, endDate, excludeId: reserva._id });
+      const conflict = await findConflict({
+        hotel: reserva.hotel,
+        room: reserva.room,
+        startDate,
+        endDate,
+        excludeId: reserva._id,
+      });
       if (conflict) {
         return res.status(409).json({
           error: "CONFLICT",
           message: "Conflicto: ya existe una reserva en ese rango.",
-          conflict: { id: String(conflict._id), startDate: conflict.startDate, endDate: conflict.endDate },
+          conflict: {
+            id: String(conflict._id),
+            startDate: conflict.startDate,
+            endDate: conflict.endDate,
+          },
         });
       }
 
@@ -505,7 +1083,12 @@ router.patch(
       const oldEndDate = reserva.endDate;
 
       if (oldStartDate !== startDate || oldEndDate !== endDate) {
-        const removedDates = calcRemovedDates(oldStartDate, oldEndDate, startDate, endDate);
+        const removedDates = calcRemovedDates(
+          oldStartDate,
+          oldEndDate,
+          startDate,
+          endDate
+        );
         await logDateChange({
           req,
           reserva,
@@ -520,9 +1103,28 @@ router.patch(
 
       reserva.startDate = startDate;
       reserva.endDate = endDate;
+
+      // Recalcular totalAmount con la habitación actual
+      const habMeta = await Habitacion.findById(reserva.habitacionId)
+        .select("_id price offer")
+        .lean();
+
+      if (
+        habMeta &&
+        typeof habMeta.price === "number" &&
+        Number.isFinite(habMeta.price)
+      ) {
+        const billing = computeBilling({
+          price: habMeta.price,
+          offer: habMeta.offer || null,
+          startDate: reserva.startDate,
+          endDate: reserva.endDate,
+        });
+        reserva.totalAmount = billing.total;
+      }
+
       await reserva.save();
 
-      const habMeta = await Habitacion.findById(reserva.habitacionId).select("_id price offer").lean();
       res.json({ data: toEventDto(reserva.toObject(), habMeta) });
     } catch (err) {
       rerr("[PATCH /reservas/:id/dates] Error:", err);
@@ -541,22 +1143,40 @@ router.patch(
   async (req, res) => {
     try {
       const reserva = await Reserva.findById(req.params.id);
-      if (!reserva || reserva.isDeleted) return fail(res, 404, "NOT_FOUND", "Reserva no encontrada.");
-      if (reserva.type !== "stay") return fail(res, 400, "INVALID_ACTION", "Acción no válida.");
+      if (!reserva || reserva.isDeleted)
+        return fail(res, 404, "NOT_FOUND", "Reserva no encontrada.");
+      if (reserva.type !== "stay")
+        return fail(res, 400, "INVALID_ACTION", "Acción no válida.");
 
       if (reserva.checkinAt) {
-        const habMeta = await Habitacion.findById(reserva.habitacionId).select("_id price offer").lean();
+        const habMeta = await Habitacion.findById(reserva.habitacionId)
+          .select("_id price offer")
+          .lean();
         return res.json({ data: toEventDto(reserva.toObject(), habMeta) });
       }
 
       const hoy = todayMeridaStr();
-      if (hoy < reserva.startDate) return fail(res, 400, "INVALID_ACTION", "No se puede marcar check-in antes de la entrada.");
-      if (hoy > reserva.endDate) return fail(res, 400, "INVALID_ACTION", "No se puede marcar check-in después de la salida.");
+      if (hoy < reserva.startDate)
+        return fail(
+          res,
+          400,
+          "INVALID_ACTION",
+          "No se puede marcar check-in antes de la entrada."
+        );
+      if (hoy > reserva.endDate)
+        return fail(
+          res,
+          400,
+          "INVALID_ACTION",
+          "No se puede marcar check-in después de la salida."
+        );
 
       reserva.checkinAt = hoy;
       await reserva.save();
 
-      const habMeta = await Habitacion.findById(reserva.habitacionId).select("_id price offer").lean();
+      const habMeta = await Habitacion.findById(reserva.habitacionId)
+        .select("_id price offer")
+        .lean();
       res.json({ data: toEventDto(reserva.toObject(), habMeta) });
     } catch (err) {
       rerr("[PATCH /reservas/:id/checkin] Error:", err);
@@ -569,6 +1189,7 @@ router.patch(
  * PATCH /api/reservas/:id/checkout
  * ✅ checkout recorta endDate a hoy
  * ✅ guarda removedDates en log
+ * ✅ recalcula totalAmount
  */
 router.patch(
   "/:id/checkout",
@@ -577,17 +1198,33 @@ router.patch(
   async (req, res) => {
     try {
       const reserva = await Reserva.findById(req.params.id);
-      if (!reserva || reserva.isDeleted) return fail(res, 404, "NOT_FOUND", "Reserva no encontrada.");
-      if (reserva.type !== "stay") return fail(res, 400, "INVALID_ACTION", "Acción no válida.");
-      if (!reserva.checkinAt) return fail(res, 400, "INVALID_ACTION", "Primero marca check-in.");
+      if (!reserva || reserva.isDeleted)
+        return fail(res, 404, "NOT_FOUND", "Reserva no encontrada.");
+      if (reserva.type !== "stay")
+        return fail(res, 400, "INVALID_ACTION", "Acción no válida.");
+      if (!reserva.checkinAt)
+        return fail(
+          res,
+          400,
+          "INVALID_ACTION",
+          "Primero marca check-in."
+        );
 
       if (reserva.checkoutAt) {
-        const habMeta = await Habitacion.findById(reserva.habitacionId).select("_id price offer").lean();
+        const habMeta = await Habitacion.findById(reserva.habitacionId)
+          .select("_id price offer")
+          .lean();
         return res.json({ data: toEventDto(reserva.toObject(), habMeta) });
       }
 
       const hoy = todayMeridaStr();
-      if (hoy < reserva.checkinAt) return fail(res, 400, "INVALID_ACTION", "checkout no puede ser menor que checkin.");
+      if (hoy < reserva.checkinAt)
+        return fail(
+          res,
+          400,
+          "INVALID_ACTION",
+          "checkout no puede ser menor que checkin."
+        );
 
       const oldStartDate = reserva.startDate;
       const oldEndDate = reserva.endDate;
@@ -597,7 +1234,12 @@ router.patch(
       if (reserva.endDate !== hoy) {
         reserva.endDate = hoy;
 
-        const removedDates = calcRemovedDates(oldStartDate, oldEndDate, oldStartDate, hoy);
+        const removedDates = calcRemovedDates(
+          oldStartDate,
+          oldEndDate,
+          oldStartDate,
+          hoy
+        );
         await logDateChange({
           req,
           reserva,
@@ -610,9 +1252,27 @@ router.patch(
         });
       }
 
+      // Recalcular totalAmount con el recorte
+      const habMeta = await Habitacion.findById(reserva.habitacionId)
+        .select("_id price offer")
+        .lean();
+
+      if (
+        habMeta &&
+        typeof habMeta.price === "number" &&
+        Number.isFinite(habMeta.price)
+      ) {
+        const billing = computeBilling({
+          price: habMeta.price,
+          offer: habMeta.offer || null,
+          startDate: reserva.startDate,
+          endDate: reserva.endDate,
+        });
+        reserva.totalAmount = billing.total;
+      }
+
       await reserva.save();
 
-      const habMeta = await Habitacion.findById(reserva.habitacionId).select("_id price offer").lean();
       res.json({ data: toEventDto(reserva.toObject(), habMeta) });
     } catch (err) {
       rerr("[PATCH /reservas/:id/checkout] Error:", err);
@@ -632,12 +1292,15 @@ router.patch(
   async (req, res) => {
     try {
       const reserva = await Reserva.findById(req.params.id);
-      if (!reserva || reserva.isDeleted) return fail(res, 404, "NOT_FOUND", "Reserva no encontrada.");
+      if (!reserva || reserva.isDeleted)
+        return fail(res, 404, "NOT_FOUND", "Reserva no encontrada.");
 
       reserva.paidAt = todayMeridaStr();
       await reserva.save();
 
-      const habMeta = await Habitacion.findById(reserva.habitacionId).select("_id price offer").lean();
+      const habMeta = await Habitacion.findById(reserva.habitacionId)
+        .select("_id price offer")
+        .lean();
       res.json({ data: toEventDto(reserva.toObject(), habMeta) });
     } catch (err) {
       rerr("[PATCH /reservas/:id/paid] Error:", err);
@@ -653,12 +1316,15 @@ router.patch(
   async (req, res) => {
     try {
       const reserva = await Reserva.findById(req.params.id);
-      if (!reserva || reserva.isDeleted) return fail(res, 404, "NOT_FOUND", "Reserva no encontrada.");
+      if (!reserva || reserva.isDeleted)
+        return fail(res, 404, "NOT_FOUND", "Reserva no encontrada.");
 
       reserva.paidAt = null;
       await reserva.save();
 
-      const habMeta = await Habitacion.findById(reserva.habitacionId).select("_id price offer").lean();
+      const habMeta = await Habitacion.findById(reserva.habitacionId)
+        .select("_id price offer")
+        .lean();
       res.json({ data: toEventDto(reserva.toObject(), habMeta) });
     } catch (err) {
       rerr("[PATCH /reservas/:id/unpaid] Error:", err);
@@ -679,7 +1345,8 @@ router.patch(
       const id = String(req.params.id);
       rlog("TRASH request", { id });
 
-      if (!isOid(id)) return fail(res, 400, "INVALID_ID", "El id de la reserva no es válido.");
+      if (!isOid(id))
+        return fail(res, 400, "INVALID_ID", "El id de la reserva no es válido.");
 
       const updated = await Reserva.findOneAndUpdate(
         { _id: id },
@@ -687,13 +1354,18 @@ router.patch(
         { new: true }
       ).lean();
 
-      if (!updated) return fail(res, 404, "NOT_FOUND", "Reserva no encontrada.");
+      if (!updated)
+        return fail(res, 404, "NOT_FOUND", "Reserva no encontrada.");
 
-      const habMeta = await Habitacion.findById(updated.habitacionId).select("_id price offer").lean();
+      const habMeta = await Habitacion.findById(updated.habitacionId)
+        .select("_id price offer")
+        .lean();
       return res.json({ ok: true, data: toEventDto(updated, habMeta) });
     } catch (err) {
       rerr("[PATCH /reservas/:id/trash] Error:", err);
-      return res.status(400).json({ error: "BAD_REQUEST", details: err.message });
+      return res
+        .status(400)
+        .json({ error: "BAD_REQUEST", details: err.message });
     }
   }
 );
@@ -708,14 +1380,21 @@ router.patch(
   async (req, res) => {
     try {
       const id = String(req.params.id);
-      if (!isOid(id)) return fail(res, 400, "INVALID_ID", "El id de la reserva no es válido.");
+      if (!isOid(id))
+        return fail(res, 400, "INVALID_ID", "El id de la reserva no es válido.");
 
       const reserva = await Reserva.findById(id);
-      if (!reserva) return fail(res, 404, "NOT_FOUND", "Reserva no encontrada.");
+      if (!reserva)
+        return fail(res, 404, "NOT_FOUND", "Reserva no encontrada.");
 
       if (!reserva.isDeleted) {
-        const habMeta = await Habitacion.findById(reserva.habitacionId).select("_id price offer").lean();
-        return res.json({ ok: true, data: toEventDto(reserva.toObject(), habMeta) });
+        const habMetaExisting = await Habitacion.findById(reserva.habitacionId)
+          .select("_id price offer")
+          .lean();
+        return res.json({
+          ok: true,
+          data: toEventDto(reserva.toObject(), habMetaExisting),
+        });
       }
 
       const conflict = await findConflict({
@@ -728,7 +1407,8 @@ router.patch(
       if (conflict) {
         return res.status(409).json({
           error: "CONFLICT",
-          message: "No se puede restaurar: la habitación ya está ocupada en esas fechas.",
+          message:
+            "No se puede restaurar: la habitación ya está ocupada en esas fechas.",
         });
       }
 
@@ -736,7 +1416,9 @@ router.patch(
       reserva.deletedAt = null;
       await reserva.save();
 
-      const habMeta = await Habitacion.findById(reserva.habitacionId).select("_id price offer").lean();
+      const habMeta = await Habitacion.findById(reserva.habitacionId)
+        .select("_id price offer")
+        .lean();
       res.json({ ok: true, data: toEventDto(reserva.toObject(), habMeta) });
     } catch (err) {
       rerr("[PATCH /reservas/:id/restore] Error:", err);
@@ -755,18 +1437,26 @@ router.delete(
   async (req, res) => {
     try {
       const reserva = await Reserva.findById(req.params.id);
-      if (!reserva) return fail(res, 404, "NOT_FOUND", "Reserva no encontrada.");
+      if (!reserva)
+        return fail(res, 404, "NOT_FOUND", "Reserva no encontrada.");
 
       if (reserva.isDeleted) {
-        const habMeta = await Habitacion.findById(reserva.habitacionId).select("_id price offer").lean();
-        return res.json({ ok: true, data: toEventDto(reserva.toObject(), habMeta) });
+        const habMetaExisting = await Habitacion.findById(reserva.habitacionId)
+          .select("_id price offer")
+          .lean();
+        return res.json({
+          ok: true,
+          data: toEventDto(reserva.toObject(), habMetaExisting),
+        });
       }
 
       reserva.isDeleted = true;
       reserva.deletedAt = new Date();
       await reserva.save();
 
-      const habMeta = await Habitacion.findById(reserva.habitacionId).select("_id price offer").lean();
+      const habMeta = await Habitacion.findById(reserva.habitacionId)
+        .select("_id price offer")
+        .lean();
       res.json({ ok: true, data: toEventDto(reserva.toObject(), habMeta) });
     } catch (err) {
       rerr("[DELETE /reservas/:id] Error:", err);

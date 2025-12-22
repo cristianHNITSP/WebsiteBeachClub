@@ -1,6 +1,17 @@
+// models/Reserva.js
 const mongoose = require("mongoose");
 
-const ORIGINS = ["manual", "web", "seed", "import"];
+const ORIGINS = [
+  "manual",
+  "web",
+  "seed",
+  "import",
+  "directo",
+  "whatsapp",
+  "booking",
+  "expedia",
+  "facebook",
+];
 const TYPES = ["stay"];
 
 function genCodigoReserva({ hotel, room, startDate }) {
@@ -45,17 +56,22 @@ const ReservaSchema = new mongoose.Schema(
 
     label: { type: String, default: "", trim: true },
     notes: { type: String, default: "", trim: true },
+
+    // ahora puede ser: manual / web / seed / import / directo / whatsapp / booking / expedia / facebook
     origen: { type: String, enum: ORIGINS, default: "manual", index: true },
 
     checkinAt: { type: String, default: null, trim: true },
     checkoutAt: { type: String, default: null, trim: true },
     paidAt: { type: String, default: null, trim: true },
 
-    // ✅ PAPELERA (soft delete)
+    //PAPELERA (soft delete)
     isDeleted: { type: Boolean, default: false, index: true },
     deletedAt: { type: Date, default: null, index: true },
   },
-  { timestamps: { createdAt: "createdAt", updatedAt: "updatedAt" }, strict: true }
+  {
+    timestamps: { createdAt: "createdAt", updatedAt: "updatedAt" },
+    strict: true,
+  }
 );
 
 // autogenera si faltara (por seguridad)
@@ -70,6 +86,12 @@ ReservaSchema.pre("validate", function (next) {
   next();
 });
 
-ReservaSchema.index({ hotel: 1, room: 1, startDate: 1, endDate: 1, isDeleted: 1 });
+ReservaSchema.index({
+  hotel: 1,
+  room: 1,
+  startDate: 1,
+  endDate: 1,
+  isDeleted: 1,
+});
 
 module.exports = mongoose.model("Reserva", ReservaSchema);

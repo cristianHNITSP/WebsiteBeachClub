@@ -124,6 +124,18 @@ const UsuariosInactiveList = ({
                       >
                         {user.roleLabel}
                       </Tag>
+                      {/* 👇 Sede también en papelera */}
+                      <Tag
+                        style={{
+                          borderRadius: 999,
+                          fontSize: 9,
+                          background: "#eef2ff",
+                          border: "none",
+                          color: "#4338ca",
+                        }}
+                      >
+                        {user.sedeLabel}
+                      </Tag>
                     </Space>
                   }
                   description={

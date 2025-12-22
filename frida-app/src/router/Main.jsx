@@ -20,21 +20,15 @@ axios.defaults.withCredentials = true;
 
 /**
  * Ruta pública "/" que opcionalmente recibe currentUser
- * - Si viene en location.state, lo usa.
- * - Si no, intenta hacer /api/auth/me para ver si hay sesión.
- * - Si no hay sesión, simplemente renderiza <Home /> sin usuario.
  */
 function PublicHomeRoute() {
   const location = useLocation();
   const userFromNav = location.state?.currentUser || null;
 
   const [currentUser, setCurrentUser] = useState(userFromNav);
-  const [checkedSession, setCheckedSession] = useState(
-    !!userFromNav // si ya vino desde el panel, no necesitamos checar
-  );
+  const [checkedSession, setCheckedSession] = useState(!!userFromNav);
 
   useEffect(() => {
-    // Si ya traemos usuario desde el panel, no llamamos a /me
     if (userFromNav) return;
 
     let isMounted = true;
@@ -45,7 +39,7 @@ function PublicHomeRoute() {
         if (!isMounted) return;
         setCurrentUser(data);
       } catch (err) {
-        // sin sesión, simplemente dejamos currentUser en null
+        // sin sesión, currentUser se queda en null
       } finally {
         if (isMounted) setCheckedSession(true);
       }
@@ -57,8 +51,6 @@ function PublicHomeRoute() {
     };
   }, [userFromNav]);
 
-  // Podemos mostrar el Home incluso mientras se revisa sesión;
-  // currentUser será null hasta que se resuelva.
   return <Home currentUser={currentUser} />;
 }
 
@@ -75,7 +67,7 @@ function ProtectedPanelRoute({ component: Component }) {
 
     const checkSession = async () => {
       try {
-        const { data } = await axios.get("/api/auth/me"); // aquí viene tu user
+        const { data } = await axios.get("/api/auth/me"); // aquí viene tu user completo
         if (!isMounted) return;
         setCurrentUser(data);
         setStatus("allowed");
@@ -91,6 +83,26 @@ function ProtectedPanelRoute({ component: Component }) {
     };
   }, []);
 
+  // 👇 función que usará el header/config para actualizar el usuario en caliente
+  const handleCurrentUserUpdated = (patchedUser) => {
+    setCurrentUser((prev) => {
+      if (!prev) return patchedUser;
+
+      return {
+        ...prev,
+        ...patchedUser,
+        // SI el backend no manda permissions en /api/users/me,
+        // conservamos los existentes
+        permissions:
+          patchedUser.permissions !== undefined
+            ? patchedUser.permissions
+            : prev.permissions,
+        role:
+          patchedUser.role !== undefined ? patchedUser.role : prev.role,
+      };
+    });
+  };
+
   if (status === "checking") {
     return <CheckSesion />;
   }
@@ -100,13 +112,16 @@ function ProtectedPanelRoute({ component: Component }) {
   }
 
   // Aquí ya tenemos sesión válida y un usuario
-  return <Component currentUser={currentUser} />;
+  return (
+    <Component
+      currentUser={currentUser}
+      onCurrentUserUpdated={handleCurrentUserUpdated}
+    />
+  );
 }
 
 /**
- * Ruta de Login:
- * - Si NO hay sesión -> muestra el formulario de login.
- * - Si SÍ hay sesión -> redirige directo al panel admin.
+ * Ruta de Login
  */
 function LoginRoute() {
   const [status, setStatus] = useState("checking"); // 'checking' | 'guest' | 'logged'
@@ -137,7 +152,6 @@ function LoginRoute() {
     return <Navigate to="/panel.web/panel.admin.web" replace />;
   }
 
-  // Invitado -> mostrar login
   return <InicioSesionPanel />;
 }
 
@@ -145,7 +159,7 @@ const RouterApp = () => {
   return (
     <Router basename="/hotelesfrida.app">
       <Routes>
-        {/* Home público, usando PublicHomeRoute */}
+        {/* Home público */}
         <Route path="/" element={<PublicHomeRoute />} />
 
         {/* Grupo: /panel.web */}
@@ -160,7 +174,7 @@ const RouterApp = () => {
           />
         </Route>
 
-        {/* Fallback: cualquier ruta desconocida -> NotFound */}
+        {/* Fallback */}
         <Route path="*" element={<NotFound />} />
       </Routes>
     </Router>

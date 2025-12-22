@@ -49,7 +49,9 @@ const GestionHabitacionesView = ({ isMobile, currentUser }) => {
 
   useEffect(() => {
     if (currentUser && !canManageRooms) {
-      messageApi.info("Estás en modo solo lectura: no puedes crear, editar ni eliminar habitaciones.");
+      messageApi.info(
+        "Estás en modo solo lectura: no puedes crear, editar ni eliminar habitaciones."
+      );
     }
   }, [currentUser, canManageRooms, messageApi]);
 
@@ -125,7 +127,8 @@ const GestionHabitacionesView = ({ isMobile, currentUser }) => {
 
   const abrirEditar = (registro) => {
     if (!canManageRooms) return messageApi.warning("No tienes permisos para editar habitaciones.");
-    if (registro?.isDeleted) return messageApi.warning("Esta habitación está en papelera. Restaúrala para editar.");
+    if (registro?.isDeleted)
+      return messageApi.warning("Esta habitación está en papelera. Restaúrala para editar.");
 
     setEditando(registro);
     form.setFieldsValue({
@@ -143,7 +146,10 @@ const GestionHabitacionesView = ({ isMobile, currentUser }) => {
       featured: registro.featured,
       amenities: registro.amenities || [],
       offerIsSpecial: registro.offer?.isSpecial || false,
-      offerDiscountPercent: typeof registro.offer?.discountPercent === "number" ? registro.offer.discountPercent : null,
+      offerDiscountPercent:
+        typeof registro.offer?.discountPercent === "number"
+          ? registro.offer.discountPercent
+          : null,
       offerDescription: registro.offer?.description || "",
     });
     setModalVisible(true);
@@ -184,10 +190,20 @@ const GestionHabitacionesView = ({ isMobile, currentUser }) => {
 
           if (editando && editando._id) {
             await axios.put(`/api/habitaciones/${editando._id}`, payload, { withCredentials: true });
-            messageApi.open({ key: "saving-room", type: "success", content: "Habitación actualizada.", duration: 2 });
+            messageApi.open({
+              key: "saving-room",
+              type: "success",
+              content: "Habitación actualizada.",
+              duration: 2,
+            });
           } else {
             await axios.post("/api/habitaciones", payload, { withCredentials: true });
-            messageApi.open({ key: "saving-room", type: "success", content: "Habitación creada.", duration: 2 });
+            messageApi.open({
+              key: "saving-room",
+              type: "success",
+              content: "Habitación creada.",
+              duration: 2,
+            });
           }
 
           await fetchHabitaciones(pagination.current || 1);
@@ -212,9 +228,19 @@ const GestionHabitacionesView = ({ isMobile, currentUser }) => {
     if (!canManageRooms) return messageApi.warning("No tienes permisos para eliminar habitaciones.");
     try {
       setDeletingRoomId(id);
-      messageApi.open({ key: `trash-${id}`, type: "loading", content: "Enviando a papelera...", duration: 0 });
+      messageApi.open({
+        key: `trash-${id}`,
+        type: "loading",
+        content: "Enviando a papelera...",
+        duration: 0,
+      });
       await axios.patch(`/api/habitaciones/${id}/trash`, {}, { withCredentials: true });
-      messageApi.open({ key: `trash-${id}`, type: "success", content: "Enviada a papelera.", duration: 2 });
+      messageApi.open({
+        key: `trash-${id}`,
+        type: "success",
+        content: "Enviada a papelera.",
+        duration: 2,
+      });
       await fetchHabitaciones(pagination.current || 1);
     } catch (err) {
       console.error(err);
@@ -236,39 +262,80 @@ const GestionHabitacionesView = ({ isMobile, currentUser }) => {
     if (!canManageRooms) return messageApi.warning("No tienes permisos para restaurar.");
     try {
       setDeletingRoomId(id);
-      messageApi.open({ key: `restore-${id}`, type: "loading", content: "Restaurando...", duration: 0 });
+      messageApi.open({
+        key: `restore-${id}`,
+        type: "loading",
+        content: "Restaurando...",
+        duration: 0,
+      });
       await axios.patch(`/api/habitaciones/${id}/restore`, {}, { withCredentials: true });
-      messageApi.open({ key: `restore-${id}`, type: "success", content: "Restaurada.", duration: 2 });
+      messageApi.open({
+        key: `restore-${id}`,
+        type: "success",
+        content: "Restaurada.",
+        duration: 2,
+      });
       await fetchHabitaciones(pagination.current || 1);
     } catch (err) {
       console.error(err);
-      messageApi.open({ key: `restore-${id}`, type: "error", content: err?.response?.data?.message || "No se pudo restaurar.", duration: 3 });
+      messageApi.open({
+        key: `restore-${id}`,
+        type: "error",
+        content: err?.response?.data?.message || "No se pudo restaurar.",
+        duration: 3,
+      });
     } finally {
       setDeletingRoomId(null);
     }
   };
 
   const eliminarHabitacionPermanent = async (id) => {
-    if (!canManageRooms) return messageApi.warning("No tienes permisos para eliminar permanentemente.");
+    if (!canManageRooms)
+      return messageApi.warning("No tienes permisos para eliminar permanentemente.");
     try {
       setDeletingRoomId(id);
-      messageApi.open({ key: `permanent-${id}`, type: "loading", content: "Eliminando permanentemente...", duration: 0 });
+      messageApi.open({
+        key: `permanent-${id}`,
+        type: "loading",
+        content: "Eliminando permanentemente...",
+        duration: 0,
+      });
       await axios.delete(`/api/habitaciones/${id}/permanent`, { withCredentials: true });
-      messageApi.open({ key: `permanent-${id}`, type: "success", content: "Eliminada permanentemente.", duration: 2 });
+      messageApi.open({
+        key: `permanent-${id}`,
+        type: "success",
+        content: "Eliminada permanentemente.",
+        duration: 2,
+      });
       await fetchHabitaciones(pagination.current || 1);
     } catch (err) {
       console.error(err);
-      messageApi.open({ key: `permanent-${id}`, type: "error", content: err?.response?.data?.message || "No se pudo eliminar permanentemente.", duration: 3 });
+      messageApi.open({
+        key: `permanent-${id}`,
+        type: "error",
+        content: err?.response?.data?.message || "No se pudo eliminar permanentemente.",
+        duration: 3,
+      });
     } finally {
       setDeletingRoomId(null);
     }
   };
 
-  const totalActivas = habitaciones.filter((h) => h.inventoryStatus === "Activa" && !h.isDeleted).length;
-  const totalMantenimiento = habitaciones.filter((h) => h.inventoryStatus === "Mantenimiento" && !h.isDeleted).length;
-  const totalFuera = habitaciones.filter((h) => (h.inventoryStatus === "Fuera de servicio" || h.inventoryStatus === "Bloqueada") && !h.isDeleted).length;
+  const totalActivas = habitaciones.filter(
+    (h) => h.inventoryStatus === "Activa" && !h.isDeleted
+  ).length;
+  const totalMantenimiento = habitaciones.filter(
+    (h) => h.inventoryStatus === "Mantenimiento" && !h.isDeleted
+  ).length;
+  const totalFuera = habitaciones.filter(
+    (h) =>
+      (h.inventoryStatus === "Fuera de servicio" || h.inventoryStatus === "Bloqueada") &&
+      !h.isDeleted
+  ).length;
   const totalConPromo = habitaciones.filter((h) => hasPromo(h) && !h.isDeleted).length;
-  const totalConFavoritos = habitaciones.filter((h) => (h.favoritesCount || 0) > 0 && !h.isDeleted).length;
+  const totalConFavoritos = habitaciones.filter(
+    (h) => (h.favoritesCount || 0) > 0 && !h.isDeleted
+  ).length;
 
   const limpiarFiltros = () => {
     setBusqueda("");
@@ -312,7 +379,10 @@ const GestionHabitacionesView = ({ isMobile, currentUser }) => {
     } catch (err) {
       console.error(err);
       setReservasModal((p) => ({ ...p, loading: false, items: [], total: 0 }));
-      messageApi.error(err?.response?.data?.message || "No se pudieron cargar las reservas futuras de esta habitación.");
+      messageApi.error(
+        err?.response?.data?.message ||
+          "No se pudieron cargar las reservas futuras de esta habitación."
+      );
     }
   };
 
@@ -330,7 +400,14 @@ const GestionHabitacionesView = ({ isMobile, currentUser }) => {
   };
 
   const cerrarReservasFuturas = () => {
-    setReservasModal((p) => ({ ...p, open: false, room: null, items: [], total: 0, page: 1 }));
+    setReservasModal((p) => ({
+      ...p,
+      open: false,
+      room: null,
+      items: [],
+      total: 0,
+      page: 1,
+    }));
   };
 
   const reservasColumns = useMemo(
@@ -344,7 +421,9 @@ const GestionHabitacionesView = ({ isMobile, currentUser }) => {
           const e = r?.endDate ? dayjs(r.endDate).format("DD/MM/YYYY") : s;
           return (
             <Space direction="vertical" size={0}>
-              <Text style={{ fontSize: 12, fontWeight: 600 }}>{s} → {e}</Text>
+              <Text style={{ fontSize: 12, fontWeight: 600 }}>
+                {s} → {e}
+              </Text>
               <Text style={{ fontSize: 10, color: "#6b7280" }}>
                 Creada: {r?.createdAt ? dayjs(r.createdAt).format("DD/MM/YYYY HH:mm") : "—"}
               </Text>
@@ -368,10 +447,30 @@ const GestionHabitacionesView = ({ isMobile, currentUser }) => {
         width: 210,
         render: (_, r) => {
           const tags = [];
-          if (r?.checkinAt) tags.push(<Tag key="ci" color="green" style={{ borderRadius: 999 }}>Check-in</Tag>);
-          if (r?.checkoutAt) tags.push(<Tag key="co" color="red" style={{ borderRadius: 999 }}>Check-out</Tag>);
-          if (r?.paidAt) tags.push(<Tag key="paid" color="cyan" style={{ borderRadius: 999 }}>$ Pagada</Tag>);
-          if (!tags.length) tags.push(<Tag key="res" color="blue" style={{ borderRadius: 999 }}>Reserva</Tag>);
+          if (r?.checkinAt)
+            tags.push(
+              <Tag key="ci" color="green" style={{ borderRadius: 999 }}>
+                Check-in
+              </Tag>
+            );
+          if (r?.checkoutAt)
+            tags.push(
+              <Tag key="co" color="red" style={{ borderRadius: 999 }}>
+                Check-out
+              </Tag>
+            );
+          if (r?.paidAt)
+            tags.push(
+              <Tag key="paid" color="cyan" style={{ borderRadius: 999 }}>
+                $ Pagada
+              </Tag>
+            );
+          if (!tags.length)
+            tags.push(
+              <Tag key="res" color="blue" style={{ borderRadius: 999 }}>
+                Reserva
+              </Tag>
+            );
           return <Space size={6} wrap>{tags}</Space>;
         },
       },
@@ -381,9 +480,19 @@ const GestionHabitacionesView = ({ isMobile, currentUser }) => {
         align: "right",
         width: 130,
         render: (_, r) => {
-          const t = Number(r?.billing?.total);
-          if (!Number.isFinite(t) || t <= 0) return <Text style={{ color: "#6b7280" }}>—</Text>;
-          return <Text style={{ fontWeight: 700 }}>${t.toLocaleString("es-MX")}</Text>;
+          const fromTotalAmount = Number(r?.totalAmount);
+          const fromBilling = Number(r?.billing?.total);
+          const t = Number.isFinite(fromTotalAmount) && fromTotalAmount > 0 ? fromTotalAmount : fromBilling;
+
+          if (!Number.isFinite(t) || t <= 0) {
+            return <Text style={{ color: "#6b7280" }}>—</Text>;
+          }
+
+          return (
+            <Text style={{ fontWeight: 700 }}>
+              ${t.toLocaleString("es-MX")}
+            </Text>
+          );
         },
       },
     ],
@@ -449,7 +558,7 @@ const GestionHabitacionesView = ({ isMobile, currentUser }) => {
           onRestore={restaurarHabitacion}
           onDeletePermanent={eliminarHabitacionPermanent}
           deletingRoomId={deletingRoomId}
-          onViewFutureReservations={abrirReservasFuturas} // ✅ NEW
+          onViewFutureReservations={abrirReservasFuturas} // ✅ usa modal de reservas futuras
         />
       </Card>
 
@@ -462,13 +571,14 @@ const GestionHabitacionesView = ({ isMobile, currentUser }) => {
         onOk={guardarHabitacion}
       />
 
-      {/* ✅ MODAL: Reservas futuras por habitación */}
+      {/* MODAL: Reservas futuras por habitación */}
       <Modal
         open={reservasModal.open}
         title={
           <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
             <Text style={{ fontSize: 14, fontWeight: 700 }}>
-              Reservas futuras · Hab {reservasModal.room?.codigo || reservasModal.room?.roomNumber || "—"}
+              Reservas futuras · Hab{" "}
+              {reservasModal.room?.codigo || reservasModal.room?.roomNumber || "—"}
             </Text>
             <Text style={{ fontSize: 11, color: "#6b7280" }}>
               {reservasModal.room?.title || "—"} · {reservasModal.room?.hotelCode || ""}
@@ -477,7 +587,12 @@ const GestionHabitacionesView = ({ isMobile, currentUser }) => {
         }
         onCancel={cerrarReservasFuturas}
         footer={[
-          <Button key="refresh" icon={<ReloadOutlined />} onClick={() => loadReservasFuturas({ page: reservasModal.page })} loading={reservasModal.loading}>
+          <Button
+            key="refresh"
+            icon={<ReloadOutlined />}
+            onClick={() => loadReservasFuturas({ page: reservasModal.page })}
+            loading={reservasModal.loading}
+          >
             Recargar
           </Button>,
           <Button key="close" type="primary" onClick={cerrarReservasFuturas}>

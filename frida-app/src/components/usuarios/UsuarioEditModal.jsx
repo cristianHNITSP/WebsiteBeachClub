@@ -1,7 +1,8 @@
-// src/components/usuarios/UsuarioEditModal.jsx
+import { useEffect } from "react";
 import { Modal, Form, Input, Select } from "antd";
 
 const { Option } = Select;
+const EMAIL_DOMAIN = "beachclub.com";
 
 const UsuarioEditModal = ({
   modalVisible,
@@ -9,7 +10,17 @@ const UsuarioEditModal = ({
   savingUser,
   cerrarModal,
   form,
+  initialValues,
+  editingUserId,
 }) => {
+  useEffect(() => {
+    console.log("[UsuarioEditModal] props:", {
+      modalVisible,
+      initialValues,
+      editingUserId,
+    });
+  }, [modalVisible, initialValues, editingUserId]);
+
   return (
     <Modal
       open={modalVisible}
@@ -20,10 +31,15 @@ const UsuarioEditModal = ({
       okText="Guardar cambios"
       cancelText="Cancelar"
       centered
-      // destroyOnClose  ❌ deprecated -> destroyOnHidden ✅ :contentReference[oaicite:1]{index=1}
       destroyOnHidden
     >
-      <Form form={form} layout="vertical" preserve={false}>
+      <Form
+        key={editingUserId || "no-user"} // 🔑 fuerza remount cuando cambia el usuario
+        form={form}
+        layout="vertical"
+        preserve={false}
+        initialValues={initialValues || {}}
+      >
         <Form.Item
           label="Nombre completo"
           name="name"
@@ -33,14 +49,28 @@ const UsuarioEditModal = ({
         </Form.Item>
 
         <Form.Item
-          label="Correo"
-          name="email"
+          label="Usuario corporativo"
+          name="emailUser"
+          tooltip={`El correo final será usuario@${EMAIL_DOMAIN}`}
           rules={[
-            { required: true, message: "Ingresa el correo" },
-            { type: "email", message: "Correo no válido" },
+            { required: true, message: "Ingresa el usuario corporativo" },
           ]}
         >
-          <Input placeholder="nombre@hotel.com" />
+          <Input
+            placeholder="ej: laura.sanchez"
+            addonAfter={`@${EMAIL_DOMAIN}`}
+          />
+        </Form.Item>
+
+        <Form.Item
+          label="Sede"
+          name="sede"
+          rules={[{ required: true, message: "Selecciona la sede" }]}
+        >
+          <Select placeholder="Selecciona la sede">
+            <Option value="casa-frida">Casa Frida</Option>
+            <Option value="cabanas-frida">Cabañas Frida</Option>
+          </Select>
         </Form.Item>
 
         <Form.Item

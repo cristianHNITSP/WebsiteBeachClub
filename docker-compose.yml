@@ -1,4 +1,4 @@
-version: "3.9"
+#version: "3.9"
 
 # Comandos útiles BeachClub:
 # dev:    sudo docker compose --profile dev  up --build
@@ -11,6 +11,10 @@ version: "3.9"
 #sudo docker exec -it beachclub-users-service-dev node src/seed/seed-users.js
 #sudo docker exec -it beachclub-reservas-service-dev node src/seed/seed-data.js
 
+# ver logs -f es para seguir los actualizados
+# sudo docker logs -f beachclub-users-service-dev
+# sudo docker logs rsboapp-inventory
+# sudo docker logs -f rsboapp-auth
 
 services:
   # =========================

@@ -1,4 +1,3 @@
-// frida-app/src/App.jsx
 import { useMediaQuery } from "react-responsive";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { initSocket, disconnectSocket } from "@api/websockets";
@@ -22,6 +21,7 @@ import {
   Empty,
   Spin,
   Tooltip,
+  AutoComplete, // 👈 NUEVO
 } from "antd";
 
 import {
@@ -37,6 +37,7 @@ import {
   ReloadOutlined,
   CalendarOutlined,
   CheckCircleOutlined,
+  FontSizeOutlined,
 } from "@ant-design/icons";
 
 import dayjs from "dayjs";
@@ -44,7 +45,7 @@ import dayjs from "dayjs";
 import RoomCards from "./components/website/RoomCards.jsx";
 import Recommendcards from "./components/website/RecommendCards.jsx";
 import BuscadorMovil from "./components/website/BuscadorMovil.jsx";
-import ChatSoporte from "./components/website/ChatSoporte.jsx";
+// import ChatSoporte from "./components/website/ChatSoporte.jsx";
 import HeroCarousel from "./components/website/HeroCarousel.jsx";
 import { beachColors } from "./theme/beachTheme";
 
@@ -54,7 +55,7 @@ const { Option } = Select;
 const backgroundColor = "#f8fafc";
 const borderColor = "#e2e8f0";
 
-/** ✅ base URL de Vite (en prod debería ser "/hotelesfrida.app/") */
+/**base URL de Vite (en prod debería ser "/hotelesfrida.app/") */
 const BASE = import.meta.env.BASE_URL || "/";
 const withBase = (p) => `${BASE}${String(p || "").replace(/^\//, "")}`;
 
@@ -71,11 +72,38 @@ if (!WS_URL || WS_URL.trim() === "") {
   }
 }
 
+/** ================= Filtros HARDCODEADOS ================= */
+const ROOM_TYPE_OPTIONS = [
+  "Cabaña",
+  "Doble",
+  "King",
+  "Loft",
+  "Suite",
+  "Suite Jardín",
+];
+
+const AMENITY_OPTIONS = [
+  "A/C",
+  "Balcón",
+  "Cocina",
+  "Cocina pequeña",
+  "Desayuno incluido",
+  "Dos Camas",
+  "Hamaca",
+  "Hamacas",
+  "TV",
+  "Terraza",
+  "Ventilador",
+  "Vista panorámica",
+  "WiFi",
+];
+
+const LOCATION_OPTIONS = ["Chelem", "Chuburná"];
+
 /** ================= helpers ================= */
 const toArrayCheckedKeys = (checkedKeys) => {
   if (Array.isArray(checkedKeys)) return checkedKeys;
-  if (checkedKeys && Array.isArray(checkedKeys.checked))
-    return checkedKeys.checked;
+  if (checkedKeys && Array.isArray(checkedKeys.checked)) return checkedKeys.checked;
   return [];
 };
 
@@ -83,14 +111,47 @@ const normalizeStr = (s) =>
   String(s || "")
     .trim()
     .toLowerCase();
+
 const isYmd = (s) => /^\d{4}-\d{2}-\d{2}$/.test(String(s || ""));
+
+/**
+ * Intenta inferir capacidad (número de huéspedes) de la habitación
+ * Prioridad:
+ *  - room.maxGuests (numérico, si existe)
+ *  - room.size / room.capacity / room.capacityLabel con textos tipo "1 adulto", "2 adultos", "Familia"
+ */
+const parseGuestCapacity = (room) => {
+  const rawMax = room?.maxGuests;
+  if (typeof rawMax === "number" && Number.isFinite(rawMax) && rawMax > 0) {
+    return rawMax;
+  }
+
+  const sizeRaw =
+    room?.size || room?.capacity || room?.capacityLabel || "";
+
+  const s = normalizeStr(sizeRaw);
+  if (!s) return null;
+
+  // Cadenas tipo "Familia", "familiar", etc. => asumimos capacidad alta
+  if (s.includes("familia") || s.includes("familiar")) {
+    return 99; // “ilimitado” para efectos de filtro
+  }
+
+  // Buscar primer número en el texto ("1 adulto", "2 adultos", "3 pax", etc.)
+  const m = s.match(/(\d+)/);
+  if (!m) return null;
+  const n = Number(m[1]);
+  return Number.isFinite(n) && n > 0 ? n : null;
+};
 
 const roomMatchesFilters = (room, filters) => {
   const q = normalizeStr(filters.q);
   const roomTypes = Array.isArray(filters.roomTypes) ? filters.roomTypes : [];
   const amenities = Array.isArray(filters.amenities) ? filters.amenities : [];
   const locations = Array.isArray(filters.locations) ? filters.locations : [];
+  const guests = Number(filters.guests || "0") || 0;
 
+  // Texto libre (destino / ciudad / código / número / título)
   if (q) {
     const haystack = [
       room?.codigo,
@@ -105,24 +166,36 @@ const roomMatchesFilters = (room, filters) => {
     if (!haystack.includes(q)) return false;
   }
 
+  // Tipo de alojamiento
   if (roomTypes.length) {
     const rt = normalizeStr(room?.roomType);
     const ok = roomTypes.some((t) => normalizeStr(t) === rt);
     if (!ok) return false;
   }
 
+  // Servicios (amenities)
   if (amenities.length) {
     const have = new Set((room?.amenities || []).map((a) => normalizeStr(a)));
     const ok = amenities.every((a) => have.has(normalizeStr(a)));
     if (!ok) return false;
   }
 
+  // Ubicación
   if (locations.length) {
     const loc = normalizeStr(room?.location);
     const ok = locations.some((x) => loc.includes(normalizeStr(x)));
     if (!ok) return false;
   }
 
+  // 🔹 Capacidad vs huéspedes solicitados
+  if (guests > 0) {
+    const cap = parseGuestCapacity(room);
+    if (cap !== null && cap < guests) {
+      return false;
+    }
+  }
+
+  // Fechas + solo disponibles
   const hasDates = isYmd(filters.startDate) && isYmd(filters.endDate);
   if (hasDates && filters.onlyAvailable === true) {
     if (room?.available !== true) return false;
@@ -138,6 +211,33 @@ function App({ currentUser }) {
 
   const isMobile = useMediaQuery({ maxWidth: 1024 });
   const [messageApi, contextHolder] = message.useMessage();
+
+  /** ================= Accesibilidad: tamaño de fuente ================= */
+  const [fontScale, setFontScale] = useState(() => {
+    if (typeof window === "undefined") return "normal";
+    const stored = window.localStorage.getItem("frida_font_scale");
+    return stored === "large" ? "large" : "normal";
+  });
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem("frida_font_scale", fontScale);
+  }, [fontScale]);
+
+  const toggleFontScale = () => {
+    setFontScale((prev) => (prev === "normal" ? "large" : "normal"));
+    messageApi.open({
+      type: "info",
+      content:
+        fontScale === "normal"
+          ? "Tamaño de fuente aumentado"
+          : "Tamaño de fuente restablecido",
+      duration: 1.4,
+    });
+  };
+
+  // Base de fuentes para el theme de AntD
+  const baseFontSize = fontScale === "large" ? 16 : 14;
 
   /** ================= socket ================= */
   const socketRef = useRef(null);
@@ -164,17 +264,18 @@ function App({ currentUser }) {
     filtersRef.current = filters;
   }, [filters]);
 
+  /** ================= filtros pendientes (Tree) ================= */
   const [checkedKeys, setCheckedKeys] = useState([]);
 
   /** ================= header controls ================= */
   const [searchText, setSearchText] = useState("");
-  const [dates, setDates] = useState(null); // ✅ null = sin rango
+  const [dates, setDates] = useState(null); // null = sin rango
   const [guests, setGuests] = useState("2");
 
-  /** ================= paginado local ================= */
+  /** ================= paginado local (5 en 5) ================= */
   const [pagination, setPagination] = useState({
     page: 1,
-    limit: 6,
+    limit: 5,
     total: 0,
     totalPages: 0,
     hasMore: false,
@@ -183,25 +284,40 @@ function App({ currentUser }) {
   /** ================= selection ================= */
   const [habitacionSeleccionada, setHabitacionSeleccionada] = useState(null);
 
-  /** ================= TREE dinámico (sale de habitaciones) ================= */
+  /** ================= TREE HARDCODEADO ================= */
   const treeData = useMemo(() => {
-    const rooms = Array.isArray(habitaciones) ? habitaciones : [];
+    const roomTypeNodes =
+      ROOM_TYPE_OPTIONS.length > 0
+        ? ROOM_TYPE_OPTIONS.map((t) => ({ title: t, key: `t:${t}` }))
+        : [
+            {
+              title: <Text type="secondary">Sin datos</Text>,
+              key: "t:__empty",
+              disabled: true,
+            },
+          ];
 
-    const uniq = (arr) =>
-      [
-        ...new Set(
-          arr
-            .filter(Boolean)
-            .map((x) => String(x).trim())
-            .filter(Boolean)
-        ),
-      ].sort();
+    const amenityNodes =
+      AMENITY_OPTIONS.length > 0
+        ? AMENITY_OPTIONS.map((a) => ({ title: a, key: `a:${a}` }))
+        : [
+            {
+              title: <Text type="secondary">Sin datos</Text>,
+              key: "a:__empty",
+              disabled: true,
+            },
+          ];
 
-    const roomTypes = uniq(rooms.map((r) => r?.roomType));
-    const amenities = uniq(
-      rooms.flatMap((r) => (Array.isArray(r?.amenities) ? r.amenities : []))
-    );
-    const locations = uniq(rooms.map((r) => r?.location));
+    const locationNodes =
+      LOCATION_OPTIONS.length > 0
+        ? LOCATION_OPTIONS.map((l) => ({ title: l, key: `l:${l}` }))
+        : [
+            {
+              title: <Text type="secondary">Sin datos</Text>,
+              key: "l:__empty",
+              disabled: true,
+            },
+          ];
 
     return [
       {
@@ -212,15 +328,7 @@ function App({ currentUser }) {
           </Flex>
         ),
         key: "group:type",
-        children: roomTypes.length
-          ? roomTypes.map((t) => ({ title: t, key: `t:${t}` }))
-          : [
-              {
-                title: <Text type="secondary">Sin datos</Text>,
-                key: "t:__empty",
-                disabled: true,
-              },
-            ],
+        children: roomTypeNodes,
       },
       {
         title: (
@@ -230,15 +338,7 @@ function App({ currentUser }) {
           </Flex>
         ),
         key: "group:amenities",
-        children: amenities.length
-          ? amenities.map((a) => ({ title: a, key: `a:${a}` }))
-          : [
-              {
-                title: <Text type="secondary">Sin datos</Text>,
-                key: "a:__empty",
-                disabled: true,
-              },
-            ],
+        children: amenityNodes,
       },
       {
         title: (
@@ -248,26 +348,15 @@ function App({ currentUser }) {
           </Flex>
         ),
         key: "group:location",
-        children: locations.length
-          ? locations.map((l) => ({ title: l, key: `l:${l}` }))
-          : [
-              {
-                title: <Text type="secondary">Sin datos</Text>,
-                key: "l:__empty",
-                disabled: true,
-              },
-            ],
+        children: locationNodes,
       },
     ];
-  }, [habitaciones]);
+  }, []);
 
   /** ================= emitir query por WS ================= */
   const emitQuery = useCallback(
     (opts = {}) => {
-      const socket = socketRef.current;
-      if (!socket) return;
-
-      const f = filtersRef.current;
+      const f = opts.filters || filtersRef.current;
       const hasDates = isYmd(f.startDate) && isYmd(f.endDate);
 
       const payload = {
@@ -293,7 +382,7 @@ function App({ currentUser }) {
       setLoadingHabitaciones(true);
       setError(null);
 
-      socket.emit("habitaciones:query", payload);
+      socketRef.current?.emit("habitaciones:query", payload);
     },
     [messageApi]
   );
@@ -304,7 +393,7 @@ function App({ currentUser }) {
     socketRef.current = socket;
 
     socket.on("connect", () => {
-      console.log("✅ WS conectado:", socket.id);
+      console.log("WS conectado:", socket.id);
       emitQuery({ showToast: false });
     });
 
@@ -326,7 +415,7 @@ function App({ currentUser }) {
 
       messageApi.open({
         type: "success",
-        content: `Listo ✅ ${items.length} habitaciones sincronizadas`,
+        content: `Listo. ${items.length} habitaciones sincronizadas`,
         key: "roomsSync",
         duration: 2,
       });
@@ -391,37 +480,47 @@ function App({ currentUser }) {
     };
   }, [emitQuery, messageApi]);
 
-  /** ================= debounce: cuando cambien filtros => re-query WS ================= */
-  useEffect(() => {
-    const t = setTimeout(() => emitQuery({ showToast: false }), 250);
-    return () => clearTimeout(t);
-  }, [filters, emitQuery]);
-
-  /** ================= aplicar filtros desde Tree (keys dinámicos) ================= */
+  /** ================= aplicar filtros desde Tree (solo cambia estado local) ================= */
   const applyTreeCheckedKeys = (keys) => {
     const arr = toArrayCheckedKeys(keys).filter(
       (k) => !String(k).endsWith("__empty")
     );
     setCheckedKeys(arr);
+  };
+
+  /** ================= aplicar filtros AL HACER CLICK en "Aplicar" ================= */
+  const handleApplyTreeFilters = () => {
+    const arr = checkedKeys.filter((k) => !String(k).endsWith("__empty"));
 
     const roomTypes = arr
       .filter((k) => String(k).startsWith("t:"))
       .map((k) => String(k).slice(2))
       .filter(Boolean);
+
     const amenities = arr
       .filter((k) => String(k).startsWith("a:"))
       .map((k) => String(k).slice(2))
       .filter(Boolean);
+
     const locations = arr
       .filter((k) => String(k).startsWith("l:"))
       .map((k) => String(k).slice(2))
       .filter(Boolean);
 
     setPagination((p) => ({ ...p, page: 1 }));
-    setFilters((prev) => ({ ...prev, roomTypes, amenities, locations }));
+
+    const nextFilters = {
+      ...filtersRef.current,
+      roomTypes,
+      amenities,
+      locations,
+    };
+
+    setFilters(nextFilters);
+    emitQuery({ showToast: true, filters: nextFilters });
   };
 
-  /** ✅ limpiar DE VERDAD */
+  /**limpiar DE VERDAD */
   const clearFilters = () => {
     setCheckedKeys([]);
     setSearchText("");
@@ -430,7 +529,7 @@ function App({ currentUser }) {
 
     setPagination((p) => ({ ...p, page: 1 }));
 
-    setFilters({
+    const nextFilters = {
       q: "",
       roomTypes: [],
       amenities: [],
@@ -439,7 +538,10 @@ function App({ currentUser }) {
       endDate: null,
       guests: "2",
       onlyAvailable: true,
-    });
+    };
+
+    setFilters(nextFilters);
+    emitQuery({ showToast: true, filters: nextFilters });
 
     messageApi.success("Filtros limpiados.");
   };
@@ -463,14 +565,17 @@ function App({ currentUser }) {
 
     setPagination((p) => ({ ...p, page: 1 }));
 
-    setFilters((prev) => ({
-      ...prev,
+    const nextFilters = {
+      ...filtersRef.current,
       q,
       startDate: isYmd(startDate) ? startDate : null,
       endDate: isYmd(endDate) ? endDate : null,
       guests: g,
       onlyAvailable: true,
-    }));
+    };
+
+    setFilters(nextFilters);
+    emitQuery({ showToast: true, filters: nextFilters });
 
     messageApi.open({
       type: "success",
@@ -489,7 +594,56 @@ function App({ currentUser }) {
     });
   };
 
-  /** ================= cards filtradas + paginado local ================= */
+  /** ================= SUGERENCIAS DEL BUSCADOR ================= */
+  const suggestionPool = useMemo(() => {
+    const titles = (habitaciones || [])
+      .map((h) => h?.title)
+      .filter(Boolean);
+    const codes = (habitaciones || [])
+      .map((h) => h?.codigo)
+      .filter(Boolean);
+    const locationsDyn = (habitaciones || [])
+      .map((h) => h?.location)
+      .filter(Boolean);
+
+    const all = [
+      ...titles,
+      ...codes,
+      ...locationsDyn,
+      ...LOCATION_OPTIONS,
+      ...ROOM_TYPE_OPTIONS,
+    ]
+      .map((s) => String(s).trim())
+      .filter(Boolean);
+
+    return Array.from(new Set(all)); // únicos
+  }, [habitaciones]);
+
+  const suggestionOptions = useMemo(() => {
+    const q = normalizeStr(searchText);
+    const base = suggestionPool;
+
+    const filtered = q
+      ? base.filter((s) => normalizeStr(s).includes(q))
+      : base;
+
+    return filtered.slice(0, 8).map((value) => ({
+      value,
+      label: value,
+    }));
+  }, [searchText, suggestionPool]);
+
+  const handleSuggestionSelect = (value) => {
+    setSearchText(value);
+    runSearch({
+      q: value,
+      startDate: dates?.[0]?.format("YYYY-MM-DD") || null,
+      endDate: dates?.[1]?.format("YYYY-MM-DD") || null,
+      guests,
+    });
+  };
+
+  /** ================= cards filtradas + paginado local (5 en 5) ================= */
   const filteredCards = useMemo(() => {
     const arr = Array.isArray(habitaciones) ? habitaciones : [];
     return arr.filter((r) => roomMatchesFilters(r, filters));
@@ -497,7 +651,7 @@ function App({ currentUser }) {
 
   useEffect(() => {
     const total = filteredCards.length;
-    const limit = pagination.limit || 6;
+    const limit = pagination.limit || 5;
     const totalPages = Math.max(1, Math.ceil(total / limit));
     setPagination((p) => ({
       ...p,
@@ -510,8 +664,9 @@ function App({ currentUser }) {
 
   const cardsToShow = useMemo(() => {
     const { page, limit } = pagination;
-    const start = (page - 1) * (limit || 6);
-    const end = start + (limit || 6);
+    const size = limit || 5;
+    const start = (page - 1) * size;
+    const end = start + size;
     return filteredCards.slice(start, end);
   }, [filteredCards, pagination]);
 
@@ -524,13 +679,13 @@ function App({ currentUser }) {
   const handleReservaExpress = async (room) => {
     setHabitacionSeleccionada(room);
     setOpenChat(true);
-    messageApi.info("Listo ✅ Abriendo chat para solicitar tu reserva.");
+    messageApi.info("Listo. Abriendo chat para solicitar tu reserva.");
   };
 
   const handleInfoWhatsapp = (room) => {
     setHabitacionSeleccionada(room);
 
-    const numero = "9993676541";
+    const numero = "9994485069";
     const texto = `Hola, me interesa la habitación ${room.codigo || ""} - ${
       room.title || ""
     } en ${room.location || "su propiedad"}. ¿Podrían darme más información?`;
@@ -546,7 +701,7 @@ function App({ currentUser }) {
 
   /** ================= styles ================= */
   const headerStyle = {
-    padding: "10px 16px",
+    padding: ".5rem",
     background: `linear-gradient(120deg, ${beachColors.teal}, ${beachColors.oceanBlue})`,
     boxShadow: "0 4px 18px rgba(15,23,42,0.26)",
     position: "sticky",
@@ -576,6 +731,9 @@ function App({ currentUser }) {
           borderRadius: 10,
           fontFamily:
             '-apple-system, BlinkMacSystemFont, system-ui, "SF Pro Text", sans-serif',
+          fontSize: baseFontSize,
+          fontSizeLG: baseFontSize + 2,
+          fontSizeSM: baseFontSize - 2,
         },
       }}
     >
@@ -639,25 +797,31 @@ function App({ currentUser }) {
                   boxShadow: "0 4px 12px rgba(15,23,42,0.35)",
                 }}
               >
-                <Input
+                {/* 🔎 Buscador con recomendaciones antes de buscar */}
+                <AutoComplete
                   value={searchText}
-                  onChange={(e) => setSearchText(e.target.value)}
-                  onPressEnter={handleSearchClick}
+                  onChange={setSearchText}
+                  onSelect={handleSuggestionSelect}
+                  options={suggestionOptions}
+                  style={{ flex: 1 }}
                   allowClear
-                  placeholder="Destino, ciudad o alojamiento"
-                  prefix={
-                    <EnvironmentOutlined
-                      style={{ color: beachColors.turquoise }}
-                    />
-                  }
-                  style={{
-                    flex: 1,
-                    borderRadius: 10,
-                    border: "none",
-                    height: 40,
-                    background: "rgba(255,255,255,0.98)",
-                  }}
-                />
+                >
+                  <Input
+                    onPressEnter={handleSearchClick}
+                    placeholder="Destino, ciudad o alojamiento"
+                    prefix={
+                      <EnvironmentOutlined
+                        style={{ color: beachColors.turquoise }}
+                      />
+                    }
+                    style={{
+                      borderRadius: 10,
+                      border: "none",
+                      height: 40,
+                      background: "rgba(255,255,255,0.98)",
+                    }}
+                  />
+                </AutoComplete>
 
                 <DatePicker.RangePicker
                   value={dates}
@@ -706,15 +870,26 @@ function App({ currentUser }) {
             )}
 
             {!isMobile && (
-              <Space size={10}>
-                <Button
-                  type="text"
-                  icon={<CustomerServiceOutlined />}
-                  style={{ color: "#e5e7eb", fontSize: 12 }}
-                  onClick={() => setOpenChat(true)}
+              <Space size={10} align="center">
+                <Tooltip
+                  title={
+                    fontScale === "large"
+                      ? "Reducir tamaño de fuente"
+                      : "Aumentar tamaño de fuente"
+                  }
                 >
-                  Ayuda
-                </Button>
+                  <Button
+                    type="text"
+                    icon={
+                      <FontSizeOutlined
+                        style={{ color: "#e5e7eb", fontSize: 16 }}
+                      />
+                    }
+                    onClick={toggleFontScale}
+                    style={{ color: "#e5e7eb" }}
+                    aria-label="Cambiar tamaño de fuente"
+                  />
+                </Tooltip>
 
                 <Button
                   ghost
@@ -743,6 +918,12 @@ function App({ currentUser }) {
                   type="text"
                   icon={<MenuOutlined style={{ color: "#ffffff" }} />}
                   onClick={() => setOpenFiltrosMovil(true)}
+                />
+                <Button
+                  type="text"
+                  icon={<FontSizeOutlined style={{ color: "#ffffff" }} />}
+                  onClick={toggleFontScale}
+                  aria-label="Cambiar tamaño de fuente"
                 />
                 <Button
                   size="small"
@@ -854,7 +1035,7 @@ function App({ currentUser }) {
                     borderColor: beachColors.teal,
                   }}
                   onClick={() => {
-                    emitQuery({ showToast: true });
+                    handleApplyTreeFilters();
                     setOpenFiltrosMovil(false);
                   }}
                 >
@@ -864,7 +1045,8 @@ function App({ currentUser }) {
 
               <div style={{ marginTop: 4 }}>
                 <Text type="secondary" style={{ fontSize: 11 }}>
-                  Tip: al marcar filtros, se actualiza automáticamente.
+                  Tip: marca los filtros y luego pulsa <b>Aplicar</b> para
+                  actualizar los resultados.
                 </Text>
               </div>
             </Flex>
@@ -930,10 +1112,7 @@ function App({ currentUser }) {
                         />
                         <Text strong>Disponibilidad (fechas)</Text>
                       </Flex>
-                      <Text style={{ fontSize: 11, color: "#64748b" }}>
-                        Se usa cuando el WS te manda <b>available</b> según el
-                        rango.
-                      </Text>
+
                       <Flex wrap gap={6}>
                         <Tag color={hasDateFilter ? "green" : "default"}>
                           {hasDateFilter
@@ -960,7 +1139,7 @@ function App({ currentUser }) {
                         background: beachColors.teal,
                         borderColor: beachColors.teal,
                       }}
-                      onClick={() => emitQuery({ showToast: true })}
+                      onClick={handleApplyTreeFilters}
                       loading={loadingHabitaciones}
                     >
                       Aplicar
@@ -1033,7 +1212,7 @@ function App({ currentUser }) {
                     >
                       Re-sincronizar
                     </Button>
-
+                    {/* 
                     {!isMobile && (
                       <Button
                         size="small"
@@ -1048,6 +1227,7 @@ function App({ currentUser }) {
                         Asistencia
                       </Button>
                     )}
+                    */}
                   </Space>
                 </Flex>
 
@@ -1109,65 +1289,71 @@ function App({ currentUser }) {
               </Flex>
             </Splitter.Panel>
 
-        <Splitter.Panel defaultSize="30%" min="30%" max="30%" style={panelStyles.right}>
-                <Flex vertical gap={12}>
-                  <Recommendcards recommendedDestinations={[]} beachColors={beachColors} loading={false} />
+            <Splitter.Panel
+              defaultSize="30%"
+              min="30%"
+              max="30%"
+              style={panelStyles.right}
+            >
+              <Flex vertical gap={12}>
+                <Recommendcards
+                  recommendedDestinations={[]}
+                  beachColors={beachColors}
+                  loading={false}
+                />
 
-                  <Card bordered={false} style={{ borderRadius: 14, background: "#ffffff", boxShadow: "0 6px 18px rgba(148,163,253,0.16)" }}>
-                    <Flex vertical gap={6}>
-                      <Text strong style={{ fontSize: 13, color: "#0f172a" }}>
-                        ¿Por qué reservar aquí?
-                      </Text>
-                      <Text style={{ fontSize: 11, color: "#6b7280" }}>
-                        Información directa, trato cercano y alojamientos seleccionados especialmente para tus huéspedes.
-                      </Text>
-                      <Flex gap={6} wrap>
-                        <Tag color={beachColors.teal} style={{ borderRadius: 999, fontSize: 9, color: "#064e3b" }}>
-                          Atención personalizada
-                        </Tag>
-                        <Tag color={beachColors.turquoise} style={{ borderRadius: 999, fontSize: 9, color: "#065f46" }}>
-                          Reservas seguras
-                        </Tag>
-                        <Tag color={beachColors.sand} style={{ borderRadius: 999, fontSize: 9, color: beachColors.deepBlue }}>
-                          Experiencias únicas
-                        </Tag>
-                      </Flex>
-                    </Flex>
-                  </Card>
-
-                  <Card
-                    bordered={false}
-                    style={{
-                      borderRadius: 14,
-                      background: `linear-gradient(135deg, ${beachColors.oceanBlue}, ${beachColors.teal})`,
-                      color: "#ffffff",
-                    }}
-                  >
-                    <Flex vertical gap={6}>
-                      <Flex align="center" gap={8}>
-                        <CustomerServiceOutlined />
-                        <Text style={{ fontSize: 12, color: "#eff6ff" }}>¿Necesitas ayuda con tu reserva?</Text>
-                      </Flex>
-                      <Button
-                        size="small"
-                        type="primary"
-                        onClick={() => setOpenChat(true)}
+                <Card
+                  bordered={false}
+                  style={{
+                    borderRadius: 14,
+                    background: "#ffffff",
+                    boxShadow: "0 6px 18px rgba(148,163,253,0.16)",
+                  }}
+                >
+                  <Flex vertical gap={6}>
+                    <Text strong style={{ fontSize: 13, color: "#0f172a" }}>
+                      ¿Por qué reservar aquí?
+                    </Text>
+                    <Text style={{ fontSize: 11, color: "#6b7280" }}>
+                      Información directa, trato cercano y alojamientos
+                      seleccionados especialmente para tus huéspedes.
+                    </Text>
+                    <Flex gap={6} wrap>
+                      <Tag
+                        color={beachColors.teal}
                         style={{
-                          marginTop: 4,
-                          alignSelf: "flex-start",
-                          background: "#ffffff",
-                          color: beachColors.deepBlue,
                           borderRadius: 999,
-                          fontSize: 11,
-                          paddingInline: 14,
+                          fontSize: 9,
+                          color: "#064e3b",
                         }}
                       >
-                        Hablar con el equipo
-                      </Button>
+                        Atención personalizada
+                      </Tag>
+                      <Tag
+                        color={beachColors.turquoise}
+                        style={{
+                          borderRadius: 999,
+                          fontSize: 9,
+                          color: "#065f46",
+                        }}
+                      >
+                        Reservas seguras
+                      </Tag>
+                      <Tag
+                        color={beachColors.sand}
+                        style={{
+                          borderRadius: 999,
+                          fontSize: 9,
+                          color: beachColors.deepBlue,
+                        }}
+                      >
+                        Experiencias únicas
+                      </Tag>
                     </Flex>
-                  </Card>
-                </Flex>
-              </Splitter.Panel>
+                  </Flex>
+                </Card>
+              </Flex>
+            </Splitter.Panel>
           </Splitter>
         </main>
 
@@ -1175,7 +1361,7 @@ function App({ currentUser }) {
         <footer
           style={{
             textAlign: "center",
-            padding: 22,
+            padding: 20,
             background: `linear-gradient(135deg, ${beachColors.deepBlue}, ${beachColors.oceanBlue})`,
             color: "white",
           }}
@@ -1210,6 +1396,7 @@ function App({ currentUser }) {
           </Flex>
         </footer>
 
+        {/*
         <ChatSoporte
           open={openChat}
           onClose={() => setOpenChat(false)}
@@ -1217,6 +1404,7 @@ function App({ currentUser }) {
           habitacionSeleccionada={habitacionSeleccionada}
           onFinalizarReserva={handleChatClosedForReserva}
         />
+        */}
       </div>
     </ConfigProvider>
   );

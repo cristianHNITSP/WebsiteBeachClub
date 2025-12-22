@@ -186,6 +186,44 @@ async function hydrateAvailability(rooms, startDate, endDate) {
   });
 }
 
+/* ===================== BILLING helpers (igual que en reservas.routes) ===================== */
+function parseDateUTC(yyyyMMdd) {
+  return new Date(`${yyyyMMdd}T00:00:00.000Z`);
+}
+
+function daysInclusive(startDate, endDate) {
+  const s = parseDateUTC(startDate);
+  const e = parseDateUTC(endDate || startDate);
+  const ms = e.getTime() - s.getTime();
+  const d = Math.floor(ms / 86400000) + 1;
+  return Math.max(1, d);
+}
+
+function round2(n) {
+  const num = Number(n);
+  if (!Number.isFinite(num)) return 0;
+  return Math.round((num + Number.EPSILON) * 100) / 100;
+}
+
+function computeBilling({ price, offer, startDate, endDate }) {
+  const days = daysInclusive(startDate, endDate || startDate);
+
+  const dp = offer?.discountPercent;
+  const disc = Number.isFinite(Number(dp)) ? Number(dp) : null;
+  const hasDiscount = disc !== null && disc > 0;
+
+  const totalBeforeDiscount = round2(price * days);
+  const total = hasDiscount ? round2(totalBeforeDiscount * (1 - disc / 100)) : totalBeforeDiscount;
+
+  return {
+    days,
+    pricePerDay: round2(price),
+    discountPercent: hasDiscount ? disc : null,
+    totalBeforeDiscount,
+    total,
+  };
+}
+
 /* ===================== Router factory (recibe io) ===================== */
 function createHabitacionesRouter(io) {
   const router = express.Router();
@@ -212,9 +250,11 @@ function createHabitacionesRouter(io) {
       ],
     });
   };
-    /**
+
+  /**
    * GET /api/habitaciones/:id/reservas.futuras?page=1&limit=6
    * Devuelve reservas futuras/activas PENDIENTES (sin checkout) de esa habitación.
+   * ✅ Ahora incluye billing calculado desde Habitacion.price/offer
    */
   router.get(
     "/:id/reservas.futuras",
@@ -236,8 +276,12 @@ function createHabitacionesRouter(io) {
         const skip = (page - 1) * limit;
 
         // checamos que exista la habitación (aunque esté en papelera, tú decides si lo permites)
-        const room = await Habitacion.findById(id).select("_id hotelCode roomNumber codigo isDeleted").lean();
-        if (!room) return res.status(404).json({ error: "NOT_FOUND", message: "Habitación no encontrada." });
+        const room = await Habitacion.findById(id)
+          .select("_id hotelCode roomNumber codigo isDeleted price offer")
+          .lean();
+        if (!room) {
+          return res.status(404).json({ error: "NOT_FOUND", message: "Habitación no encontrada." });
+        }
 
         const hoy = todayMeridaStr(); // YYYY-MM-DD
 
@@ -250,7 +294,7 @@ function createHabitacionesRouter(io) {
           endDate: { $gte: hoy },
         };
 
-        const [items, total] = await Promise.all([
+        const [itemsRaw, total] = await Promise.all([
           Reserva.find(baseQuery)
             .sort({ startDate: 1 })
             .skip(skip)
@@ -259,6 +303,23 @@ function createHabitacionesRouter(io) {
             .lean(),
           Reserva.countDocuments(baseQuery),
         ]);
+
+        // ✅ adjuntar billing calculado con el precio y oferta actuales de la habitación
+        const price = typeof room.price === "number" && Number.isFinite(room.price) ? room.price : null;
+        const offer = room.offer || null;
+
+        const items = itemsRaw.map((r) => {
+          let billing = null;
+          if (price !== null) {
+            billing = computeBilling({
+              price,
+              offer,
+              startDate: r.startDate,
+              endDate: r.endDate,
+            });
+          }
+          return { ...r, billing };
+        });
 
         const totalPages = Math.ceil(total / limit);
 
@@ -283,10 +344,10 @@ function createHabitacionesRouter(io) {
     }
   );
 
-
   /**
    * GET /api/habitaciones/public
    * (no es tu carga inicial, pero se deja compatible)
+   * ✅ Ahora por defecto y máximo 5 habitaciones por página
    */
   router.get("/public", async (req, res) => {
     try {
@@ -294,7 +355,7 @@ function createHabitacionesRouter(io) {
       const limitRaw = parseInt(req.query.limit, 10);
 
       const page = Math.max(pageRaw || 1, 1);
-      const limit = Math.min(Math.max(limitRaw || 30, 1), 60);
+      const limit = Math.min(Math.max(limitRaw || 5, 1), 5); // <= 5 siempre
       const skip = (page - 1) * limit;
 
       const filter = buildHabitacionesFilterFromQuery(req.query, { forPublic: true });

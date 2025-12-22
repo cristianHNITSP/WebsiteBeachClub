@@ -150,6 +150,7 @@ router.get('/me', async (req, res) => {
       isActive: user.isActive,
       lastLogin: user.lastLogin,
       permissions,
+      sede: user.sede,
       token,
       tokenInStore: user.tokens?.some(t => t.token === token)
     });

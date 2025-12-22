@@ -1,4 +1,3 @@
-// src/views/UsuariosView.jsx
 import { useState, useEffect, useRef, useCallback } from "react";
 import axios from "@api/axios";
 import {
@@ -12,7 +11,7 @@ import {
   Modal,
   message,
   Divider,
-  Spin, // 👈 spinner
+  Spin,
 } from "antd";
 import { TeamOutlined, PlusOutlined } from "@ant-design/icons";
 import { beachColors, neutrals } from "../theme/beachTheme";
@@ -26,13 +25,17 @@ import UsuarioEditModal from "../components/usuarios/UsuarioEditModal";
 
 const { Text } = Typography;
 
-/* =========================================================
-   ROLES DISPONIBLES (BACKEND: administrador | staff)
-   ========================================================= */
 const ROLE_LABELS = {
   administrador: "Administrador",
   staff: "Staff",
 };
+
+const SEDE_LABELS = {
+  "casa-frida": "Casa Frida",
+  "cabanas-frida": "Cabañas Frida",
+};
+
+const EMAIL_DOMAIN = "beachclub.com";
 
 /* =========================================================
    HELPERS
@@ -67,7 +70,9 @@ const formatLastLogin = (iso) => {
 
 const mapUserFromApi = (apiUser, currentUser) => {
   const role = apiUser.role || "staff";
-  return {
+  const sede = apiUser.sede || "casa-frida";
+
+  const mapped = {
     id: apiUser._id,
     name: apiUser.name,
     email: apiUser.email,
@@ -82,7 +87,12 @@ const mapUserFromApi = (apiUser, currentUser) => {
       (currentUser.id === apiUser._id ||
         currentUser.email === apiUser.email),
     channels: [],
+    sede,
+    sedeLabel: SEDE_LABELS[sede] || "Casa Frida",
   };
+
+  console.log("[mapUserFromApi] apiUser -> mapped", apiUser, mapped);
+  return mapped;
 };
 
 /* =========================================================
@@ -94,13 +104,13 @@ const UsuariosView = ({ isMobile, currentUser }) => {
 
   const [users, setUsers] = useState([]);
 
-  // 🔎 Filtros que ahora se aplican en el BACKEND
   const [userRoleFilter, setUserRoleFilter] = useState("all");
   const [userSearch, setUserSearch] = useState("");
 
   const [modalVisible, setModalVisible] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
-  const [form] = Form.useForm();
+  const [editInitialValues, setEditInitialValues] = useState(null); // 👈 para el modal
+  const [form] = Form.useForm(); // form del modal de edición
 
   // Panel de creación
   const [createPanelOpen, setCreatePanelOpen] = useState(false);
@@ -116,12 +126,12 @@ const UsuariosView = ({ isMobile, currentUser }) => {
   const [errorMsg, setErrorMsg] = useState("");
 
   const [offset, setOffset] = useState(0);
-  const [limit] = useState(5); // 5 en 5, alineado con backend
+  const [limit] = useState(5);
   const [hasMore, setHasMore] = useState(true);
 
   const [savingUser, setSavingUser] = useState(false);
 
-  // Debounce para el buscador
+  // Debounce del buscador
   const [debouncedSearch, setDebouncedSearch] = useState("");
   useEffect(() => {
     const handler = setTimeout(() => {
@@ -131,23 +141,21 @@ const UsuariosView = ({ isMobile, currentUser }) => {
   }, [userSearch]);
 
   /* =======================
-     ✅ OPTIMIZACIÓN REQUESTS
+     OPTIMIZACIÓN REQUESTS
      ======================= */
   const abortRef = useRef(null);
   const reqSeqRef = useRef(0);
   const skipFirstFiltersEffectRef = useRef(true);
-  const lastResetKeyRef = useRef(""); // evita spamear success si por alguna razón se repite
+  const lastResetKeyRef = useRef("");
 
-  /* ========== CARGAR LISTA DESDE API (paginada + filtros backend) ========== */
+  /* ========== CARGAR LISTA DESDE API  ========== */
 
   const fetchUsers = useCallback(
     async ({ reset = false } = {}) => {
-      // ✅ Cancela request anterior si todavía está en vuelo
       if (abortRef.current) abortRef.current.abort();
       const controller = new AbortController();
       abortRef.current = controller;
 
-      // ✅ Evita que respuestas viejas pisen estado
       const mySeq = ++reqSeqRef.current;
 
       if (reset) {
@@ -180,18 +188,23 @@ const UsuariosView = ({ isMobile, currentUser }) => {
           params.q = debouncedSearch;
         }
 
+        console.log("[fetchUsers] params enviados", params);
+
         const res = await axios.get("/api/users", {
           withCredentials: true,
           params,
-          signal: controller.signal, // ✅ axios v1 + AbortController
+          signal: controller.signal,
         });
 
-        // si llegó tarde (vieja), ignorar
         if (mySeq !== reqSeqRef.current) return;
 
         const api = res.data;
         const apiUsers = Array.isArray(api) ? api : api.items || [];
+        console.log("[fetchUsers] respuesta raw", api);
+
         const mapped = apiUsers.map((u) => mapUserFromApi(u, currentUser));
+
+        console.log("[fetchUsers] usuarios mapeados", mapped);
 
         setUsers((prev) =>
           reset
@@ -211,8 +224,6 @@ const UsuariosView = ({ isMobile, currentUser }) => {
           setHasMore(false);
         }
 
-        // ✅ Mantener tu mensaje de éxito, pero sin spam:
-        // solo cuando es reset y el "key" (filtro+search) cambió de verdad.
         if (reset) {
           const resetKey = `${userRoleFilter}::${debouncedSearch}`;
           if (lastResetKeyRef.current !== resetKey) {
@@ -221,7 +232,6 @@ const UsuariosView = ({ isMobile, currentUser }) => {
           }
         }
       } catch (err) {
-        // Abort => no avisar (es normal si el usuario escribe/filtra rápido)
         if (err?.code === "ERR_CANCELED" || err?.name === "CanceledError") {
           return;
         }
@@ -240,14 +250,11 @@ const UsuariosView = ({ isMobile, currentUser }) => {
     [hasMore, offset, limit, userRoleFilter, debouncedSearch, currentUser, messageApi]
   );
 
-  // Carga inicial (una vez)
   useEffect(() => {
     fetchUsers({ reset: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Cuando cambian filtros -> recargar desde 0
-  // ✅ pero saltar el primer render para que NO se duplique con la carga inicial
   useEffect(() => {
     if (skipFirstFiltersEffectRef.current) {
       skipFirstFiltersEffectRef.current = false;
@@ -257,9 +264,13 @@ const UsuariosView = ({ isMobile, currentUser }) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userRoleFilter, debouncedSearch]);
 
+  useEffect(() => {
+    console.log("[UsuariosView] users en estado", users);
+  }, [users]);
+
   /* ========== DERIVADOS ========== */
 
-  const baseFiltered = users; // ya viene filtrado desde backend
+  const baseFiltered = users;
 
   const filteredActiveUsers = baseFiltered.filter((u) => u.isActive);
   const filteredInactiveUsers = baseFiltered.filter((u) => !u.isActive);
@@ -270,10 +281,9 @@ const UsuariosView = ({ isMobile, currentUser }) => {
   const adminsCount = users.filter((u) => u.role === "administrador").length;
   const staffCount = users.filter((u) => u.role === "staff").length;
 
-  // 🔄 loading de lista principal (para skeletons)
   const loadingActiveList = loadingUsers && users.length === 0;
 
-  /* ========== CREAR NUEVO USUARIO (panel dinámico) ========== */
+  /* ========== CREAR NUEVO USUARIO ========== */
 
   const toggleCreatePanel = () => {
     setCreatePanelOpen((prev) => !prev);
@@ -282,6 +292,7 @@ const UsuariosView = ({ isMobile, currentUser }) => {
       createForm.resetFields();
       createForm.setFieldsValue({
         role: "staff",
+        sede: "casa-frida",
       });
       messageApi.info(
         "Completa los datos para dar de alta a un nuevo usuario."
@@ -305,7 +316,20 @@ const UsuariosView = ({ isMobile, currentUser }) => {
   const crearUsuario = async () => {
     try {
       const values = await createForm.validateFields();
-      const { name, email, role, password } = values;
+      const { name, emailUser, role, password, sede } = values;
+
+      const username = String(emailUser || "")
+        .toLowerCase()
+        .trim()
+        .replace(`@${EMAIL_DOMAIN}`, "")
+        .split("@")[0];
+
+      if (!username) {
+        messageApi.error("Ingresa el usuario del correo corporativo.");
+        return;
+      }
+
+      const email = `${username}@${EMAIL_DOMAIN}`;
 
       setCreatingUser(true);
       messageApi.loading({
@@ -320,6 +344,7 @@ const UsuariosView = ({ isMobile, currentUser }) => {
           email,
           role,
           password,
+          sede,
         },
         { withCredentials: true }
       );
@@ -388,13 +413,14 @@ const UsuariosView = ({ isMobile, currentUser }) => {
       console.error("Error al crear usuario:", err);
       messageApi.destroy("creatingUser");
       if (
-        err.response?.data?.error === "EMAIL_IN_USE" &&
-        err.response?.data?.message
+        err?.response?.data?.error === "EMAIL_IN_USE" &&
+        err?.response?.data?.message
       ) {
         messageApi.error(err.response.data.message);
-      } else if (err.response?.data?.message) {
+      } else if (err?.response?.data?.message) {
         messageApi.error(err.response.data.message);
-      } else if (err.name === "Error") {
+      } else if (err?.name === "Error") {
+        // cancelado
       } else {
         messageApi.error("No se pudo crear el usuario.");
       }
@@ -406,6 +432,16 @@ const UsuariosView = ({ isMobile, currentUser }) => {
   /* ========== MODAL EDITAR ========== */
 
   const abrirModalEditar = (user) => {
+    console.log("[abrirModalEditar] argumento recibido:", user);
+
+    if (!user || typeof user !== "object" || !user.id) {
+      console.warn(
+        "[abrirModalEditar] se llamó sin un usuario válido. " +
+          "Revisa que en UsuariosActiveList hagas onClick={() => abrirModalEditar(user)}"
+      );
+      return;
+    }
+
     if (user.isSelf) {
       messageApi.info(
         "No puedes editar tu propio usuario desde este panel."
@@ -414,32 +450,65 @@ const UsuariosView = ({ isMobile, currentUser }) => {
     }
 
     setEditingUser(user);
+
+    const [userPart] = String(user.email || "").split("@");
+
+    const initial = {
+      name: user.name || "",
+      emailUser: userPart || "",
+      role: user.role || "staff",
+      sede: user.sede || "casa-frida",
+    };
+
+    console.log("[abrirModalEditar] initial values calculados:", initial);
+
+    setEditInitialValues(initial);
+
+    // Limpiamos el form y abrimos el modal.
     form.resetFields();
-    form.setFieldsValue({
-      name: user.name,
-      email: user.email,
-      role: user.role,
-    });
     setModalVisible(true);
   };
 
   const cerrarModal = () => {
+    console.log("[cerrarModal] cerrando modal de edición");
     setModalVisible(false);
     setEditingUser(null);
+    setEditInitialValues(null);
     form.resetFields();
   };
 
   const guardarUsuario = async () => {
-    if (!editingUser) return;
+    if (!editingUser) {
+      console.warn("[guardarUsuario] No hay editingUser, abortando");
+      return;
+    }
 
     const values = await form.validateFields();
-    const { name, email, role } = values;
+    console.log("[guardarUsuario] valores del form validados:", values);
+
+    const { name, emailUser, role, sede } = values;
+
+    const username = String(emailUser || "")
+      .toLowerCase()
+      .trim()
+      .replace(`@${EMAIL_DOMAIN}`, "")
+      .split("@")[0];
+
+    if (!username) {
+      messageApi.error("Ingresa el usuario del correo corporativo.");
+      return;
+    }
+
+    const email = `${username}@${EMAIL_DOMAIN}`;
 
     const payload = {
       name,
       email,
       role,
+      sede,
     };
+
+    console.log("[guardarUsuario] payload que se enviará al backend:", payload);
 
     setSavingUser(true);
     messageApi.loading({
@@ -454,6 +523,8 @@ const UsuariosView = ({ isMobile, currentUser }) => {
       );
 
       const updatedApiUser = res.data?.user || res.data;
+      console.log("[guardarUsuario] respuesta backend:", updatedApiUser);
+
       const updated = mapUserFromApi(updatedApiUser, currentUser);
 
       setUsers((prev) =>
@@ -546,7 +617,7 @@ const UsuariosView = ({ isMobile, currentUser }) => {
     }
   };
 
-  /* ========== RENDER (SIN CAMBIOS VISUALES) ========== */
+  /* ========== RENDER ========== */
 
   return (
     <>
@@ -626,7 +697,6 @@ const UsuariosView = ({ isMobile, currentUser }) => {
           />
         )}
 
-        {/* 🔄 Spinner global en carga inicial / cambio de filtros con lista vacía */}
         {loadingUsers && users.length === 0 && (
           <div
             style={{
@@ -658,7 +728,7 @@ const UsuariosView = ({ isMobile, currentUser }) => {
           isMobile={isMobile}
         />
 
-        {/* Filtros (aplicados en backend) */}
+        {/* Filtros */}
         <UsuariosFiltersBar
           isMobile={isMobile}
           userSearch={userSearch}
@@ -683,7 +753,7 @@ const UsuariosView = ({ isMobile, currentUser }) => {
 
         <UsuariosActiveList
           filteredActiveUsers={filteredActiveUsers}
-          loading={loadingActiveList} // 🦴 skeletons + loading
+          loading={loadingActiveList}
           isMobile={isMobile}
           fadingId={fadingId}
           togglingId={togglingId}
@@ -691,13 +761,12 @@ const UsuariosView = ({ isMobile, currentUser }) => {
           cambiarEstado={cambiarEstado}
         />
 
-        {/* Botón “Cargar más” con spinner */}
         {hasMore && (
           <div style={{ textAlign: "center", marginTop: 10 }}>
             <Button
               size="small"
               onClick={() => fetchUsers({ reset: false })}
-              loading={loadingMore} // 🔄 spinner en botón
+              loading={loadingMore}
             >
               Cargar más usuarios
             </Button>
@@ -720,6 +789,8 @@ const UsuariosView = ({ isMobile, currentUser }) => {
         savingUser={savingUser}
         cerrarModal={cerrarModal}
         form={form}
+        initialValues={editInitialValues}
+        editingUserId={editingUser?.id || null}
       />
     </>
   );

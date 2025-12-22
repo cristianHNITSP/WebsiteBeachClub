@@ -16,6 +16,8 @@ import { beachColors } from "../../theme/beachTheme";
 const { Text } = Typography;
 const { Option } = Select;
 
+const EMAIL_DOMAIN = "beachclub.com";
+
 const UsuariosCreatePanel = ({
   createPanelOpen,
   createForm,
@@ -70,7 +72,7 @@ const UsuariosCreatePanel = ({
                 color: "#111827",
               }}
             >
-              2. Tipo de acceso
+              2. Sede y acceso
             </Tag>
             <Tag
               style={{
@@ -102,23 +104,41 @@ const UsuariosCreatePanel = ({
                 </Form.Item>
 
                 <Form.Item
-                  label="Correo corporativo"
-                  name="email"
+                  label="Usuario corporativo"
+                  name="emailUser"
+                  tooltip={`El correo que se creará será usuario@${EMAIL_DOMAIN}`}
                   rules={[
                     {
                       required: true,
-                      message: "Ingresa el correo corporativo",
-                    },
-                    {
-                      type: "email",
-                      message: "Formato de correo no válido",
+                      message: "Ingresa el usuario corporativo",
                     },
                   ]}
                 >
-                  <Input placeholder="nombre@hotel.com" />
+                  <Input
+                    placeholder="ej: laura.sanchez"
+                    addonAfter={`@${EMAIL_DOMAIN}`}
+                  />
                 </Form.Item>
 
                 <Row gutter={8}>
+                  <Col xs={24} md={12}>
+                    <Form.Item
+                      label="Sede"
+                      name="sede"
+                      rules={[
+                        {
+                          required: true,
+                          message: "Selecciona la sede",
+                        },
+                      ]}
+                    >
+                      <Select placeholder="Selecciona la sede">
+                        <Option value="casa-frida">Casa Frida</Option>
+                        <Option value="cabanas-frida">Cabañas Frida</Option>
+                      </Select>
+                    </Form.Item>
+                  </Col>
+
                   <Col xs={24} md={12}>
                     <Form.Item
                       label="Tipo de acceso"
@@ -138,41 +158,40 @@ const UsuariosCreatePanel = ({
                       </Select>
                     </Form.Item>
                   </Col>
-                  <Col xs={24} md={12}>
-                    <Form.Item
-                      label="Contraseña"
-                      name="password"
-                      tooltip="Puedes escribir una contraseña manualmente o generar una segura desde aquí."
-                      rules={[
-                        {
-                          required: true,
-                          message: "Define una contraseña para esta persona",
-                        },
-                        {
-                          min: 8,
-                          message:
-                            "La contraseña debe tener al menos 8 caracteres",
-                        },
-                      ]}
-                    >
-                      <div
-                        style={{
-                          display: "flex",
-                          gap: 8,
-                          alignItems: "center",
-                        }}
-                      >
-                        <Input.Password
-                          placeholder="Ej: Usa una contraseña fuerte"
-                          style={{ flex: 1 }}
-                        />
-                        <Button size="small" onClick={generarPasswordSegura}>
-                          Generar
-                        </Button>
-                      </div>
-                    </Form.Item>
-                  </Col>
                 </Row>
+
+                <Form.Item
+                  label="Contraseña"
+                  name="password"
+                  tooltip="Puedes escribir una contraseña manualmente o generar una segura desde aquí."
+                  rules={[
+                    {
+                      required: true,
+                      message: "Define una contraseña para esta persona",
+                    },
+                    {
+                      min: 8,
+                      message:
+                        "La contraseña debe tener al menos 8 caracteres",
+                    },
+                  ]}
+                >
+                  <div
+                    style={{
+                      display: "flex",
+                      gap: 8,
+                      alignItems: "center",
+                    }}
+                  >
+                    <Input.Password
+                      placeholder="Ej: Usa una contraseña fuerte"
+                      style={{ flex: 1 }}
+                    />
+                    <Button size="small" onClick={generarPasswordSegura}>
+                      Generar
+                    </Button>
+                  </div>
+                </Form.Item>
               </Form>
             </Col>
 
@@ -185,8 +204,9 @@ const UsuariosCreatePanel = ({
                 description={
                   <Text style={{ fontSize: 11 }}>
                     Este formulario crea directamente un usuario activo en el
-                    sistema. Copia la contraseña que definas y compártela solo
-                    con la persona correspondiente.
+                    sistema, asociado a una sede específica. Copia la
+                    contraseña que definas y compártela solo con la persona
+                    correspondiente.
                   </Text>
                 }
               />

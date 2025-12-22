@@ -1,3 +1,4 @@
+// routes/users.routes.js (o donde lo tengas)
 const express = require('express');
 const bcrypt = require('bcrypt');
 const { body, param, validationResult } = require('express-validator');
@@ -19,6 +20,7 @@ const router = express.Router();
  * Filtros opcionales (se ejecutan SIEMPRE en backend):
  *   - ?role=administrador | staff
  *   - ?state=active | inactive
+ *   - ?sede=casa-frida | cabanas-frida   👈 (nuevo filtro opcional)
  *   - ?q=texto   (busca por nombre, email o rol)
  *
  * Respuesta:
@@ -39,7 +41,7 @@ router.get(
   requirePermissions(["manage_users"]),
   async (req, res) => {
     try {
-      let { offset, limit, role, state, q } = req.query;
+      let { offset, limit, role, state, q, sede } = req.query;
 
       const skip = Math.max(parseInt(offset, 10) || 0, 0);
       const pageSizeRaw = parseInt(limit, 10);
@@ -53,6 +55,11 @@ router.get(
 
       if (state === "active") filter.isActive = true;
       else if (state === "inactive") filter.isActive = false;
+
+      // 👇 filtro por sede opcional
+      if (sede && ["casa-frida", "cabanas-frida"].includes(sede)) {
+        filter.sede = sede;
+      }
 
       if (q && typeof q === "string" && q.trim() !== "") {
         const safe = escapeRegExp(q.trim());
@@ -91,15 +98,15 @@ router.get(
   }
 );
 
-
 /**
  * POST /api/users
  *
  * Crear nuevo usuario (solo para quienes tienen manage_users).
  * - name (obligatorio)
- * - email (obligatorio, único)
+ * - email (obligatorio, único)  👈 desde FE siempre será *@beachclub.com
  * - role ('administrador' | 'staff', por defecto 'staff')
  * - password (obligatorio, se guarda encriptada)
+ * - sede ('casa-frida' | 'cabanas-frida') 👈 obligatorio
  */
 router.post(
   '/',
@@ -131,6 +138,12 @@ router.post(
       .isString()
       .isLength({ min: 8 })
       .withMessage('La contraseña debe tener al menos 8 caracteres'),
+    body('sede')
+      .exists()
+      .withMessage('La sede es obligatoria')
+      .bail()
+      .isIn(['casa-frida', 'cabanas-frida'])
+      .withMessage('Sede no válida. Usa "casa-frida" o "cabanas-frida".'),
   ],
   async (req, res) => {
     const errors = validationResult(req);
@@ -143,7 +156,7 @@ router.post(
     }
 
     try {
-      const { name, email, role = 'staff', password } = req.body;
+      const { name, email, role = 'staff', password, sede } = req.body;
       const normalizedEmail = email.toLowerCase().trim();
 
       // Verificar si ya existe el correo
@@ -163,6 +176,7 @@ router.post(
         password: hashedPassword,
         role: role || 'staff',
         isActive: true,
+        sede, // 👈 guardar sede
       });
 
       const userObj = user.toObject();
@@ -191,6 +205,100 @@ router.post(
   }
 );
 
+
+/**
+ * PUT /api/users/me
+ * Actualizar el propio perfil del usuario autenticado.
+ *
+ * - name (obligatorio si viene, y no puede estar vacío)
+ *
+ * No permite cambiar: email, role, isActive, tokens, sede, etc.
+ */
+router.put('/me', authMiddleware, async (req, res) => {
+  try {
+    console.log('[/api/users/me] body recibido:', req.body);
+
+    const userId = req.user?.id || req.user?._id;
+    if (!userId) {
+      return res.status(401).json({
+        error: 'UNAUTHENTICATED',
+        message: 'Usuario no autenticado',
+      });
+    }
+
+    // Solo vamos a permitir cambiar el nombre
+    const rawName = req.body?.name;
+
+    if (typeof rawName !== 'string') {
+      return res.status(400).json({
+        error: 'VALIDATION_ERROR',
+        message: 'El nombre debe ser una cadena de texto.',
+        details: [
+          {
+            param: 'name',
+            msg: 'El nombre debe ser una cadena de texto.',
+            value: rawName,
+          },
+        ],
+      });
+    }
+
+    const name = rawName.trim();
+
+    if (!name) {
+      return res.status(400).json({
+        error: 'VALIDATION_ERROR',
+        message: 'El nombre no puede estar vacío.',
+        details: [
+          {
+            param: 'name',
+            msg: 'El nombre no puede estar vacío.',
+            value: rawName,
+          },
+        ],
+      });
+    }
+
+    const currentUser = await User.findById(userId);
+    if (!currentUser) {
+      return res.status(404).json({
+        error: 'USER_NOT_FOUND',
+        message: 'Usuario no encontrado',
+      });
+    }
+
+    // Si no cambia nada, devolvemos 400 con NO_CHANGES
+    if ((currentUser.name || '').trim() === name) {
+      return res.status(400).json({
+        error: 'NO_CHANGES',
+        message: 'No se enviaron cambios válidos para actualizar.',
+      });
+    }
+
+    currentUser.name = name;
+
+    const updatedUser = await currentUser
+      .save()
+      .then((u) => u.toObject());
+
+    delete updatedUser.password;
+    delete updatedUser.tokens;
+
+    console.log('[/api/users/me] usuario actualizado:', updatedUser);
+
+    return res.json({
+      message: 'Perfil actualizado correctamente',
+      user: updatedUser,
+    });
+  } catch (err) {
+    console.error('Error al actualizar perfil propio:', err);
+    return res.status(500).json({
+      error: 'INTERNAL_ERROR',
+      message: 'Error interno del servidor al actualizar el perfil',
+    });
+  }
+});
+
 /**
  * PUT /api/users/:id
  * Editar información general del usuario:
@@ -198,6 +306,7 @@ router.post(
  * - email
  * - role ('administrador' | 'staff')
  * - isActive (boolean)
+ * - sede ('casa-frida' | 'cabanas-frida') 👈 nuevo
  */
 router.put(
   '/:id',
@@ -223,6 +332,10 @@ router.put(
       .optional()
       .isBoolean()
       .withMessage('isActive debe ser booleano'),
+    body('sede')
+      .optional()
+      .isIn(['casa-frida', 'cabanas-frida'])
+      .withMessage('Sede no válida. Usa "casa-frida" o "cabanas-frida".'),
   ],
   async (req, res) => {
     const errors = validationResult(req);
@@ -235,13 +348,14 @@ router.put(
     }
 
     const { id } = req.params;
-    const { name, email, role, isActive } = req.body;
+    const { name, email, role, isActive, sede } = req.body;
 
     const updates = {};
     if (name !== undefined) updates.name = name;
     if (email !== undefined) updates.email = email.toLowerCase().trim();
     if (role !== undefined) updates.role = role;
     if (isActive !== undefined) updates.isActive = isActive;
+    if (sede !== undefined) updates.sede = sede;
 
     try {
       const user = await User.findByIdAndUpdate(
@@ -284,6 +398,7 @@ router.put(
  * Cambiar rápido el estado isActive (activar/desactivar).
  * Body: { isActive: true/false }
  */
+
 router.patch(
   '/:id/status',
   authMiddleware,

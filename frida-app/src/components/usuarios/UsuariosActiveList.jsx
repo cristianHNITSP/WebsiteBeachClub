@@ -22,9 +22,8 @@ const UsuariosActiveList = ({
   abrirModalEditar,
   cambiarEstado,
 }) => {
-  // 🦴 Skeletons cuando está cargando (inicio o cambio de filtros)
   if (loading) {
-    const skeletonItems = [1, 2, 3, 4, 5]; // máximo 5 por backend
+    const skeletonItems = [1, 2, 3, 4, 5];
 
     return (
       <List
@@ -88,7 +87,6 @@ const UsuariosActiveList = ({
     );
   }
 
-  // ✅ Lista normal cuando ya cargó
   return (
     <List
       dataSource={filteredActiveUsers}
@@ -148,6 +146,18 @@ const UsuariosActiveList = ({
                   >
                     {user.roleLabel}
                     {user.isSelf ? " · Tú" : ""}
+                  </Tag>
+                  {/* 👇 Sede visual */}
+                  <Tag
+                    style={{
+                      borderRadius: 999,
+                      fontSize: 9,
+                      background: "#eef2ff",
+                      border: "none",
+                      color: "#4338ca",
+                    }}
+                  >
+                    {user.sedeLabel}
                   </Tag>
                 </Space>
               }

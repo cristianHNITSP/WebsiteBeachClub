@@ -18,7 +18,7 @@ import {
   Modal,
   Divider,
   Spin,
-  Switch,
+  Checkbox,
   Dropdown,
   Popconfirm,
   Tabs,
@@ -58,7 +58,7 @@ const RESERVAS_ENDPOINT = "/api/reservas";
 const RESERVAS_HABS_ENDPOINT = "/api/reservas/habitaciones";
 const RESERVAS_DATE_CHANGES_ENDPOINT = "/api/reservas/date-changes";
 
-// ✅ NUEVO: endpoints de papelera (con fallback si tu backend no los tiene)
+//NUEVO: endpoints de papelera (con fallback si tu backend no los tiene)
 const RESERVAS_TRASH_ENDPOINT = "/api/reservas/trash";
 
 const DATE_FMT = "YYYY-MM-DD";
@@ -122,6 +122,18 @@ const metaEvento = (evento) => {
   return metaTipo(evento?.type);
 };
 
+/* ===================== ORIGEN RESERVA (UI) ===================== */
+const ORIGEN_LABELS = {
+  manual: "Panel interno (recepción / staff)",
+  directo: "Recepción / venta directa",
+  whatsapp: "WhatsApp",
+  booking: "Booking.com",
+  expedia: "Expedia",
+  facebook: "Facebook / Instagram",
+};
+
+const getOrigenLabel = (o) => ORIGEN_LABELS[o] || null;
+
 /* ===================== HELPERS FECHAS ===================== */
 const recortar = (texto, max = 90) => {
   if (!texto) return "";
@@ -169,7 +181,7 @@ const TooltipContenidoEvento = ({
   const [openActions, setOpenActions] = useState(false);
   const [confirmKey, setConfirmKey] = useState(null); // "delete" | "checkout" | null
 
-  // ✅ Mantener Popover abierto mientras haya dropdown/confirm (evita Popconfirm pegado)
+  //aMantener Popover abierto mientras haya dropdown/confirm (evita Popconfirm pegado)
   useEffect(() => {
     const locked = !!confirmKey || !!openActions;
     onLockPopover?.(popoverKey, locked);
@@ -181,6 +193,7 @@ const TooltipContenidoEvento = ({
   const hotelLabel = getHotelLabel(evento.hotel);
   const fechas = buildFechasTexto(evento);
   const detalleCorto = recortar(evento.label, 90);
+  const origenLabel = getOrigenLabel(evento.origen);
 
   const esReserva = evento.type === "stay";
   const tieneCheckin = !!evento.checkinAt;
@@ -194,7 +207,7 @@ const TooltipContenidoEvento = ({
   const todayStr = dayjs().format(DATE_FMT);
   const sameDayCheckoutRisk = !!evento?.checkinAt && String(evento.checkinAt) === todayStr && !evento?.checkoutAt;
 
-  // ✅ Billing viene del backend (Habitacion.price/offer)
+  //Billing viene del backend (Habitacion.price/offer)
   const billing = evento?.billing || null;
   const hasDiscount = Number.isFinite(Number(billing?.discountPercent)) && Number(billing.discountPercent) > 0;
   const billingLooksInvalid = billing && (Number(billing.pricePerDay) <= 0 || Number(billing.total) <= 0) ? true : false;
@@ -603,10 +616,19 @@ const TooltipContenidoEvento = ({
         )}
       </div>
 
-      {evento.origen === "manual" && (
-        <div style={{ marginTop: 2, display: "flex", alignItems: "center", gap: 4, fontSize: 8.5, color: neutrals.textMuted }}>
+      {origenLabel && (
+        <div
+          style={{
+            marginTop: 2,
+            display: "flex",
+            alignItems: "center",
+            gap: 4,
+            fontSize: 8.5,
+            color: neutrals.textMuted,
+          }}
+        >
           <InfoCircleOutlined style={{ fontSize: 9, color: meta.color }} />
-          <span>Registrado desde el panel interno (recepción / staff).</span>
+          <span>Origen: {origenLabel}.</span>
         </div>
       )}
     </div>
@@ -752,7 +774,7 @@ const PanelProgramacionManual = ({ esMobile, onCreated, filtroHotel, messageApi 
     messageApi?.loading({ content: "Guardando la reserva…", key: msgKey, duration: 0 });
 
     try {
-      const { habitacion, huesped, rango, notas, pagada } = valores;
+      const { habitacion, huesped, rango, notas, pagada, origen } = valores;
 
       if (!habitacion) {
         messageApi?.warning({ content: "Elige una habitación.", key: msgKey });
@@ -794,17 +816,31 @@ const PanelProgramacionManual = ({ esMobile, onCreated, filtroHotel, messageApi 
         endDate: fin,
         label: etiquetaFinal,
         notes: notas || "",
-        origen: "manual",
+        origen: origen || "directo",
+        origenPanel: "manual", // si quieres distinguir en el futuro, solo a nivel de backend
+        origenUi: origen || "directo",
+        origenSource: "panel",
+        origenChannel: origen || "directo",
+        origenTag: origen || "directo",
         paid: !!pagada,
       };
+
+      // Por compatibilidad, si solo quieres un campo:
+      delete payload.origenPanel;
+      delete payload.origenUi;
+      delete payload.origenSource;
+      delete payload.origenChannel;
+      delete payload.origenTag;
 
       const res = await axios.post(RESERVAS_ENDPOINT, payload);
       const created = res?.data?.data || res?.data;
       onCreated?.(created);
 
       formulario.resetFields();
+      formulario.setFieldsValue({ origen: "directo", pagada: false });
+
       messageApi?.success({
-        content: pagada ? "Reserva guardada y marcada como pagada ✅" : "Reserva guardada ✅",
+        content: pagada ? "Reserva guardada y marcada como pagada." : "Reserva guardada.",
         key: msgKey,
       });
 
@@ -852,19 +888,39 @@ const PanelProgramacionManual = ({ esMobile, onCreated, filtroHotel, messageApi 
           Tip: selecciona <b>fechas</b> primero para ver solo habitaciones <b>disponibles</b>.
         </Text>
 
-        <Form form={formulario} layout={esMobile ? "vertical" : "inline"} onFinish={manejarEnvio} style={{ width: "100%", marginTop: 4, rowGap: 6 }} initialValues={{ pagada: false }}>
+        <Form
+          form={formulario}
+          layout={esMobile ? "vertical" : "inline"}
+          onFinish={manejarEnvio}
+          style={{ width: "100%", marginTop: 4, rowGap: 6 }}
+          initialValues={{ pagada: false, origen: "directo" }}
+        >
           <Form.Item name="hotel" style={{ marginRight: esMobile ? 0 : 6, marginBottom: 6 }}>
-            <Select size="small" placeholder="Sede" style={{ width: esMobile ? "100%" : 150 }} allowClear onChange={() => formulario.setFieldsValue({ habitacion: undefined })}>
+            <Select
+              size="small"
+              placeholder="Sede"
+              style={{ width: esMobile ? "100%" : 150 }}
+              allowClear
+              onChange={() => formulario.setFieldsValue({ habitacion: undefined })}
+            >
               <Option value="casa_frida">Casa Frida</Option>
               <Option value="cabanas_fridas">Cabañas Fridas</Option>
             </Select>
           </Form.Item>
 
-          <Form.Item name="rango" rules={[{ required: true, message: "Selecciona entrada y salida." }]} style={{ marginRight: esMobile ? 0 : 6, marginBottom: 6 }}>
+          <Form.Item
+            name="rango"
+            rules={[{ required: true, message: "Selecciona entrada y salida." }]}
+            style={{ marginRight: esMobile ? 0 : 6, marginBottom: 6 }}
+          >
             <RangePicker size="small" format="DD/MM/YYYY" style={{ width: esMobile ? "100%" : 230 }} />
           </Form.Item>
 
-          <Form.Item name="habitacion" rules={[{ required: true, message: "Selecciona la habitación" }]} style={{ marginRight: esMobile ? 0 : 6, marginBottom: 6 }}>
+          <Form.Item
+            name="habitacion"
+            rules={[{ required: true, message: "Selecciona la habitación" }]}
+            style={{ marginRight: esMobile ? 0 : 6, marginBottom: 6 }}
+          >
             <Select
               size="small"
               placeholder={loadingHabOptions ? "Cargando..." : "Habitación"}
@@ -891,7 +947,9 @@ const PanelProgramacionManual = ({ esMobile, onCreated, filtroHotel, messageApi 
                 const short = getHotelShort(h.hotelCode);
                 const estado = getRoomStatusLabel(h.inventoryStatus);
                 const disponibleTxt = h.available === false ? " · No disponible" : "";
-                const etiqueta = `${short ? short + " · " : ""}Hab ${h.roomNumber || h.codigo || "?"}${h.title ? " · " + h.title : ""}${estado ? " · " + estado : ""}${disponibleTxt}`;
+                const etiqueta = `${short ? short + " · " : ""}Hab ${h.roomNumber || h.codigo || "?"}${
+                  h.title ? " · " + h.title : ""
+                }${estado ? " · " + estado : ""}${disponibleTxt}`;
 
                 return (
                   <Option key={getHabId(h)} value={getHabId(h)}>
@@ -902,24 +960,70 @@ const PanelProgramacionManual = ({ esMobile, onCreated, filtroHotel, messageApi 
             </Select>
           </Form.Item>
 
-          <Form.Item name="huesped" style={{ marginRight: esMobile ? 0 : 6, marginBottom: 6, flex: esMobile ? "1 1 100%" : "0 1 180px" }}>
+          <Form.Item
+            name="huesped"
+            style={{
+              marginRight: esMobile ? 0 : 6,
+              marginBottom: 6,
+              flex: esMobile ? "1 1 100%" : "0 1 180px",
+            }}
+          >
             <Input size="small" placeholder="Nombre del huésped (opcional)" style={{ width: "100%" }} />
           </Form.Item>
 
-          <Form.Item name="notas" style={{ marginRight: esMobile ? 0 : 6, marginBottom: 6, flex: esMobile ? "1 1 100%" : "1 1 220px" }}>
+          <Form.Item
+            name="notas"
+            style={{
+              marginRight: esMobile ? 0 : 6,
+              marginBottom: 6,
+              flex: esMobile ? "1 1 100%" : "1 1 220px",
+            }}
+          >
             <Input size="small" placeholder="Notas internas (opcional)" style={{ width: "100%" }} />
           </Form.Item>
 
-          <Form.Item name="pagada" valuePropName="checked" style={{ marginRight: esMobile ? 0 : 6, marginBottom: 6 }}>
-            <div style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "0 10px", height: 32, borderRadius: 999, border: "1px solid #e5e7eb", background: "#fff" }}>
-              <DollarCircleOutlined style={{ color: neutrals.textMuted }} />
-              <span style={{ fontSize: 12, color: neutrals.textMain }}>¿Pagada?</span>
-              <Switch size="small" />
-            </div>
+          {/* NUEVO: origen de la reserva */}
+          <Form.Item
+            name="origen"
+            style={{ marginRight: esMobile ? 0 : 6, marginBottom: 6 }}
+            rules={[{ required: true, message: "Selecciona el origen de la reserva." }]}
+          >
+            <Select
+              size="small"
+              placeholder="Origen de la reserva"
+              style={{ width: esMobile ? "100%" : 220 }}
+              dropdownMatchSelectWidth={false}
+            >
+              <Option value="directo">Recepción / venta directa</Option>
+              <Option value="whatsapp">WhatsApp</Option>
+              <Option value="booking">Booking.com</Option>
+              <Option value="expedia">Expedia</Option>
+              <Option value="facebook">Facebook / Instagram</Option>
+            </Select>
+          </Form.Item>
+
+          {/* NUEVO: pago como checkbox con copy más claro */}
+          <Form.Item
+            name="pagada"
+            valuePropName="checked"
+            style={{ marginRight: esMobile ? 0 : 6, marginBottom: 6 }}
+          >
+            <Checkbox>Reserva pagada (monto total liquidado)</Checkbox>
           </Form.Item>
 
           <Form.Item style={{ marginBottom: 6 }}>
-            <Button type="primary" htmlType="submit" size="small" style={{ borderRadius: 999, paddingInline: 16, background: beachColors.oceanBlue, borderColor: beachColors.oceanBlue }} loading={enviando}>
+            <Button
+              type="primary"
+              htmlType="submit"
+              size="small"
+              style={{
+                borderRadius: 999,
+                paddingInline: 16,
+                background: beachColors.oceanBlue,
+                borderColor: beachColors.oceanBlue,
+              }}
+              loading={enviando}
+            >
               Guardar
             </Button>
           </Form.Item>
@@ -935,7 +1039,10 @@ const CambiosFechasTab = ({ filtroHotel, esMobile }) => {
   const [loading, setLoading] = useState(false);
   const [rows, setRows] = useState([]);
 
-  const [range, setRange] = useState([dayjs().startOf("month").subtract(1, "month"), dayjs().endOf("month").add(1, "month")]);
+  const [range, setRange] = useState([
+    dayjs().startOf("month").subtract(1, "month"),
+    dayjs().endOf("month").add(1, "month"),
+  ]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -954,7 +1061,7 @@ const CambiosFechasTab = ({ filtroHotel, esMobile }) => {
       const res = await axios.get(RESERVAS_DATE_CHANGES_ENDPOINT, { params });
       const raw = res?.data?.data || [];
       setRows(Array.isArray(raw) ? raw : []);
-      messageApi.success({ content: "Listo ✅", key });
+      messageApi.success({ content: "Listo.", key });
     } catch (e) {
       console.error(e);
       setRows([]);
@@ -970,14 +1077,24 @@ const CambiosFechasTab = ({ filtroHotel, esMobile }) => {
 
   const columns = useMemo(
     () => [
-      { title: "Fecha", dataIndex: "createdAt", key: "createdAt", width: 160, render: (v) => (v ? dayjs(v).format("DD/MM/YYYY HH:mm") : "—") },
+      {
+        title: "Fecha",
+        dataIndex: "createdAt",
+        key: "createdAt",
+        width: 160,
+        render: (v) => (v ? dayjs(v).format("DD/MM/YYYY HH:mm") : "—"),
+      },
       {
         title: "Sede / Hab",
         key: "room",
         render: (_, r) => (
           <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-            <span style={{ fontWeight: 600, color: neutrals.textMain }}>{getHotelLabel(r.hotel)} · Hab {r.room}</span>
-            <span style={{ fontSize: 11, color: neutrals.textMuted }}>Reserva: {r.codigoReserva || "—"}</span>
+            <span style={{ fontWeight: 600, color: neutrals.textMain }}>
+              {getHotelLabel(r.hotel)} · Hab {r.room}
+            </span>
+            <span style={{ fontSize: 11, color: neutrals.textMuted }}>
+              Reserva: {r.codigoReserva || "—"}
+            </span>
           </div>
         ),
       },
@@ -987,16 +1104,27 @@ const CambiosFechasTab = ({ filtroHotel, esMobile }) => {
         render: (_, r) => (
           <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
             <div>
-              <Tag color={r.action === "checkout_trim" ? "red" : "blue"} style={{ borderRadius: 999 }}>
-                {r.action === "checkout_trim" ? "Check-out (recorte)" : "Edición de fechas"}
+              <Tag
+                color={r.action === "checkout_trim" ? "red" : "blue"}
+                style={{ borderRadius: 999 }}
+              >
+                {r.action === "checkout_trim"
+                  ? "Check-out (recorte)"
+                  : "Edición de fechas"}
               </Tag>
             </div>
             <div style={{ fontSize: 11 }}>
               <div style={{ color: neutrals.textMuted }}>
-                Antes: <b style={{ color: neutrals.textMain }}>{fmtRange(r.oldStartDate, r.oldEndDate)}</b>
+                Antes:{" "}
+                <b style={{ color: neutrals.textMain }}>
+                  {fmtRange(r.oldStartDate, r.oldEndDate)}
+                </b>
               </div>
               <div style={{ color: neutrals.textMuted }}>
-                Después: <b style={{ color: neutrals.textMain }}>{fmtRange(r.newStartDate, r.newEndDate)}</b>
+                Después:{" "}
+                <b style={{ color: neutrals.textMain }}>
+                  {fmtRange(r.newStartDate, r.newEndDate)}
+                </b>
               </div>
             </div>
           </div>
@@ -1009,7 +1137,8 @@ const CambiosFechasTab = ({ filtroHotel, esMobile }) => {
         width: 260,
         render: (arr) => {
           const list = Array.isArray(arr) ? arr : [];
-          if (!list.length) return <span style={{ color: neutrals.textMuted }}>—</span>;
+          if (!list.length)
+            return <span style={{ color: neutrals.textMuted }}>—</span>;
 
           const preview = list.slice(0, 4);
           const rest = list.length - preview.length;
@@ -1044,7 +1173,11 @@ const CambiosFechasTab = ({ filtroHotel, esMobile }) => {
         title: "Actor",
         key: "actor",
         width: 180,
-        render: (_, r) => <div style={{ fontSize: 11, color: neutrals.textMuted }}>{r?.actor?.email ? <span>{r.actor.email}</span> : <span>—</span>}</div>,
+        render: (_, r) => (
+          <div style={{ fontSize: 11, color: neutrals.textMuted }}>
+            {r?.actor?.email ? <span>{r.actor.email}</span> : <span>—</span>}
+          </div>
+        ),
       },
     ],
     []
@@ -1054,14 +1187,43 @@ const CambiosFechasTab = ({ filtroHotel, esMobile }) => {
     <>
       {contextHolder}
 
-      <div style={{ padding: esMobile ? 8 : 12, borderRadius: 14, border: "1px solid #e5e7eb", background: "#ffffff" }}>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-          <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+      <div
+        style={{
+          padding: esMobile ? 8 : 12,
+          borderRadius: 14,
+          border: "1px solid #e5e7eb",
+          background: "#ffffff",
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            flexWrap: "wrap",
+            gap: 10,
+            alignItems: "center",
+            justifyContent: "space-between",
+            marginBottom: 10,
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              gap: 10,
+              alignItems: "center",
+              flexWrap: "wrap",
+            }}
+          >
             <Tag color="geekblue" style={{ borderRadius: 999 }}>
               <HistoryOutlined /> Cambios de fechas
             </Tag>
 
-            <RangePicker value={range} onChange={(v) => setRange(v || [])} format="DD/MM/YYYY" size="small" style={{ width: esMobile ? "100%" : 260 }} />
+            <RangePicker
+              value={range}
+              onChange={(v) => setRange(v || [])}
+              format="DD/MM/YYYY"
+              size="small"
+              style={{ width: esMobile ? "100%" : 260 }}
+            />
           </div>
 
           <Button size="small" icon={<ReloadOutlined />} onClick={load} loading={loading}>
@@ -1069,7 +1231,16 @@ const CambiosFechasTab = ({ filtroHotel, esMobile }) => {
           </Button>
         </div>
 
-        <Table rowKey={(r) => String(r?._id || r?.id || `${r?.createdAt}-${r?.reservaId}`)} columns={columns} dataSource={rows} loading={loading} pagination={{ pageSize: 8, showSizeChanger: false }} size="small" />
+        <Table
+          rowKey={(r) =>
+            String(r?._id || r?.id || `${r?.createdAt}-${r?.reservaId}`)
+          }
+          columns={columns}
+          dataSource={rows}
+          loading={loading}
+          pagination={{ pageSize: 8, showSizeChanger: false }}
+          size="small"
+        />
       </div>
     </>
   );
@@ -1082,7 +1253,10 @@ const PapeleraTab = ({ filtroHotel, esMobile, onRestored }) => {
   const [rows, setRows] = useState([]);
   const [q, setQ] = useState("");
 
-  const [range, setRange] = useState([dayjs().startOf("month").subtract(2, "month"), dayjs().endOf("month").add(2, "month")]);
+  const [range, setRange] = useState([
+    dayjs().startOf("month").subtract(2, "month"),
+    dayjs().endOf("month").add(2, "month"),
+  ]);
 
   const loadTrash = useCallback(async () => {
     setLoading(true);
@@ -1093,7 +1267,7 @@ const PapeleraTab = ({ filtroHotel, esMobile, onRestored }) => {
     if (filtroHotel !== "all") params.hotel = filtroHotel;
     if (range?.[0] && range?.[1]) {
       params.from = range[0].startOf("day").format(DATE_FMT);
-      params.to = range[1].endOf("day").format(DATE_FMT);
+      params.to = range[1].startOf("day").format(DATE_FMT);
     }
     if (q?.trim()) params.q = q.trim();
 
@@ -1103,15 +1277,17 @@ const PapeleraTab = ({ filtroHotel, esMobile, onRestored }) => {
       const raw = res?.data?.data || res?.data || [];
       const arr = Array.isArray(raw) ? raw : [];
       setRows(arr);
-      messageApi.success({ content: "Listo ✅", key });
+      messageApi.success({ content: "Listo.", key });
     } catch (e1) {
       // 2) Fallback: list por query en /api/reservas
       try {
-        const res2 = await axios.get(RESERVAS_ENDPOINT, { params: { ...params, isDeleted: "true" } });
+        const res2 = await axios.get(RESERVAS_ENDPOINT, {
+          params: { ...params, isDeleted: "true" },
+        });
         const raw2 = res2?.data?.data || res2?.data || [];
         const arr2 = Array.isArray(raw2) ? raw2 : [];
         setRows(arr2.filter((x) => !!x?.isDeleted));
-        messageApi.success({ content: "Listo ✅", key });
+        messageApi.success({ content: "Listo.", key });
       } catch (e2) {
         console.error("[trash] no se pudo cargar:", e1, e2);
         setRows([]);
@@ -1143,7 +1319,7 @@ const PapeleraTab = ({ filtroHotel, esMobile, onRestored }) => {
           await axios.patch(`${RESERVAS_ENDPOINT}/${sid}/untrash`);
         }
 
-        messageApi.success({ content: "Reserva restaurada ✅", key });
+        messageApi.success({ content: "Reserva restaurada.", key });
         setRows((prev) => prev.filter((r) => getEventId(r) !== sid));
         onRestored?.();
       } catch (e) {
@@ -1163,18 +1339,20 @@ const PapeleraTab = ({ filtroHotel, esMobile, onRestored }) => {
       messageApi.loading({ content: "Eliminando definitivamente…", key, duration: 0 });
 
       try {
-        // ✅ probamos rutas típicas sin romper tu backend:
+        //probamos rutas típicas sin romper tu backend:
         try {
           await axios.delete(`${RESERVAS_ENDPOINT}/${sid}/hard`);
         } catch (e1) {
           try {
             await axios.delete(`${RESERVAS_ENDPOINT}/${sid}/destroy`);
           } catch (e2) {
-            await axios.delete(`${RESERVAS_ENDPOINT}/${sid}`, { params: { hard: "true" } });
+            await axios.delete(`${RESERVAS_ENDPOINT}/${sid}`, {
+              params: { hard: "true" },
+            });
           }
         }
 
-        messageApi.success({ content: "Eliminada definitivamente ✅", key });
+        messageApi.success({ content: "Eliminada definitivamente.", key });
         setRows((prev) => prev.filter((r) => getEventId(r) !== sid));
       } catch (e) {
         console.error(e);
@@ -1191,7 +1369,12 @@ const PapeleraTab = ({ filtroHotel, esMobile, onRestored }) => {
         dataIndex: "deletedAt",
         key: "deletedAt",
         width: 160,
-        render: (v, r) => (v ? dayjs(v).format("DD/MM/YYYY HH:mm") : r?.updatedAt ? dayjs(r.updatedAt).format("DD/MM/YYYY HH:mm") : "—"),
+        render: (v, r) =>
+          v
+            ? dayjs(v).format("DD/MM/YYYY HH:mm")
+            : r?.updatedAt
+            ? dayjs(r.updatedAt).format("DD/MM/YYYY HH:mm")
+            : "—",
       },
       {
         title: "Sede / Hab",
@@ -1201,7 +1384,9 @@ const PapeleraTab = ({ filtroHotel, esMobile, onRestored }) => {
             <span style={{ fontWeight: 600, color: neutrals.textMain }}>
               {getHotelLabel(r.hotel)} · Hab {r.room}
             </span>
-            <span style={{ fontSize: 11, color: neutrals.textMuted }}>{recortar(r.label || "—", 60)}</span>
+            <span style={{ fontSize: 11, color: neutrals.textMuted }}>
+              {recortar(r.label || "—", 60)}
+            </span>
           </div>
         ),
       },
@@ -1209,7 +1394,11 @@ const PapeleraTab = ({ filtroHotel, esMobile, onRestored }) => {
         title: "Fechas",
         key: "range",
         width: 190,
-        render: (_, r) => <span style={{ color: neutrals.textMuted }}>{r?.startDate ? fmtRange(r.startDate, r.endDate) : "—"}</span>,
+        render: (_, r) => (
+          <span style={{ color: neutrals.textMuted }}>
+            {r?.startDate ? fmtRange(r.startDate, r.endDate) : "—"}
+          </span>
+        ),
       },
       {
         title: "Total",
@@ -1217,9 +1406,20 @@ const PapeleraTab = ({ filtroHotel, esMobile, onRestored }) => {
         width: 140,
         render: (_, r) => {
           const b = r?.billing;
-          if (!b) return <span style={{ color: neutrals.textMuted }}>—</span>;
-          const invalid = Number(b?.total) <= 0 || Number(b?.pricePerDay) <= 0;
-          return <span style={{ fontWeight: 700, color: invalid ? neutrals.textMuted : neutrals.textMain }}>{invalid ? "—" : moneyMXN(b.total)}</span>;
+          if (!b)
+            return <span style={{ color: neutrals.textMuted }}>—</span>;
+          const invalid =
+            Number(b?.total) <= 0 || Number(b?.pricePerDay) <= 0;
+          return (
+            <span
+              style={{
+                fontWeight: 700,
+                color: invalid ? neutrals.textMuted : neutrals.textMain,
+              }}
+            >
+              {invalid ? "—" : moneyMXN(b.total)}
+            </span>
+          );
         },
       },
       {
@@ -1293,14 +1493,43 @@ const PapeleraTab = ({ filtroHotel, esMobile, onRestored }) => {
     <>
       {contextHolder}
 
-      <div style={{ padding: esMobile ? 8 : 12, borderRadius: 14, border: "1px solid #e5e7eb", background: "#ffffff" }}>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-          <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+      <div
+        style={{
+          padding: esMobile ? 8 : 12,
+          borderRadius: 14,
+          border: "1px solid #e5e7eb",
+          background: "#ffffff",
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            flexWrap: "wrap",
+            gap: 10,
+            alignItems: "center",
+            justifyContent: "space-between",
+            marginBottom: 10,
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              gap: 10,
+              alignItems: "center",
+              flexWrap: "wrap",
+            }}
+          >
             <Tag color="volcano" style={{ borderRadius: 999 }}>
               <InboxOutlined /> Papelera
             </Tag>
 
-            <RangePicker value={range} onChange={(v) => setRange(v || [])} format="DD/MM/YYYY" size="small" style={{ width: esMobile ? "100%" : 260 }} />
+            <RangePicker
+              value={range}
+              onChange={(v) => setRange(v || [])}
+              format="DD/MM/YYYY"
+              size="small"
+              style={{ width: esMobile ? "100%" : 260 }}
+            />
 
             <Input
               size="small"
@@ -1318,7 +1547,9 @@ const PapeleraTab = ({ filtroHotel, esMobile, onRestored }) => {
         </div>
 
         <Table
-          rowKey={(r) => String(r?._id || r?.id || `${r?.deletedAt}-${r?.room}-${r?.startDate}`)}
+          rowKey={(r) =>
+            String(r?._id || r?.id || `${r?.deletedAt}-${r?.room}-${r?.startDate}`)
+          }
           columns={columns}
           dataSource={rows}
           loading={loading}
@@ -1347,7 +1578,10 @@ const HabitacionesReservaView = ({ isMobile: forzarMobile }) => {
     if (axiosDebugInstalledRef.current) return;
     axiosDebugInstalledRef.current = true;
 
-    console.log("[AXIOS DEBUG] instalado", { baseURL: axios.defaults.baseURL, withCredentials: axios.defaults.withCredentials });
+    console.log("[AXIOS DEBUG] instalado", {
+      baseURL: axios.defaults.baseURL,
+      withCredentials: axios.defaults.withCredentials,
+    });
 
     axios.interceptors.request.use((config) => {
       const reqId = Math.random().toString(16).slice(2);
@@ -1355,7 +1589,10 @@ const HabitacionesReservaView = ({ isMobile: forzarMobile }) => {
       config.headers["x-debug-reqid"] = reqId;
       config.metadata = { reqId, t0: performance.now() };
 
-      console.groupCollapsed(`%c[HTTP ->] ${String(config.method).toUpperCase()} ${config.url}`, "color:#2563eb;font-weight:600");
+      console.groupCollapsed(
+        `%c[HTTP ->] ${String(config.method).toUpperCase()} ${config.url}`,
+        "color:#2563eb;font-weight:600"
+      );
       console.log("reqId:", reqId);
       console.log("params:", config.params);
       console.log("data:", config.data);
@@ -1369,7 +1606,10 @@ const HabitacionesReservaView = ({ isMobile: forzarMobile }) => {
       (res) => {
         const md = res.config.metadata || {};
         const ms = md.t0 ? Math.round(performance.now() - md.t0) : "?";
-        console.groupCollapsed(`%c[HTTP <-] ${res.status} ${res.config.url} (${ms}ms)`, "color:#16a34a;font-weight:600");
+        console.groupCollapsed(
+          `%c[HTTP <-] ${res.status} ${res.config.url} (${ms}ms)`,
+          "color:#16a34a;font-weight:600"
+        );
         console.log("reqId:", md.reqId);
         console.log("data:", res.data);
         console.groupEnd();
@@ -1379,7 +1619,10 @@ const HabitacionesReservaView = ({ isMobile: forzarMobile }) => {
         const cfg = err.config || {};
         const md = cfg.metadata || {};
         const ms = md.t0 ? Math.round(performance.now() - md.t0) : "?";
-        console.groupCollapsed(`%c[HTTP !!] ${(cfg.method || "??").toUpperCase()} ${cfg.url} (${ms}ms)`, "color:#dc2626;font-weight:600");
+        console.groupCollapsed(
+          `%c[HTTP !!] ${(cfg.method || "??").toUpperCase()} ${cfg.url} (${ms}ms)`,
+          "color:#dc2626;font-weight:600"
+        );
         console.log("reqId:", md.reqId);
         console.log("status:", err?.response?.status);
         console.log("response:", err?.response?.data);
@@ -1400,13 +1643,15 @@ const HabitacionesReservaView = ({ isMobile: forzarMobile }) => {
     setPending((prev) => {
       const cur = prev[sid] || {};
       const next = { ...cur, [action]: !!value };
-      // ✅ incluye acciones de papelera si luego las usas aquí
-      next.any = ["checkin", "checkout", "paid", "unpaid", "delete", "dates", "restore", "hard_delete"].some((k) => !!next[k]);
+      //incluye acciones de papelera si luego las usas aquí
+      next.any = ["checkin", "checkout", "paid", "unpaid", "delete", "dates", "restore", "hard_delete"].some(
+        (k) => !!next[k]
+      );
       return { ...prev, [sid]: next };
     });
   };
 
-  // ✅ Popover open + lock map (evita Popconfirm pegado)
+  //Popover open + lock map (evita Popconfirm pegado)
   const [openPopoverKey, setOpenPopoverKey] = useState(null);
   const popoverLocksRef = useRef(new Map()); // key -> boolean
   const lastOpenAtRef = useRef(0);
@@ -1433,7 +1678,12 @@ const HabitacionesReservaView = ({ isMobile: forzarMobile }) => {
     if (openPopoverKey === k) setOpenPopoverKey(null);
   };
 
-  const [editModal, setEditModal] = useState({ open: false, eventoId: null, start: null, end: null });
+  const [editModal, setEditModal] = useState({
+    open: false,
+    eventoId: null,
+    start: null,
+    end: null,
+  });
 
   const loadReservas = useCallback(async () => {
     const msgKey = "load_reservas";
@@ -1456,10 +1706,13 @@ const HabitacionesReservaView = ({ isMobile: forzarMobile }) => {
       const arr = Array.isArray(raw) ? raw : [];
       setEventos(arr.filter((e) => !e?.isDeleted));
 
-      messageApi.success({ content: "Listo ✅", key: msgKey });
+      messageApi.success({ content: "Listo.", key: msgKey });
     } catch (e) {
       console.error("Error cargando reservas:", e);
-      messageApi.error({ content: "No pudimos cargar el calendario. Intenta recargar.", key: msgKey });
+      messageApi.error({
+        content: "No pudimos cargar el calendario. Intenta recargar.",
+        key: msgKey,
+      });
       setEventos([]);
     } finally {
       setLoadingEventos(false);
@@ -1472,15 +1725,31 @@ const HabitacionesReservaView = ({ isMobile: forzarMobile }) => {
 
   const patchEventoLocal = (id, patch) => {
     const sid = String(id);
-    setEventos((prev) => prev.map((e) => (getEventId(e) !== sid ? e : { ...e, ...patch })));
+    setEventos((prev) =>
+      prev.map((e) => (getEventId(e) !== sid ? e : { ...e, ...patch }))
+    );
   };
 
-  const runAction = async ({ id, action, loadingText = "Aplicando cambios…", okText = "Listo ✅", failText = "Ups… no se pudo completar. Intenta de nuevo.", fn, afterSuccess, afterFail }) => {
+  const runAction = async ({
+    id,
+    action,
+    loadingText = "Aplicando cambios…",
+    okText = "Listo.",
+    failText = "Ups… no se pudo completar. Intenta de nuevo.",
+    fn,
+    afterSuccess,
+    afterFail,
+  }) => {
     const sid = String(id);
     const key = `act_${action}_${sid}`;
 
     if (pending?.[sid]?.any) {
-      if (DEBUG_RESERVAS) console.warn("[runAction] bloqueado por pending.any", { sid, action, pending: pending?.[sid] });
+      if (DEBUG_RESERVAS)
+        console.warn("[runAction] bloqueado por pending.any", {
+          sid,
+          action,
+          pending: pending?.[sid],
+        });
       return;
     }
 
@@ -1507,7 +1776,14 @@ const HabitacionesReservaView = ({ isMobile: forzarMobile }) => {
       messageApi.error({ content: human, key });
       afterFail?.(err);
 
-      if (DEBUG_RESERVAS) console.error("[runAction] fail:", { sid, action, status, data: err?.response?.data, msg: err?.message });
+      if (DEBUG_RESERVAS)
+        console.error("[runAction] fail:", {
+          sid,
+          action,
+          status,
+          data: err?.response?.data,
+          msg: err?.message,
+        });
       throw err;
     } finally {
       setPendingAction(sid, action, false);
@@ -1520,9 +1796,10 @@ const HabitacionesReservaView = ({ isMobile: forzarMobile }) => {
       id: eventoId,
       action: "checkin",
       loadingText: "Marcando entrada…",
-      okText: "Entrada registrada ✅",
+      okText: "Entrada registrada.",
       failText: "No pudimos marcar la entrada.",
-      fn: async () => (await axios.patch(`${RESERVAS_ENDPOINT}/${eventoId}/checkin`))?.data?.data,
+      fn: async () =>
+        (await axios.patch(`${RESERVAS_ENDPOINT}/${eventoId}/checkin`))?.data?.data,
       afterSuccess: (data) => data && patchEventoLocal(eventoId, data),
     });
 
@@ -1531,9 +1808,10 @@ const HabitacionesReservaView = ({ isMobile: forzarMobile }) => {
       id: eventoId,
       action: "checkout",
       loadingText: "Marcando salida…",
-      okText: "Salida registrada ✅",
+      okText: "Salida registrada.",
       failText: "No pudimos marcar la salida.",
-      fn: async () => (await axios.patch(`${RESERVAS_ENDPOINT}/${eventoId}/checkout`))?.data?.data,
+      fn: async () =>
+        (await axios.patch(`${RESERVAS_ENDPOINT}/${eventoId}/checkout`))?.data?.data,
       afterSuccess: (data) => data && patchEventoLocal(eventoId, data),
     });
 
@@ -1542,9 +1820,10 @@ const HabitacionesReservaView = ({ isMobile: forzarMobile }) => {
       id: eventoId,
       action: "paid",
       loadingText: "Marcando como pagada…",
-      okText: "Marcada como pagada ✅",
+      okText: "Marcada como pagada.",
       failText: "No pudimos marcarla como pagada.",
-      fn: async () => (await axios.patch(`${RESERVAS_ENDPOINT}/${eventoId}/paid`))?.data?.data,
+      fn: async () =>
+        (await axios.patch(`${RESERVAS_ENDPOINT}/${eventoId}/paid`))?.data?.data,
       afterSuccess: (data) => data && patchEventoLocal(eventoId, data),
     });
 
@@ -1555,7 +1834,8 @@ const HabitacionesReservaView = ({ isMobile: forzarMobile }) => {
       loadingText: "Quitando marca de pago…",
       okText: "Listo: queda como pendiente",
       failText: "No pudimos cambiar el estado de pago.",
-      fn: async () => (await axios.patch(`${RESERVAS_ENDPOINT}/${eventoId}/unpaid`))?.data?.data,
+      fn: async () =>
+        (await axios.patch(`${RESERVAS_ENDPOINT}/${eventoId}/unpaid`))?.data?.data,
       afterSuccess: (data) => data && patchEventoLocal(eventoId, data),
     });
 
@@ -1573,7 +1853,8 @@ const HabitacionesReservaView = ({ isMobile: forzarMobile }) => {
       loadingText: "Moviendo a papelera…",
       okText: "Listo: se movió a la papelera",
       failText: "No pudimos moverla a la papelera.",
-      fn: async () => (await axios.patch(`${RESERVAS_ENDPOINT}/${sid}/trash`))?.data?.data,
+      fn: async () =>
+        (await axios.patch(`${RESERVAS_ENDPOINT}/${sid}/trash`))?.data?.data,
       afterSuccess: () => {
         setEventos((prev) => prev.filter((e) => getEventId(e) !== sid));
         closeAllPopovers();
@@ -1583,7 +1864,8 @@ const HabitacionesReservaView = ({ isMobile: forzarMobile }) => {
 
   const requestEditDates = (evento) => {
     if (!evento || evento.type !== "stay") return;
-    if (evento.checkoutAt) return messageApi.warning("Esa reserva ya tiene salida. No se puede cambiar.");
+    if (evento.checkoutAt)
+      return messageApi.warning("Esa reserva ya tiene salida. No se puede cambiar.");
 
     const eid = getEventId(evento);
     setEditModal({
@@ -1601,14 +1883,20 @@ const HabitacionesReservaView = ({ isMobile: forzarMobile }) => {
     const start = editModal.start?.startOf("day");
     const end = editModal.end?.startOf("day");
     if (!start || !end) return messageApi.warning("Elige un rango válido.");
-    if (end.isBefore(start, "day")) return messageApi.warning("La salida no puede ser antes de la entrada.");
-    if (evento.checkoutAt) return messageApi.warning("Esa reserva ya tiene salida. No se puede cambiar.");
+    if (end.isBefore(start, "day"))
+      return messageApi.warning("La salida no puede ser antes de la entrada.");
+    if (evento.checkoutAt)
+      return messageApi.warning("Esa reserva ya tiene salida. No se puede cambiar.");
 
     if (evento.checkinAt) {
       const originalStart = dayjs(evento.startDate).startOf("day");
-      if (!start.isSame(originalStart, "day")) return messageApi.warning("Ya tiene entrada, solo puedes cambiar la salida.");
+      if (!start.isSame(originalStart, "day"))
+        return messageApi.warning("Ya tiene entrada, solo puedes cambiar la salida.");
       const checkin = dayjs(evento.checkinAt).startOf("day");
-      if (end.isBefore(checkin, "day")) return messageApi.warning("La salida no puede ser antes de la entrada registrada.");
+      if (end.isBefore(checkin, "day"))
+        return messageApi.warning(
+          "La salida no puede ser antes de la entrada registrada."
+        );
     }
 
     const startStr = start.format(DATE_FMT);
@@ -1618,9 +1906,15 @@ const HabitacionesReservaView = ({ isMobile: forzarMobile }) => {
       id: getEventId(evento),
       action: "dates",
       loadingText: "Actualizando fechas…",
-      okText: "Fechas actualizadas ✅",
+      okText: "Fechas actualizadas.",
       failText: "No pudimos cambiar las fechas.",
-      fn: async () => (await axios.patch(`${RESERVAS_ENDPOINT}/${getEventId(evento)}/dates`, { startDate: startStr, endDate: endStr }))?.data?.data,
+      fn: async () =>
+        (
+          await axios.patch(`${RESERVAS_ENDPOINT}/${getEventId(evento)}/dates`, {
+            startDate: startStr,
+            endDate: endStr,
+          })
+        )?.data?.data,
       afterSuccess: (data) => {
         if (data) patchEventoLocal(getEventId(evento), data);
         setEditModal({ open: false, eventoId: null, start: null, end: null });
@@ -1693,7 +1987,13 @@ const HabitacionesReservaView = ({ isMobile: forzarMobile }) => {
   );
 
   const selectorHotel = (
-    <Select size="small" value={filtroHotel} onChange={setFiltroHotel} style={{ minWidth: 160 }} dropdownMatchSelectWidth={false}>
+    <Select
+      size="small"
+      value={filtroHotel}
+      onChange={setFiltroHotel}
+      style={{ minWidth: 160 }}
+      dropdownMatchSelectWidth={false}
+    >
       <Option value="all">Todas las sedes</Option>
       <Option value="casa_frida">Casa Frida</Option>
       <Option value="cabanas_fridas">Cabañas Fridas</Option>
@@ -1702,7 +2002,11 @@ const HabitacionesReservaView = ({ isMobile: forzarMobile }) => {
 
   const renderCeldaFecha = (valor) => {
     const fechaStr = valor.format(DATE_FMT);
-    const lista = eventos.filter((e) => eventoCubreFecha(e, fechaStr) && (filtroHotel === "all" || e.hotel === filtroHotel));
+    const lista = eventos.filter(
+      (e) =>
+        eventoCubreFecha(e, fechaStr) &&
+        (filtroHotel === "all" || e.hotel === filtroHotel)
+    );
     if (!lista.length) return null;
 
     const maxItems = compacto ? 3 : 4;
@@ -1718,14 +2022,24 @@ const HabitacionesReservaView = ({ isMobile: forzarMobile }) => {
     };
 
     return (
-      <ul style={{ listStyle: "none", margin: 0, padding: 0, fontFamily: '"SF Pro Text", "Inter", -apple-system, BlinkMacSystemFont, system-ui, sans-serif' }}>
+      <ul
+        style={{
+          listStyle: "none",
+          margin: 0,
+          padding: 0,
+          fontFamily:
+            '"SF Pro Text", "Inter", -apple-system, BlinkMacSystemFont, system-ui, sans-serif',
+        }}
+      >
         {visibles.map((item, indice) => {
           const meta = metaEvento(item);
           const shortHotel = getHotelShort(item.hotel);
           const eid = getEventId(item);
           const instanceKey = `evt:${fechaStr}:${eid || "noid"}:${indice}`;
 
-          const etiquetaCorta = `${shortHotel ? `${shortHotel} · ` : ""}Hab ${item.room} · ${meta.labelCorto}${item.paidAt ? " · $" : ""}`.trim();
+          const etiquetaCorta = `${shortHotel ? `${shortHotel} · ` : ""}Hab ${
+            item.room
+          } · ${meta.labelCorto}${item.paidAt ? " · $" : ""}`.trim();
 
           return (
             <Popover
@@ -1768,7 +2082,14 @@ const HabitacionesReservaView = ({ isMobile: forzarMobile }) => {
                   WebkitTapHighlightColor: "transparent",
                 }}
               >
-                <span style={{ width: 7, height: 7, borderRadius: "999px", backgroundColor: meta.color }} />
+                <span
+                  style={{
+                    width: 7,
+                    height: 7,
+                    borderRadius: "999px",
+                    backgroundColor: meta.color,
+                  }}
+                />
                 <span
                   style={{
                     display: "inline-block",
@@ -1824,25 +2145,65 @@ const HabitacionesReservaView = ({ isMobile: forzarMobile }) => {
       label: "Calendario",
       children: (
         <>
-          <PanelProgramacionManual esMobile={esMobileFinal} onCreated={handleCreated} filtroHotel={filtroHotel} messageApi={messageApi} />
+          <PanelProgramacionManual
+            esMobile={esMobileFinal}
+            onCreated={handleCreated}
+            filtroHotel={filtroHotel}
+            messageApi={messageApi}
+          />
 
-          <div style={{ overflowX: compacto ? "auto" : "visible", paddingBottom: compacto ? 4 : 0 }}>
+          <div
+            style={{
+              overflowX: compacto ? "auto" : "visible",
+              paddingBottom: compacto ? 4 : 0,
+            }}
+          >
             <Spin spinning={loadingEventos} tip="Cargando…" style={{ width: "100%" }}>
-              <div style={{ minWidth: compacto ? 620 : "auto", opacity: loadingEventos ? 0.7 : 1 }}>
+              <div
+                style={{
+                  minWidth: compacto ? 620 : "auto",
+                  opacity: loadingEventos ? 0.7 : 1,
+                }}
+              >
                 <Calendar
                   fullscreen={false}
                   defaultValue={dayjs()}
                   dateCellRender={renderCeldaFecha}
                   headerRender={({ value, onChange }) => {
                     const meses = [];
-                    for (let i = 0; i < 12; i++) meses.push(value.clone().month(i).format("MMM"));
+                    for (let i = 0; i < 12; i++)
+                      meses.push(value.clone().month(i).format("MMM"));
 
                     return (
-                      <div style={{ padding: "4px 8px 12px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                        <Text style={{ fontWeight: 600, color: neutrals.textMain, fontSize: 13 }}>{value.format("MMMM YYYY")}</Text>
+                      <div
+                        style={{
+                          padding: "4px 8px 12px",
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                          gap: 8,
+                          flexWrap: "wrap",
+                        }}
+                      >
+                        <Text
+                          style={{
+                            fontWeight: 600,
+                            color: neutrals.textMain,
+                            fontSize: 13,
+                          }}
+                        >
+                          {value.format("MMMM YYYY")}
+                        </Text>
 
                         <Space size={6} wrap>
-                          <Select size="small" value={value.month()} onChange={(mes) => onChange(value.clone().month(mes))} style={{ width: 110 }}>
+                          <Select
+                            size="small"
+                            value={value.month()}
+                            onChange={(mes) =>
+                              onChange(value.clone().month(mes))
+                            }
+                            style={{ width: 110 }}
+                          >
                             {meses.map((nombreMes, indice) => (
                               <Option key={indice} value={indice}>
                                 {nombreMes}
@@ -1850,7 +2211,14 @@ const HabitacionesReservaView = ({ isMobile: forzarMobile }) => {
                             ))}
                           </Select>
 
-                          <Select size="small" value={value.year()} onChange={(anio) => onChange(value.clone().year(anio))} style={{ width: 90 }}>
+                          <Select
+                            size="small"
+                            value={value.year()}
+                            onChange={(anio) =>
+                              onChange(value.clone().year(anio))
+                            }
+                            style={{ width: 90 }}
+                          >
                             {[2024, 2025, 2026].map((anio) => (
                               <Option key={anio} value={anio}>
                                 {anio}
@@ -1858,7 +2226,12 @@ const HabitacionesReservaView = ({ isMobile: forzarMobile }) => {
                             ))}
                           </Select>
 
-                          <Button size="small" type="text" onClick={closeAllPopovers} style={{ color: neutrals.textMuted }}>
+                          <Button
+                            size="small"
+                            type="text"
+                            onClick={closeAllPopovers}
+                            style={{ color: neutrals.textMuted }}
+                          >
                             Cerrar tooltips
                           </Button>
                         </Space>
@@ -1872,13 +2245,25 @@ const HabitacionesReservaView = ({ isMobile: forzarMobile }) => {
         </>
       ),
     },
-    { key: "cambios", label: "Cambios de fechas", children: <CambiosFechasTab filtroHotel={filtroHotel} esMobile={esMobileFinal} /> },
+    {
+      key: "cambios",
+      label: "Cambios de fechas",
+      children: (
+        <CambiosFechasTab filtroHotel={filtroHotel} esMobile={esMobileFinal} />
+      ),
+    },
 
-    // ✅ NUEVO TAB: PAPELERA
+    //NUEVO TAB: PAPELERA
     {
       key: "papelera",
       label: "Papelera",
-      children: <PapeleraTab filtroHotel={filtroHotel} esMobile={esMobileFinal} onRestored={loadReservas} />,
+      children: (
+        <PapeleraTab
+          filtroHotel={filtroHotel}
+          esMobile={esMobileFinal}
+          onRestored={loadReservas}
+        />
+      ),
     },
   ];
 
@@ -1893,7 +2278,8 @@ const HabitacionesReservaView = ({ isMobile: forzarMobile }) => {
           borderRadius: 16,
           background: "#ffffff",
           boxShadow: "0 8px 18px rgba(15,23,42,0.05)",
-          fontFamily: '"SF Pro Text", "Inter", -apple-system, BlinkMacSystemFont, system-ui, sans-serif',
+          fontFamily:
+            '"SF Pro Text", "Inter", -apple-system, BlinkMacSystemFont, system-ui, sans-serif',
         }}
         title={
           <div style={headerWrapStyle}>
@@ -1901,7 +2287,14 @@ const HabitacionesReservaView = ({ isMobile: forzarMobile }) => {
             <div style={headerRightStyle}>
               {leyendaTipos}
               {selectorHotel}
-              <Button size="small" type="text" icon={<ReloadOutlined />} onClick={loadReservas} loading={loadingEventos} style={{ color: neutrals.textMuted }}>
+              <Button
+                size="small"
+                type="text"
+                icon={<ReloadOutlined />}
+                onClick={loadReservas}
+                loading={loadingEventos}
+                style={{ color: neutrals.textMuted }}
+              >
                 Recargar
               </Button>
             </div>
@@ -1923,16 +2316,22 @@ const HabitacionesReservaView = ({ isMobile: forzarMobile }) => {
         okText="Guardar"
         cancelText="Cancelar"
         onOk={applyEditDates}
-        onCancel={() => setEditModal({ open: false, eventoId: null, start: null, end: null })}
+        onCancel={() =>
+          setEditModal({ open: false, eventoId: null, start: null, end: null })
+        }
         destroyOnClose
       >
         {(() => {
-          const ev = eventos.find((x) => getEventId(x) === String(editModal.eventoId));
+          const ev = eventos.find(
+            (x) => getEventId(x) === String(editModal.eventoId)
+          );
           const hasCheckin = !!ev?.checkinAt;
           const hasCheckout = !!ev?.checkoutAt;
 
           return (
-            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            <div
+              style={{ display: "flex", flexDirection: "column", gap: 10 }}
+            >
               {hasCheckout && (
                 <Text style={{ fontSize: 12, color: neutrals.textMuted }}>
                   Esta reserva ya tiene <b>check-out</b>. No se permiten cambios.
@@ -1941,7 +2340,8 @@ const HabitacionesReservaView = ({ isMobile: forzarMobile }) => {
 
               {hasCheckin && !hasCheckout && (
                 <Text style={{ fontSize: 12, color: neutrals.textMuted }}>
-                  Ya existe <b>check-in</b>. Solo puedes cambiar la <b>salida</b>.
+                  Ya existe <b>check-in</b>. Solo puedes cambiar la{" "}
+                  <b>salida</b>.
                 </Text>
               )}
 
@@ -1972,7 +2372,8 @@ const HabitacionesReservaView = ({ isMobile: forzarMobile }) => {
 
               {ev && (
                 <Text style={{ fontSize: 11, color: neutrals.textMuted }}>
-                  Hab <b>#{ev.room}</b> · {getHotelLabel(ev.hotel)} · Actual: <b>{fmtRange(ev.startDate, ev.endDate)}</b>
+                  Hab <b>#{ev.room}</b> · {getHotelLabel(ev.hotel)} · Actual:{" "}
+                  <b>{fmtRange(ev.startDate, ev.endDate)}</b>
                 </Text>
               )}
             </div>

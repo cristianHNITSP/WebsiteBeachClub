@@ -16,7 +16,15 @@ const UserSchema = new mongoose.Schema(
     role: { type: String, enum: ['administrador', 'staff'], default: 'staff' }, // 👈 clave que matchea con Role.key
     tokens: { type: [TokenSchema], default: [] },
     isActive: { type: Boolean, default: true },
-    lastLogin: { type: Date, default: null }
+    lastLogin: { type: Date, default: null },
+
+    // 👇 NUEVO: sede a la que pertenece el usuario
+    // clave técnica: 'casa-frida' | 'cabanas-frida'
+    sede: {
+      type: String,
+      enum: ['casa-frida', 'cabanas-frida'],
+      default: 'casa-frida',
+    },
   },
   { timestamps: true }
 );
