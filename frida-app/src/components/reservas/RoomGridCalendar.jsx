@@ -4,7 +4,7 @@ import {
   Button,
   Space,
   Typography,
-  Popover,
+ Popover,
   Dropdown,
   Popconfirm,
   Divider,
@@ -139,7 +139,7 @@ const TooltipContenidoEvento = ({
 }) => {
   const popRootRef = useRef(null);
   const [openActions, setOpenActions] = useState(false);
-  const [confirmKey, setConfirmKey] = useState(null); // "delete" | "checkout" | null
+  const [confirmKey, setConfirmKey] = useState(null);
 
   useEffect(() => {
     const locked = !!confirmKey || !!openActions;
@@ -198,7 +198,7 @@ const TooltipContenidoEvento = ({
   const estadoAccion = pending?.[eid]?.any ? (
     <div
       style={{
-        fontSize: 9.5,
+        fontSize: 9,
         color: neutrals.textMuted,
         display: "flex",
         gap: 6,
@@ -310,7 +310,7 @@ const TooltipContenidoEvento = ({
         label: (
           <Popconfirm
             title="¿Hacer check-out hoy?"
-            description="Detecté que el check-in fue hoy. Si confirmas, se registrará la salida y la reserva se recortará a hoy (se quitarán los días futuros del calendario y se actualizará el total)."
+            description="Detecté que el check-in fue hoy. Si confirmas, se registrará la salida y la reserva se recortará a hoy."
             okText="Sí, hacer check-out"
             cancelText="Cancelar"
             okButtonProps={{ danger: true }}
@@ -347,11 +347,9 @@ const TooltipContenidoEvento = ({
   const hasBilling = !!billing;
   const todayBillingInfo =
     hasBilling && !billingLooksInvalid
-      ? `${billing.days} día(s) × ${moneyMXN(
-          billing.pricePerDay
-        )}${
+      ? `${billing.days} día(s) × ${moneyMXN(billing.pricePerDay)}${
           hasDiscount
-            ? ` · Descuento ${billing.discountPercent}% (antes: ${moneyMXN(
+            ? ` · Desc. ${billing.discountPercent}% (antes: ${moneyMXN(
                 billing.totalBeforeDiscount
               )})`
             : ""
@@ -366,22 +364,21 @@ const TooltipContenidoEvento = ({
       style={{
         display: "flex",
         flexDirection: "column",
-        gap: 6,
+        gap: 4,
         color: neutrals.textMain,
         fontFamily:
           '"SF Pro Text", "Inter", -apple-system, BlinkMacSystemFont, system-ui, sans-serif',
-        fontSize: 11,
-        minWidth: 280,
-        maxWidth: isMobileUI ? 320 : 360,
+        fontSize: 10.5,
+        minWidth: 260,
+        maxWidth: isMobileUI ? 300 : 340,
       }}
     >
-      {/* Header */}
-      <div style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
           <div
             style={{
               width: 4,
-              height: 26,
+              height: 24,
               borderRadius: 999,
               background: meta.color,
             }}
@@ -389,21 +386,15 @@ const TooltipContenidoEvento = ({
           <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
             <span
               style={{
-                fontSize: 9,
+                fontSize: 8.5,
                 textTransform: "uppercase",
-                letterSpacing: 0.4,
+                letterSpacing: 0.35,
                 color: neutrals.textMuted,
               }}
             >
               Movimiento
             </span>
-            <span
-              style={{
-                fontSize: 12,
-                fontWeight: 600,
-                color: neutrals.textMain,
-              }}
-            >
+            <span style={{ fontSize: 11.5, fontWeight: 600 }}>
               {meta.labelLargo}
             </span>
           </div>
@@ -423,10 +414,13 @@ const TooltipContenidoEvento = ({
               style={{
                 borderRadius: 999,
                 paddingInline: 8,
+                paddingBlock: 0,
                 fontSize: 9,
+                lineHeight: "16px",
                 background: "#f9fafb",
                 borderColor: meta.color,
                 color: neutrals.textMain,
+                marginInlineEnd: 0,
               }}
             >
               {hotelLabel}
@@ -438,20 +432,22 @@ const TooltipContenidoEvento = ({
             style={{
               borderRadius: 999,
               paddingInline: 8,
+              paddingBlock: 0,
+              lineHeight: "16px",
               fontSize: 9,
               display: "inline-flex",
               alignItems: "center",
               gap: 4,
-              marginTop: 2,
+              marginTop: 0,
+              marginInlineEnd: 0,
             }}
           >
-            Habitación <strong>#{evento.room}</strong>
+            Hab <strong>#{evento.room}</strong>
           </Tag>
         </div>
       </div>
 
-      {/* Cuerpo */}
-      <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
         <div
           style={{
             display: "flex",
@@ -474,7 +470,11 @@ const TooltipContenidoEvento = ({
             }}
           >
             <UserOutlined
-              style={{ fontSize: 11, color: neutrals.textMuted, marginTop: 1 }}
+              style={{
+                fontSize: 11,
+                color: neutrals.textMuted,
+                marginTop: 1,
+              }}
             />
             <span>{detalleCorto}</span>
           </div>
@@ -485,14 +485,13 @@ const TooltipContenidoEvento = ({
             size="small"
             bordered
             bodyStyle={{
-              padding: 8,
-              paddingInline: 10,
+              padding: 6,
               display: "flex",
               flexDirection: "column",
-              gap: 4,
+              gap: 3,
             }}
             style={{
-              marginTop: 4,
+              marginTop: 2,
               borderRadius: 12,
               background: "#f8fafc",
             }}
@@ -501,20 +500,14 @@ const TooltipContenidoEvento = ({
               style={{
                 display: "flex",
                 justifyContent: "space-between",
-                gap: 10,
+                gap: 8,
                 alignItems: "center",
               }}
             >
-              <span style={{ fontSize: 10, color: neutrals.textMuted }}>
-                Total a pagar
+              <span style={{ fontSize: 9.5, color: neutrals.textMuted }}>
+                Total
               </span>
-              <span
-                style={{
-                  fontSize: 12,
-                  fontWeight: 700,
-                  color: neutrals.textMain,
-                }}
-              >
+              <span style={{ fontSize: 12, fontWeight: 700 }}>
                 {billingLooksInvalid ? "—" : moneyMXN(billing.total)}
               </span>
             </div>
@@ -522,7 +515,7 @@ const TooltipContenidoEvento = ({
             {todayBillingInfo ? (
               <div
                 style={{
-                  fontSize: 9.5,
+                  fontSize: 9.25,
                   color: neutrals.textMuted,
                   display: "flex",
                   flexWrap: "wrap",
@@ -532,9 +525,8 @@ const TooltipContenidoEvento = ({
                 <span>{todayBillingInfo}</span>
               </div>
             ) : (
-              <div style={{ fontSize: 9.5, color: "#b45309" }}>
-                No se pudo calcular el total (precio inválido). Revisa el precio
-                de la habitación.
+              <div style={{ fontSize: 9.25, color: "#b45309" }}>
+                No se pudo calcular el total (precio inválido).
               </div>
             )}
           </Card>
@@ -546,18 +538,20 @@ const TooltipContenidoEvento = ({
           <>
             <Divider style={{ margin: "6px 0" }} />
 
-            <Space size={6} wrap style={{ fontSize: 9.5 }}>
+            <Space size={6} wrap style={{ fontSize: 9.25 }}>
               {evento.checkinAt ? (
                 <Tag
                   icon={<LoginOutlined />}
                   color="success"
-                  style={{ borderRadius: 999 }}
+                  style={{ borderRadius: 999, marginInlineEnd: 0 }}
                 >
-                  Entrada:{" "}
-                  <b>{dayjs(evento.checkinAt).format("DD/MM/YYYY")}</b>
+                  Ent: <b>{dayjs(evento.checkinAt).format("DD/MM/YYYY")}</b>
                 </Tag>
               ) : (
-                <Tag color="blue" style={{ borderRadius: 999 }}>
+                <Tag
+                  color="blue"
+                  style={{ borderRadius: 999, marginInlineEnd: 0 }}
+                >
                   Sin check-in
                 </Tag>
               )}
@@ -566,40 +560,40 @@ const TooltipContenidoEvento = ({
                 <Tag
                   icon={<LogoutOutlined />}
                   color="red"
-                  style={{ borderRadius: 999 }}
+                  style={{ borderRadius: 999, marginInlineEnd: 0 }}
                 >
-                  Salida:{" "}
-                  <b>{dayjs(evento.checkoutAt).format("DD/MM/YYYY")}</b>
+                  Sal: <b>{dayjs(evento.checkoutAt).format("DD/MM/YYYY")}</b>
                 </Tag>
               ) : (
-                <Tag style={{ borderRadius: 999 }}>Sin check-out</Tag>
+                <Tag style={{ borderRadius: 999, marginInlineEnd: 0 }}>
+                  Sin check-out
+                </Tag>
               )}
 
               {evento.paidAt ? (
                 <Tag
                   icon={<DollarCircleOutlined />}
                   color="success"
-                  style={{ borderRadius: 999 }}
+                  style={{ borderRadius: 999, marginInlineEnd: 0 }}
                 >
-                  Pagada:{" "}
-                  <b>{dayjs(evento.paidAt).format("DD/MM/YYYY")}</b>
+                  Pagada: <b>{dayjs(evento.paidAt).format("DD/MM/YYYY")}</b>
                 </Tag>
               ) : (
-                <Tag color="gold" style={{ borderRadius: 999 }}>
-                  Pendiente de pago
+                <Tag
+                  color="gold"
+                  style={{ borderRadius: 999, marginInlineEnd: 0 }}
+                >
+                  Pendiente
                 </Tag>
               )}
             </Space>
 
-            <div
-              style={{ display: "flex", justifyContent: "flex-end", marginTop: 2 }}
-            >
+            <div style={{ display: "flex", justifyContent: "flex-end" }}>
               <Dropdown
                 trigger={isMobileUI ? ["click"] : ["hover"]}
                 placement="bottomRight"
                 open={openActions}
                 onOpenChange={(open) => {
-                  // esto evita el glitch con el Popover:
                   if (!open && confirmKey) return;
                   setOpenActions(open);
                 }}
@@ -612,9 +606,8 @@ const TooltipContenidoEvento = ({
                   icon={<MoreOutlined />}
                   style={{
                     borderRadius: 999,
-                    marginTop: 4,
-                    width: 32,
-                    height: 32,
+                    width: 28,
+                    height: 28,
                     paddingInline: 0,
                     display: "inline-flex",
                     alignItems: "center",
@@ -653,7 +646,6 @@ const RoomGridCalendar = ({
   filtroHotel,
   compacto,
   loading,
-  // acciones
   onCheckin,
   onCheckout,
   onPaid,
@@ -661,7 +653,6 @@ const RoomGridCalendar = ({
   onDelete,
   onRequestEditDates,
   pending,
-  // control popovers
   isMobileUI,
   openPopoverKey,
   onPopoverToggle,
@@ -669,11 +660,13 @@ const RoomGridCalendar = ({
   onCloseAllPopovers,
 }) => {
   const [month, setMonth] = useState(dayjs().startOf("month"));
+  const [hoveredChipKey, setHoveredChipKey] = useState(null);
   const { token } = theme.useToken();
 
-  const FIRST_COL_WIDTH = compacto ? 220 : 240;
-  const cellHeight = compacto ? 40 : 46;
-  const cellWidth = compacto ? 70 : 80;
+  // Más compacto
+  const FIRST_COL_WIDTH = compacto ? 190 : 220;
+  const cellHeight = compacto ? 30 : 36;
+  const cellWidth = compacto ? 56 : 72;
 
   const days = useMemo(() => {
     const arr = [];
@@ -697,7 +690,6 @@ const RoomGridCalendar = ({
     [eventos, filtroHotel]
   );
 
-  // Agrupamos eventos por habitación
   const eventsByRoom = useMemo(() => {
     const out = new Map();
     for (const e of filteredEvents) {
@@ -711,7 +703,6 @@ const RoomGridCalendar = ({
     return out;
   }, [filteredEvents, filtroHotel]);
 
-  // Lista de habitaciones (metadatos)
   const rooms = useMemo(() => {
     const map = new Map();
     for (const e of filteredEvents) {
@@ -741,7 +732,6 @@ const RoomGridCalendar = ({
     return arr;
   }, [filteredEvents, filtroHotel]);
 
-  // Agrupamos habitaciones por sede => filas expandibles
   const dataSource = useMemo(() => {
     const grouped = new Map();
     for (const roomMeta of rooms) {
@@ -779,20 +769,17 @@ const RoomGridCalendar = ({
     borderRadius: token.borderRadiusLG,
     boxShadow: token.boxShadowStrong,
     border: `1px solid ${token.colorBorderSecondary}`,
-    padding: 12,
+    padding: 8,
   };
-
-  /* ===================== COLUMNAS PARA ANT TABLE ===================== */
 
   const columns = useMemo(() => {
     const cols = [];
 
-    // Columna Habitación (fixed left)
     cols.push({
       title: (
         <span
           style={{
-            fontSize: 12,
+            fontSize: 10.5,
             fontWeight: 600,
             color: neutrals.textMuted,
           }}
@@ -806,13 +793,11 @@ const RoomGridCalendar = ({
       width: FIRST_COL_WIDTH,
       render: (_, row) => {
         if (row.groupType === "hotel") {
-          // fila de sede
           return (
             <div
               style={{
-                padding: "6px 8px",
+                padding: "3px 6px",
                 display: "flex",
-                flexDirection: "row",
                 alignItems: "center",
                 justifyContent: "space-between",
                 gap: 8,
@@ -820,13 +805,13 @@ const RoomGridCalendar = ({
             >
               <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                 <HomeOutlined
-                  style={{ fontSize: 14, color: beachColors.deepBlue }}
+                  style={{ fontSize: 13, color: beachColors.deepBlue }}
                 />
                 <span
                   style={{
                     fontWeight: 600,
                     color: neutrals.textMain,
-                    fontSize: 13,
+                    fontSize: 12,
                   }}
                 >
                   {getHotelLabel(row.hotel)}
@@ -836,8 +821,10 @@ const RoomGridCalendar = ({
                 color="blue"
                 style={{
                   borderRadius: 999,
-                  fontSize: 10,
+                  fontSize: 9,
                   paddingInline: 8,
+                  marginInlineEnd: 0,
+                  lineHeight: "16px",
                 }}
               >
                 {row.roomCount} hab.
@@ -850,47 +837,41 @@ const RoomGridCalendar = ({
         return (
           <div
             style={{
-              padding: "4px 8px",
+              padding: "3px 6px",
               display: "flex",
               flexDirection: "column",
-              gap: 2,
+              gap: 0,
             }}
           >
-            <span style={{ fontWeight: 600, color: neutrals.textMain }}>
-              {roomMeta.label}
-            </span>
             <span
               style={{
+                fontWeight: 600,
+                color: neutrals.textMain,
                 fontSize: 11,
-                color: neutrals.textMuted,
               }}
             >
+              {roomMeta.label}
+            </span>
+            <span style={{ fontSize: 9.5, color: neutrals.textMuted }}>
               {getHotelLabel(roomMeta.hotel)}
             </span>
           </div>
         );
       },
-      onCell: (row) => {
-        // para fila de hotel, dejamos que ocupe solo la primera col
-        if (row.groupType === "hotel") {
-          return {
-            style: {
-              background: token.colorBgContainer,
-              borderBottom: `1px solid ${token.colorSplit}`,
-              fontWeight: 600,
-            },
-          };
-        }
-        return {
-          style: {
-            background: token.colorBgContainer,
-            borderBottom: `1px solid ${token.colorSplit}`,
-          },
-        };
-      },
+      onCell: (row) => ({
+        style: {
+          background:
+            row.groupType === "hotel"
+              ? token.colorBgContainer
+              : token.colorBgContainer,
+          borderBottom: `1px solid ${token.colorSplit}`,
+          fontWeight: row.groupType === "hotel" ? 600 : 400,
+          // 🔒 La columna fija siempre por encima de las reservas
+          zIndex: row.groupType === "hotel" ? 9 : 8,
+        },
+      }),
     });
 
-    // Columnas por día
     days.forEach((d) => {
       const dateStr = d.format(DATE_FMT);
       const isWeekend = d.day() === 0 || d.day() === 6;
@@ -902,15 +883,15 @@ const RoomGridCalendar = ({
             style={{
               display: "flex",
               flexDirection: "column",
-              gap: 2,
+              gap: 0,
               alignItems: "center",
-              paddingBlock: 2,
+              paddingBlock: 0,
             }}
           >
             <span
               style={{
-                fontWeight: 600,
-                fontSize: 12,
+                fontWeight: 700,
+                fontSize: 10.5,
                 color: isToday ? token.colorPrimary : neutrals.textMain,
               }}
             >
@@ -918,7 +899,7 @@ const RoomGridCalendar = ({
             </span>
             <span
               style={{
-                fontSize: 10,
+                fontSize: 8.5,
                 textTransform: "lowercase",
                 color: isWeekend ? beachColors.coral : neutrals.textMuted,
               }}
@@ -929,8 +910,8 @@ const RoomGridCalendar = ({
               <span
                 style={{
                   marginTop: 1,
-                  width: 6,
-                  height: 6,
+                  width: 4,
+                  height: 4,
                   borderRadius: "999px",
                   background: token.colorPrimary,
                 }}
@@ -942,7 +923,6 @@ const RoomGridCalendar = ({
         dataIndex: dateStr,
         width: cellWidth,
         onCell: (row) => {
-          // Fila de sede: solo fondo suave
           if (row.groupType === "hotel") {
             return {
               style: {
@@ -953,22 +933,13 @@ const RoomGridCalendar = ({
           }
 
           const events = row.events || [];
-
-          // buscamos si hay un evento que INICIA hoy
           const startEvent = events.find((e) => e.startDate === dateStr);
-          // buscamos si hay un evento que cubre hoy (aunque no empiece hoy)
           const coverEvent = events.find((e) =>
             eventoCubreFecha(e, dateStr)
           );
 
-          // si es día intermedio de una reserva, colSpan=0 (la barra se pinta en el día de inicio)
-          if (!startEvent && coverEvent) {
-            return {
-              colSpan: 0,
-            };
-          }
+          if (!startEvent && coverEvent) return { colSpan: 0 };
 
-          // si empieza aquí, calculamos cuántos días abarca para el colSpan
           if (startEvent) {
             const start = dayjs(startEvent.startDate);
             const end = startEvent.endDate
@@ -982,11 +953,11 @@ const RoomGridCalendar = ({
                 padding: 0,
                 background: "transparent",
                 borderBottom: `1px solid ${token.colorSplit}`,
+                overflow: "visible",
               },
             };
           }
 
-          // celda vacía normal
           return {
             style: {
               padding: 0,
@@ -999,7 +970,6 @@ const RoomGridCalendar = ({
         },
         render: (_, row) => {
           if (row.groupType === "hotel") {
-            // celdas de sede -> vacías pero manteniendo altura
             return (
               <div
                 style={{
@@ -1016,15 +986,8 @@ const RoomGridCalendar = ({
             eventoCubreFecha(e, dateStr)
           );
 
-          // celda “tapada” por colSpan=0
-          if (!startEvent && coverEvent) {
-            return null;
-          }
+          if (!startEvent && coverEvent) return null;
 
-          const isWeekend = d.day() === 0 || d.day() === 6;
-          const isToday = dateStr === todayStr;
-
-          // sin reservas este día
           if (!startEvent) {
             return (
               <div
@@ -1038,11 +1001,23 @@ const RoomGridCalendar = ({
             );
           }
 
-          // hay evento que inicia aquí -> pintamos UNA sola pill que se extiende por todos los días
           const ev = startEvent;
           const meta = metaEvento(ev);
-          const texto = recortar(ev.label || meta.labelLargo, compacto ? 18 : 28);
+          const rawLabel = ev.label || meta.labelLargo;
+
           const instanceKey = `classic:${row.roomMeta.key}:${dateStr}`;
+          const rowKeyPrefix = `classic:${row.roomMeta.key}:`;
+          const rowHasHover =
+            hoveredChipKey &&
+            hoveredChipKey.startsWith(rowKeyPrefix);
+          const isHovered = hoveredChipKey === instanceKey;
+          const isOtherHoveredOnRow = rowHasHover && !isHovered;
+
+          // 👉 Solo recorto cuando NO está en hover
+          const texto = isHovered
+            ? rawLabel
+            : recortar(rawLabel, compacto ? 18 : 30);
+
           const etiquetaCorta = `${meta.labelCorto} · Hab ${
             ev.room
           }${ev.paidAt ? " · $" : ""}`;
@@ -1051,10 +1026,9 @@ const RoomGridCalendar = ({
             <div
               style={{
                 height: cellHeight,
-                padding: 2,
-                background: isToday
-                  ? token.colorBgContainer
-                  : token.colorBgContainer,
+                padding: 0,
+                background: token.colorBgContainer,
+                overflow: isHovered ? "visible" : "hidden",
               }}
             >
               <Popover
@@ -1083,59 +1057,69 @@ const RoomGridCalendar = ({
                 }
               >
                 <div
+                  onMouseEnter={() => setHoveredChipKey(instanceKey)}
+                  onMouseLeave={() =>
+                    setHoveredChipKey((k) =>
+                      k === instanceKey ? null : k
+                    )
+                  }
                   style={{
-                    width: "100%",
+                    width: isHovered ? "max-content" : "100%",
+                    minWidth: "100%",
+                    maxWidth: isHovered ? 520 : "100%",
                     height: "100%",
                     display: "flex",
                     alignItems: "center",
                     gap: 6,
-                    padding: "4px 8px",
+                    padding: "2px 6px",
                     borderRadius: 999,
                     background:
                       "linear-gradient(90deg, rgba(56,189,248,0.12), rgba(16,185,129,0.16))",
                     borderLeft: `4px solid ${meta.color}`,
-                    fontSize: 10.5,
+                    fontSize: compacto ? 9.25 : 10,
+                    lineHeight: "14px",
                     whiteSpace: "nowrap",
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
+                    overflow: isHovered ? "visible" : "hidden",
+                    textOverflow: isHovered ? "clip" : "ellipsis",
                     color: neutrals.textMain,
-                    boxShadow: token.boxShadowTertiary,
+                    boxShadow: isHovered
+                      ? token.boxShadowSecondary
+                      : token.boxShadowTertiary,
                     cursor: "pointer",
                     userSelect: "none",
                     WebkitTapHighlightColor: "transparent",
+                    position: "relative",
+                    // 🔝 suficiente para comerse a otras reservas,
+                    // pero por debajo de la columna fija (que tiene zIndex 8/9)
+                    zIndex: isHovered ? 2 : 1,
+                    transform: isHovered
+                      ? "translateY(-1px) scale(1.015)"
+                      : "translateY(0) scale(1)",
+                    opacity: isOtherHoveredOnRow ? 0 : 1,
+                    pointerEvents: isOtherHoveredOnRow ? "none" : "auto",
+                    transition:
+                      "opacity 0.12s ease, max-width 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease, padding 0.18s ease",
                   }}
                 >
                   <span
                     style={{
-                      width: 7,
-                      height: 7,
+                      width: 6,
+                      height: 6,
                       borderRadius: "999px",
                       backgroundColor: meta.color,
                       flexShrink: 0,
                     }}
                   />
-                  <span
-                    style={{
-                      fontWeight: 600,
-                      flexShrink: 0,
-                    }}
-                  >
+                  <span style={{ fontWeight: 700, flexShrink: 0 }}>
                     {etiquetaCorta}
                   </span>
-                  <span
-                    style={{
-                      flex: 1,
-                      minWidth: 0,
-                    }}
-                  >
-                    {texto}
-                  </span>
+                  <span style={{ flex: 1, minWidth: 0 }}>{texto}</span>
                   {ev.paidAt && (
                     <span
                       style={{
                         fontSize: 10,
                         color: beachColors.teal,
-                        fontWeight: 700,
+                        fontWeight: 800,
                         flexShrink: 0,
                       }}
                     >
@@ -1171,45 +1155,45 @@ const RoomGridCalendar = ({
     onPopoverToggle,
     openPopoverKey,
     pending,
+    hoveredChipKey,
   ]);
 
   return (
     <Card
+      className="rgc-compact"
       size="small"
       bordered
       style={{
-        marginTop: 8,
-        borderRadius: 18,
+        marginTop: 6,
+        borderRadius: 14,
         boxShadow: token.boxShadowSecondary,
       }}
       bodyStyle={{ padding: 0 }}
     >
-      {/* Header mes / navegación */}
       <div
         style={{
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center",
-          padding: 10,
-          paddingInline: 18,
+          padding: 6,
+          paddingInline: 12,
           borderBottom: `1px solid ${token.colorBorderSecondary}`,
           background: token.colorBgContainer,
         }}
       >
-        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-
+        <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
           <Text
             style={{
-              fontWeight: 600,
+              fontWeight: 700,
               color: beachColors.deepBlue,
-              fontSize: 16,
+              fontSize: 13,
             }}
           >
             {monthLabel}
           </Text>
         </div>
 
-        <Space size={8} wrap>
+        <Space size={4} wrap>
           <Button
             size="small"
             onClick={() => changeMonth(-1)}
@@ -1217,10 +1201,12 @@ const RoomGridCalendar = ({
               borderRadius: 999,
               borderColor: token.colorBorderSecondary,
               background: token.colorBgLayout,
-              fontSize: 12,
+              fontSize: 11,
+              paddingInline: 8,
+              height: 26,
             }}
           >
-            &lt; Mes anterior
+            &lt;
           </Button>
           <Button
             size="small"
@@ -1228,7 +1214,9 @@ const RoomGridCalendar = ({
             onClick={() => setMonth(dayjs().startOf("month"))}
             style={{
               borderRadius: 999,
-              fontSize: 12,
+              fontSize: 11,
+              paddingInline: 10,
+              height: 26,
             }}
           >
             Hoy
@@ -1240,34 +1228,35 @@ const RoomGridCalendar = ({
               borderRadius: 999,
               borderColor: token.colorBorderSecondary,
               background: token.colorBgLayout,
-              fontSize: 12,
+              fontSize: 11,
+              paddingInline: 8,
+              height: 26,
             }}
           >
-            Mes siguiente &gt;
+            &gt;
           </Button>
         </Space>
       </div>
 
-      {/* Tabla Ant Design */}
       <Table
+        className="rgc-compact"
         columns={columns}
         dataSource={dataSource}
         loading={loading}
         pagination={false}
-        size={compacto ? "small" : "middle"}
+        size="small"
         scroll={{
           x: tableMinWidth,
-          y: compacto ? 420 : 520,
+          y: compacto ? 360 : 460,
         }}
         sticky
         tableLayout="fixed"
         rowKey="key"
         expandable={{
-          // expandir por defecto todas las sedes
           defaultExpandAllRows: true,
         }}
         style={{
-          borderRadius: "0 0 18px 18px",
+          borderRadius: "0 0 14px 14px",
         }}
       />
     </Card>
