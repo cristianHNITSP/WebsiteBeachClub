@@ -4,7 +4,7 @@ import {
   Button,
   Space,
   Typography,
- Popover,
+  Popover,
   Dropdown,
   Popconfirm,
   Divider,
@@ -12,6 +12,7 @@ import {
   Card,
   Table,
   theme,
+  DatePicker, // ⬅️ nuevo
 } from "antd";
 import {
   CalendarOutlined,
@@ -119,6 +120,58 @@ const metaEvento = (evento) => {
     return metaTipo("stay");
   }
   return metaTipo(evento?.type);
+};
+
+/**
+ * ===================== LANES POR HABITACIÓN =====================
+ */
+const buildRoomLanes = (events) => {
+  if (!events || !events.length) return [[]];
+
+  const sorted = [...events].sort((a, b) =>
+    String(a.startDate || a.checkinAt || "").localeCompare(
+      String(b.startDate || b.checkinAt || "")
+    )
+  );
+
+  const toRange = (ev) => {
+    const start =
+      ev.startDate || ev.checkinAt || ev.createdAt || dayjs().format(DATE_FMT);
+    const end =
+      ev.endDate ||
+      ev.checkoutAt ||
+      ev.startDate ||
+      ev.checkinAt ||
+      start;
+    return {
+      start: dayjs(start),
+      end: dayjs(end),
+    };
+  };
+
+  const lanes = [];
+
+  for (const ev of sorted) {
+    const { start, end } = toRange(ev);
+    let placed = false;
+
+    for (const lane of lanes) {
+      const last = lane[lane.length - 1];
+      const lastRange = toRange(last);
+
+      if (start.isAfter(lastRange.end, "day")) {
+        lane.push(ev);
+        placed = true;
+        break;
+      }
+    }
+
+    if (!placed) {
+      lanes.push([ev]);
+    }
+  }
+
+  return lanes;
 };
 
 /* ===================== TOOLTIP / POPOVER ===================== */
@@ -659,9 +712,17 @@ const RoomGridCalendar = ({
   onPopoverLock,
   onCloseAllPopovers,
 }) => {
-  const [month, setMonth] = useState(dayjs().startOf("month"));
+  // ⬅️ ahora guardamos una fecha seleccionada
+  const [selectedDate, setSelectedDate] = useState(dayjs());
   const [hoveredChipKey, setHoveredChipKey] = useState(null);
+  const [collapsedOverflowByRoom, setCollapsedOverflowByRoom] = useState({});
   const { token } = theme.useToken();
+
+  // el mes se deriva de la fecha seleccionada
+  const month = useMemo(
+    () => selectedDate.startOf("month"),
+    [selectedDate]
+  );
 
   // Más compacto
   const FIRST_COL_WIDTH = compacto ? 190 : 220;
@@ -679,7 +740,10 @@ const RoomGridCalendar = ({
     return arr;
   }, [month]);
 
-  const todayStr = dayjs().format(DATE_FMT);
+  const today = dayjs();
+  const todayStr = today.format(DATE_FMT);
+  const isSelectedToday = selectedDate.isSame(today, "day");
+
   const tableMinWidth = FIRST_COL_WIDTH + days.length * cellWidth;
 
   const filteredEvents = useMemo(
@@ -747,20 +811,31 @@ const RoomGridCalendar = ({
       }
       const parent = grouped.get(hotelKey);
       parent.roomCount += 1;
-      parent.children.push({
-        key: roomMeta.key,
-        groupType: "room",
-        roomMeta,
-        events: eventsByRoom.get(roomMeta.key) || [],
+
+      const roomEvents = eventsByRoom.get(roomMeta.key) || [];
+      const lanes = buildRoomLanes(roomEvents);
+      const hasOverflow = lanes.length > 1;
+      const isCollapsed = !!collapsedOverflowByRoom[roomMeta.key];
+
+      lanes.forEach((laneEvents, laneIndex) => {
+        if (laneIndex > 0 && isCollapsed) return;
+
+        parent.children.push({
+          key:
+            laneIndex === 0
+              ? roomMeta.key
+              : `${roomMeta.key}::lane${laneIndex}`,
+          groupType: "room",
+          roomMeta,
+          laneIndex,
+          totalLanes: lanes.length,
+          hasOverflow,
+          events: laneEvents,
+        });
       });
     }
     return Array.from(grouped.values());
-  }, [rooms, eventsByRoom]);
-
-  const changeMonth = (offset) => {
-    setMonth((m) => m.add(offset, "month"));
-    onCloseAllPopovers?.();
-  };
+  }, [rooms, eventsByRoom, collapsedOverflowByRoom]);
 
   const monthLabel = month.format("MMMM YYYY");
 
@@ -833,40 +908,111 @@ const RoomGridCalendar = ({
           );
         }
 
-        const { roomMeta } = row;
+        const { roomMeta, laneIndex = 0, totalLanes = 1, hasOverflow } = row;
+        const isCollapsed = !!collapsedOverflowByRoom[roomMeta.key];
+
+        if (laneIndex > 0) {
+          return (
+            <div
+              style={{
+                padding: "3px 6px",
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                fontSize: 9,
+                color: neutrals.textMuted,
+              }}
+            >
+              <span
+                style={{
+                  width: 6,
+                  height: 6,
+                  borderRadius: "999px",
+                  background: token.colorBorderSecondary,
+                  flexShrink: 0,
+                }}
+              />
+              <span>Reserva adicional</span>
+            </div>
+          );
+        }
+
         return (
           <div
             style={{
               padding: "3px 6px",
               display: "flex",
-              flexDirection: "column",
-              gap: 0,
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 6,
             }}
           >
-            <span
+            <div
               style={{
-                fontWeight: 600,
-                color: neutrals.textMain,
-                fontSize: 11,
+                display: "flex",
+                flexDirection: "column",
+                gap: 0,
+                minWidth: 0,
               }}
             >
-              {roomMeta.label}
-            </span>
-            <span style={{ fontSize: 9.5, color: neutrals.textMuted }}>
-              {getHotelLabel(roomMeta.hotel)}
-            </span>
+              <span
+                style={{
+                  fontWeight: 600,
+                  color: neutrals.textMain,
+                  fontSize: 11,
+                }}
+              >
+                {roomMeta.label}
+              </span>
+              <span style={{ fontSize: 9.5, color: neutrals.textMuted }}>
+                {getHotelLabel(roomMeta.hotel)}
+              </span>
+            </div>
+
+            {hasOverflow && totalLanes > 1 && (
+              <Button
+                size="small"
+                type="text"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setCollapsedOverflowByRoom((prev) => ({
+                    ...prev,
+                    [roomMeta.key]: !prev[roomMeta.key],
+                  }));
+                }}
+                style={{
+                  borderRadius: 999,
+                  height: 22,
+                  paddingInline: 6,
+                  fontSize: 10,
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 4,
+                }}
+              >
+                <span
+                  style={{
+                    display: "inline-block",
+                    transform: isCollapsed ? "rotate(90deg)" : "rotate(-90deg)",
+                    transition: "transform 0.18s ease",
+                  }}
+                >
+                  <MoreOutlined />
+                </span>
+                <span>
+                  {isCollapsed ? "+" : ""}
+                  {totalLanes - 1}
+                </span>
+              </Button>
+            )}
           </div>
         );
       },
       onCell: (row) => ({
         style: {
-          background:
-            row.groupType === "hotel"
-              ? token.colorBgContainer
-              : token.colorBgContainer,
+          background: token.colorBgContainer,
           borderBottom: `1px solid ${token.colorSplit}`,
           fontWeight: row.groupType === "hotel" ? 600 : 400,
-          // 🔒 La columna fija siempre por encima de las reservas
           zIndex: row.groupType === "hotel" ? 9 : 8,
         },
       }),
@@ -875,7 +1021,7 @@ const RoomGridCalendar = ({
     days.forEach((d) => {
       const dateStr = d.format(DATE_FMT);
       const isWeekend = d.day() === 0 || d.day() === 6;
-      const isToday = dateStr === todayStr;
+      const isTodayCol = dateStr === todayStr;
 
       cols.push({
         title: () => (
@@ -892,7 +1038,7 @@ const RoomGridCalendar = ({
               style={{
                 fontWeight: 700,
                 fontSize: 10.5,
-                color: isToday ? token.colorPrimary : neutrals.textMain,
+                color: isTodayCol ? token.colorPrimary : neutrals.textMain,
               }}
             >
               {d.format("DD")}
@@ -906,7 +1052,7 @@ const RoomGridCalendar = ({
             >
               {d.format("dd")}
             </span>
-            {isToday && (
+            {isTodayCol && (
               <span
                 style={{
                   marginTop: 1,
@@ -1005,15 +1151,9 @@ const RoomGridCalendar = ({
           const meta = metaEvento(ev);
           const rawLabel = ev.label || meta.labelLargo;
 
-          const instanceKey = `classic:${row.roomMeta.key}:${dateStr}`;
-          const rowKeyPrefix = `classic:${row.roomMeta.key}:`;
-          const rowHasHover =
-            hoveredChipKey &&
-            hoveredChipKey.startsWith(rowKeyPrefix);
+          const instanceKey = `classic:${row.roomMeta.key}:${row.laneIndex || 0}:${dateStr}`;
           const isHovered = hoveredChipKey === instanceKey;
-          const isOtherHoveredOnRow = rowHasHover && !isHovered;
 
-          // 👉 Solo recorto cuando NO está en hover
           const texto = isHovered
             ? rawLabel
             : recortar(rawLabel, compacto ? 18 : 30);
@@ -1050,12 +1190,13 @@ const RoomGridCalendar = ({
                 }
                 color={token.colorBgElevated}
                 styles={{ body: bodyPopoverStyle }}
-                trigger={isMobileUI ? "click" : "hover"}
+                trigger="click"
                 open={openPopoverKey === instanceKey}
                 onOpenChange={(open) =>
                   onPopoverToggle?.(instanceKey, open)
                 }
               >
+                {/* ===== CHIP RESERVA (grid para que el $ tenga su columna fija) ===== */}
                 <div
                   onMouseEnter={() => setHoveredChipKey(instanceKey)}
                   onMouseLeave={() =>
@@ -1068,9 +1209,12 @@ const RoomGridCalendar = ({
                     minWidth: "100%",
                     maxWidth: isHovered ? 520 : "100%",
                     height: "100%",
-                    display: "flex",
+                    display: "grid",
+                    gridTemplateColumns: ev.paidAt
+                      ? "auto auto minmax(0, 1fr) auto"
+                      : "auto auto minmax(0, 1fr)",
                     alignItems: "center",
-                    gap: 6,
+                    columnGap: 6,
                     padding: "2px 6px",
                     borderRadius: 999,
                     background:
@@ -1079,8 +1223,6 @@ const RoomGridCalendar = ({
                     fontSize: compacto ? 9.25 : 10,
                     lineHeight: "14px",
                     whiteSpace: "nowrap",
-                    overflow: isHovered ? "visible" : "hidden",
-                    textOverflow: isHovered ? "clip" : "ellipsis",
                     color: neutrals.textMain,
                     boxShadow: isHovered
                       ? token.boxShadowSecondary
@@ -1089,16 +1231,13 @@ const RoomGridCalendar = ({
                     userSelect: "none",
                     WebkitTapHighlightColor: "transparent",
                     position: "relative",
-                    // 🔝 suficiente para comerse a otras reservas,
-                    // pero por debajo de la columna fija (que tiene zIndex 8/9)
                     zIndex: isHovered ? 2 : 1,
                     transform: isHovered
                       ? "translateY(-1px) scale(1.015)"
                       : "translateY(0) scale(1)",
-                    opacity: isOtherHoveredOnRow ? 0 : 1,
-                    pointerEvents: isOtherHoveredOnRow ? "none" : "auto",
                     transition:
-                      "opacity 0.12s ease, max-width 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease, padding 0.18s ease",
+                      "max-width 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease, padding 0.18s ease",
+                    overflow: isHovered ? "visible" : "hidden",
                   }}
                 >
                   <span
@@ -1107,20 +1246,33 @@ const RoomGridCalendar = ({
                       height: 6,
                       borderRadius: "999px",
                       backgroundColor: meta.color,
-                      flexShrink: 0,
                     }}
                   />
-                  <span style={{ fontWeight: 700, flexShrink: 0 }}>
+                  <span
+                    style={{
+                      fontWeight: 700,
+                      whiteSpace: "nowrap",
+                    }}
+                  >
                     {etiquetaCorta}
                   </span>
-                  <span style={{ flex: 1, minWidth: 0 }}>{texto}</span>
+                  <span
+                    style={{
+                      minWidth: 0,
+                      whiteSpace: "nowrap",
+                      overflow: isHovered ? "visible" : "hidden",
+                      textOverflow: isHovered ? "clip" : "ellipsis",
+                    }}
+                  >
+                    {texto}
+                  </span>
                   {ev.paidAt && (
                     <span
                       style={{
                         fontSize: 10,
                         color: beachColors.teal,
                         fontWeight: 800,
-                        flexShrink: 0,
+                        whiteSpace: "nowrap",
                       }}
                     >
                       $
@@ -1156,6 +1308,7 @@ const RoomGridCalendar = ({
     openPopoverKey,
     pending,
     hoveredChipKey,
+    collapsedOverflowByRoom,
   ]);
 
   return (
@@ -1193,48 +1346,36 @@ const RoomGridCalendar = ({
           </Text>
         </div>
 
-        <Space size={4} wrap>
-          <Button
+        {/* ⬅️ Nuevo selector de fecha + indicador de hoy */}
+        <Space size={6} wrap>
+          <DatePicker
             size="small"
-            onClick={() => changeMonth(-1)}
+            value={selectedDate}
+            onChange={(value) => {
+              if (!value) return;
+              setSelectedDate(value);
+              onCloseAllPopovers?.();
+            }}
+            format="DD/MM/YYYY"
+            allowClear={false}
             style={{
               borderRadius: 999,
-              borderColor: token.colorBorderSecondary,
-              background: token.colorBgLayout,
-              fontSize: 11,
-              paddingInline: 8,
-              height: 26,
             }}
-          >
-            &lt;
-          </Button>
-          <Button
-            size="small"
-            type="primary"
-            onClick={() => setMonth(dayjs().startOf("month"))}
-            style={{
-              borderRadius: 999,
-              fontSize: 11,
-              paddingInline: 10,
-              height: 26,
-            }}
-          >
-            Hoy
-          </Button>
-          <Button
-            size="small"
-            onClick={() => changeMonth(1)}
-            style={{
-              borderRadius: 999,
-              borderColor: token.colorBorderSecondary,
-              background: token.colorBgLayout,
-              fontSize: 11,
-              paddingInline: 8,
-              height: 26,
-            }}
-          >
-            &gt;
-          </Button>
+          />
+          {isSelectedToday && (
+            <Tag
+              color="blue"
+              style={{
+                borderRadius: 999,
+                fontSize: 10,
+                paddingInline: 8,
+                marginInlineEnd: 0,
+                lineHeight: "18px",
+              }}
+            >
+              Hoy
+            </Tag>
+          )}
         </Space>
       </div>
 

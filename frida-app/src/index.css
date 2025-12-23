@@ -1,16 +1,62 @@
-/* Selecciona la etiqueta <body> para aplicar los estilos */
-body {
-  /* Propiedades para el fondo */
-  background-color: #f4f4f4;
-  /* Un color de fondo gris claro */
-  /* Elimina los márgenes predeterminados del navegador */
-  margin: 0;
+/* ==============
+   Base del body
+   ============== */
 
-  /* Elimina los rellenos predeterminados del navegador */
+body {
+  background-color: #f4f4f4;
+  margin: 0;
   padding: 0;
 }
 
+/* Ejemplo que ya tenías */
 .ant-tree {
   background-color: transparent;
 }
 
+/* =========================================
+   Reduced motion (SIN romper componentes AntD)
+   ========================================= */
+
+/* Nada de transitions/animations globales, solo cosas controladas */
+html[data-reduced-motion="true"] body {
+  scroll-behavior: auto !important;
+}
+
+/* Usa estas clases para marcar elementos con efectos pesados tuyos */
+html[data-reduced-motion="true"] .fx-heavy,
+html[data-reduced-motion="true"] .hero-bg,
+html[data-reduced-motion="true"] .motion-card,
+html[data-reduced-motion="true"] .reservation-chip,
+html[data-reduced-motion="true"] .hf-soft-motion {
+  animation: none !important;
+  transition: none !important;
+}
+
+/* (Opcional) si tienes parallax / background fancy, añádelos aquí igual */
+
+/* =========================================
+   Dark mode (sin pelearse con Ant Design)
+   ========================================= */
+
+html[data-theme="dark"] body {
+  background-color: #020617;
+  color: #e5e7eb;
+}
+
+/* Ajusta a las clases de tu layout principal si las usas */
+html[data-theme="dark"] .app-layout,
+html[data-theme="dark"] .app-shell {
+  background-color: #020617;
+}
+
+/* Dejamos que AntD pinte sus fondos y solo suavizamos la integración */
+html[data-theme="dark"] .ant-card,
+html[data-theme="dark"] .ant-modal,
+html[data-theme="dark"] .ant-drawer,
+html[data-theme="dark"] .ant-layout,
+html[data-theme="dark"] .ant-table,
+html[data-theme="dark"] .ant-popover,
+html[data-theme="dark"] .ant-dropdown {
+  background-color: transparent;
+  color: inherit;
+}

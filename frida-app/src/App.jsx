@@ -255,7 +255,7 @@ function App({ currentUser }) {
     locations: [],
     startDate: null, // "YYYY-MM-DD"
     endDate: null, // "YYYY-MM-DD"
-    guests: "2",
+    guests: "0",
     onlyAvailable: true,
   });
 

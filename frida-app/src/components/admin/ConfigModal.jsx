@@ -1,4 +1,3 @@
-// src/components/admin/ConfigModal.jsx
 import { useEffect, useState } from "react";
 import {
   Modal,
@@ -12,12 +11,17 @@ import {
   Tag,
   message,
   Popconfirm,
-  Collapse,
+  Tabs,
+  Switch,
+  Segmented,
 } from "antd";
 import axios from "@api/axios";
+import {
+  loadAccessibilityPrefs,
+  saveAccessibilityPrefs,
+} from "../../utils/accessibilityDOM";
 
 const { Text } = Typography;
-const { Panel } = Collapse;
 
 const SEDE_LABELS = {
   "casa-frida": "Casa Frida",
@@ -37,6 +41,12 @@ const ConfigModal = ({ open, onClose, currentUser, onUserUpdated }) => {
   const [savingProfile, setSavingProfile] = useState(false);
   const [changingPassword, setChangingPassword] = useState(false);
 
+  // 🔶 Accesibilidad
+  const [accessPrefs, setAccessPrefs] = useState(() =>
+    loadAccessibilityPrefs()
+  );
+  const [savingAccess, setSavingAccess] = useState(false);
+
   // ========= CARGAR DATOS AL ABRIR =========
   useEffect(() => {
     if (!open || !currentUser) return;
@@ -53,9 +63,11 @@ const ConfigModal = ({ open, onClose, currentUser, onUserUpdated }) => {
 
     setProfileInitialValues(initial);
 
-    // 🔥 Importante: establecemos los valores del form explícitamente
     profileForm.setFieldsValue(initial);
     passwordForm.resetFields();
+
+    // refrescar accesibilidad por si cambió desde otro lado
+    setAccessPrefs(loadAccessibilityPrefs());
   }, [open, currentUser, profileForm, passwordForm]);
 
   if (!currentUser) {
@@ -145,7 +157,6 @@ const ConfigModal = ({ open, onClose, currentUser, onUserUpdated }) => {
         key: "saveProfile",
       });
 
-      // 🔥 Notificamos hacia arriba para que actualicen currentUser en el estado global
       if (onUserUpdated) onUserUpdated(updatedUser);
 
       onClose();
@@ -211,100 +222,103 @@ const ConfigModal = ({ open, onClose, currentUser, onUserUpdated }) => {
     }
   };
 
-  return (
-    <Modal
-      open={open}
-      title="Configuración de mi cuenta"
-      onCancel={onClose}
-      footer={null}
-      width={640}
-      destroyOnClose
-    >
-      <Alert
-        message="Configuración personal"
-        description={
-          <Text style={{ fontSize: 12 }}>
-            Ajusta tu nombre y revisa tus datos de acceso. La sede y el rol son
-            solo informativos y no se pueden modificar desde aquí. Si lo
-            necesitas, también puedes cambiar tu contraseña.
-          </Text>
-        }
-        type="info"
-        showIcon
-        style={{ marginBottom: 12 }}
-      />
+  // ========= ACCESIBILIDAD =========
+  const handleUpdateAccessPrefs = (patch) => {
+    const next = { ...accessPrefs, ...patch };
+    setAccessPrefs(next);
+    setSavingAccess(true);
+    try {
+      saveAccessibilityPrefs(next);
+      message.success({
+        content: "Preferencias de accesibilidad actualizadas.",
+        key: "access",
+        duration: 1.5,
+      });
+    } catch (e) {
+      console.error("[ConfigModal] error guardando accesibilidad:", e);
+      message.error(
+        "No se pudieron guardar las preferencias de accesibilidad."
+      );
+    } finally {
+      setSavingAccess(false);
+    }
+  };
 
-      {/* === BLOQUE: DATOS BÁSICOS === */}
-      <Divider orientation="left" style={{ margin: "8px 0 10px" }}>
-        <Text style={{ fontSize: 12 }}>Datos de perfil</Text>
-      </Divider>
+  const tabItems = [
+    {
+      key: "profile",
+      label: "Información personal",
+      children: (
+        <>
+          <Divider orientation="left" style={{ margin: "8px 0 10px" }}>
+            <Text style={{ fontSize: 12 }}>Datos de perfil</Text>
+          </Divider>
 
-      <Form
-        form={profileForm}
-        layout="vertical"
-        preserve={false}
-        initialValues={profileInitialValues}
-      >
-        <Form.Item
-          label="Nombre completo"
-          name="name"
-          rules={[{ required: true, message: "Ingresa tu nombre completo" }]}
-        >
-          <Input placeholder="Ej: Juan Pérez" />
-        </Form.Item>
-
-        <Form.Item label="Correo corporativo">
-          <Input disabled value={currentUser.email || ""} />
-        </Form.Item>
-
-        <Form.Item label="Rol en el sistema">
-          <Input disabled value={roleLabel} />
-        </Form.Item>
-
-        <Form.Item label="Sede asignada">
-          <Input disabled value={sedeLabel} />
-        </Form.Item>
-
-        <Space
-          style={{ display: "flex", justifyContent: "flex-end", marginTop: 4 }}
-          wrap
-        >
-          <Button onClick={onClose}>Cancelar</Button>
-
-          <Popconfirm
-            title="Confirmar cambios en tu perfil"
-            description="¿Quieres aplicar los cambios en tu perfil?"
-            okText="Sí, aplicar"
-            cancelText="Cancelar"
-            placement="topRight"
-            onConfirm={handleSaveProfile}
-            disabled={savingProfile}
+          <Form
+            form={profileForm}
+            layout="vertical"
+            preserve={false}
+            initialValues={profileInitialValues}
           >
-            <Button type="primary" loading={savingProfile}>
-              Enviar cambios
-            </Button>
-          </Popconfirm>
-        </Space>
-      </Form>
+            <Form.Item
+              label="Nombre completo"
+              name="name"
+              rules={[
+                { required: true, message: "Ingresa tu nombre completo" },
+              ]}
+            >
+              <Input placeholder="Ej: Juan Pérez" />
+            </Form.Item>
 
-      {/* === BLOQUE: CONTRASEÑA (COLAPSABLE) === */}
-      <Divider style={{ margin: "14px 0 8px" }} />
+            <Form.Item label="Correo corporativo">
+              <Input disabled value={currentUser.email || ""} />
+            </Form.Item>
 
-      <Collapse
-        bordered={false}
-        defaultActiveKey={[]}
-        style={{ background: "#f9fafb", borderRadius: 8 }}
-      >
-        <Panel
-          key="password"
-          header={
-            <Space size={6}>
-              <Text style={{ fontSize: 12, fontWeight: 500 }}>
-                Cambiar contraseña (opcional)
-              </Text>
+            <Form.Item label="Rol en el sistema">
+              <Input disabled value={roleLabel} />
+            </Form.Item>
+
+            <Form.Item label="Sede asignada">
+              <Input disabled value={sedeLabel} />
+            </Form.Item>
+
+            <Space
+              style={{
+                display: "flex",
+                justifyContent: "flex-end",
+                marginTop: 4,
+              }}
+              wrap
+            >
+              <Button onClick={onClose}>Cancelar</Button>
+
+              <Popconfirm
+                title="Confirmar cambios en tu perfil"
+                description="¿Quieres aplicar los cambios en tu perfil?"
+                okText="Sí, aplicar"
+                cancelText="Cancelar"
+                placement="topRight"
+                onConfirm={handleSaveProfile}
+                disabled={savingProfile}
+              >
+                <Button type="primary" loading={savingProfile}>
+                  Enviar cambios
+                </Button>
+              </Popconfirm>
             </Space>
-          }
-        >
+          </Form>
+        </>
+      ),
+    },
+    {
+      key: "password",
+      label: "Cambiar contraseña",
+      children: (
+        <>
+          <Divider orientation="left" style={{ margin: "8px 0 10px" }}>
+            <Text style={{ fontSize: 12 }}>Seguridad y acceso</Text>
+          </Divider>
+
           <Alert
             type="warning"
             showIcon
@@ -368,10 +382,7 @@ const ConfigModal = ({ open, onClose, currentUser, onUserUpdated }) => {
               <Input.Password placeholder="Repite la nueva contraseña" />
             </Form.Item>
 
-            <Space
-              style={{ display: "flex", justifyContent: "flex-end" }}
-              wrap
-            >
+            <Space style={{ display: "flex", justifyContent: "flex-end" }} wrap>
               <Popconfirm
                 title="Confirmar cambio de contraseña"
                 description="¿Seguro que quieres actualizar tu contraseña?"
@@ -387,8 +398,192 @@ const ConfigModal = ({ open, onClose, currentUser, onUserUpdated }) => {
               </Popconfirm>
             </Space>
           </Form>
-        </Panel>
-      </Collapse>
+        </>
+      ),
+    },
+    {
+      key: "accessibility",
+      label: "Accesibilidad (Demo)",
+      children: (
+        <>
+          <Divider orientation="left" style={{ margin: "8px 0 10px" }}>
+            <Text style={{ fontSize: 12 }}>Preferencias de accesibilidad</Text>
+          </Divider>
+
+          <Alert
+            type="info"
+            showIcon
+            style={{ marginBottom: 10 }}
+            message={<Text style={{ fontSize: 11 }}>Ajustes visuales</Text>}
+            description={
+              <Text style={{ fontSize: 11 }}>
+                Estas opciones estan en fase de prueba. Puedes cambiar la
+                apariencia y comportamiento de la interfaz para adaptarla a tus
+                necesidades.
+              </Text>
+            }
+          />
+
+          <Space
+            direction="vertical"
+            size={12}
+            style={{ width: "100%", marginTop: 4 }}
+          >
+            {/* Reducir animaciones */}
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                gap: 12,
+              }}
+            >
+              <div style={{ maxWidth: 420 }}>
+                <Text strong style={{ fontSize: 12 }}>
+                  Reducir animaciones y efectos
+                </Text>
+                <br />
+                <Text type="secondary" style={{ fontSize: 11 }}>
+                  Desactiva la mayoría de transiciones y animaciones para una
+                  experiencia más tranquila o en dispositivos lentos.
+                </Text>
+              </div>
+
+              <Switch
+                checked={accessPrefs.reducedMotion}
+                loading={savingAccess}
+                onChange={(checked) =>
+                  handleUpdateAccessPrefs({ reducedMotion: checked })
+                }
+              />
+            </div>
+
+            {/* Tema claro / oscuro */}
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                gap: 12,
+              }}
+            >
+              <div style={{ maxWidth: 420 }}>
+                <Text strong style={{ fontSize: 12 }}>
+                  Tema de la aplicación
+                </Text>
+                <br />
+                <Text type="secondary" style={{ fontSize: 11 }}>
+                  Cambia entre modo claro y oscuro. Afecta a todos los
+                  componentes de Ant Design y la mayor parte de la interfaz.
+                </Text>
+              </div>
+
+              <Segmented
+                size="small"
+                options={[
+                  { label: "Claro", value: false },
+                  { label: "Oscuro", value: true },
+                ]}
+                value={accessPrefs.darkMode}
+                onChange={(val) => handleUpdateAccessPrefs({ darkMode: !!val })}
+              />
+            </div>
+
+            {/* Contraste */}
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                gap: 12,
+              }}
+            >
+              <div style={{ maxWidth: 420 }}>
+                <Text strong style={{ fontSize: 12 }}>
+                  Contraste
+                </Text>
+                <br />
+                <Text type="secondary" style={{ fontSize: 11 }}>
+                  Usa un contraste más fuerte para mejorar la legibilidad de
+                  textos y controles.
+                </Text>
+              </div>
+
+              <Segmented
+                size="small"
+                options={[
+                  { label: "Normal", value: false },
+                  { label: "Alto contraste", value: true },
+                ]}
+                value={accessPrefs.highContrast}
+                onChange={(val) =>
+                  handleUpdateAccessPrefs({ highContrast: !!val })
+                }
+              />
+            </div>
+
+            {/* Tamaño de fuente base */}
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                gap: 12,
+              }}
+            >
+              <div style={{ maxWidth: 420 }}>
+                <Text strong style={{ fontSize: 12 }}>
+                  Tamaño de texto
+                </Text>
+                <br />
+                <Text type="secondary" style={{ fontSize: 11 }}>
+                  Aumenta ligeramente el tamaño base de la tipografía en todo el
+                  sistema.
+                </Text>
+              </div>
+
+              <Segmented
+                size="small"
+                options={[
+                  { label: "Normal", value: false },
+                  { label: "Grande", value: true },
+                ]}
+                value={accessPrefs.largeFonts}
+                onChange={(val) =>
+                  handleUpdateAccessPrefs({ largeFonts: !!val })
+                }
+              />
+            </div>
+          </Space>
+        </>
+      ),
+    },
+  ];
+
+  return (
+    <Modal
+      open={open}
+      title="Configuración de mi cuenta"
+      onCancel={onClose}
+      footer={null}
+      width={640}
+      destroyOnClose
+    >
+      <Alert
+        message="Configuración personal"
+        description={
+          <Text style={{ fontSize: 12 }}>
+            Usa las pestañas para editar tus datos de perfil, actualizar tu
+            contraseña o ajustar accesibilidad visual. La sede y el rol son
+            informativos y solo pueden ser cambiados por un administrador.
+          </Text>
+        }
+        type="info"
+        showIcon
+        style={{ marginBottom: 12 }}
+      />
+
+      <Tabs defaultActiveKey="profile" size="small" items={tabItems} animated />
 
       {/* Etiquetas informativas abajo */}
       <Divider style={{ margin: "12px 0 6px" }} />
