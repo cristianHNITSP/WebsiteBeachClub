@@ -123,9 +123,7 @@ const InicioSesionPanel = () => {
           backendMsg ||
             "Tu usuario está inactivo. Contacta al administrador del sistema para recuperar el acceso."
         );
-        messageApi.warning(
-          "Tu usuario esta inactivo."
-        );
+        messageApi.warning("Tu usuario esta inactivo.");
       }
       // ❌ Credenciales incorrectas
       else if (errorCode === "INVALID_CREDENTIALS") {
@@ -603,6 +601,20 @@ const InicioSesionPanel = () => {
                       }}
                     >
                       Acceder al panel
+                    </Button>
+
+                    {/* 🔙 Botón para regresar a la ruta raíz */}
+                    <Button
+                      type="default"
+                      size="middle"
+                      block
+                      onClick={() => navigate("/")}
+                      style={{
+                        borderRadius: 999,
+                        marginTop: 4,
+                      }}
+                    >
+                      Volver al inicio
                     </Button>
                   </Form>
 
