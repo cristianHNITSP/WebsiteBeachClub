@@ -67,6 +67,16 @@ const ReservaSchema = new mongoose.Schema(
     //PAPELERA (soft delete)
     isDeleted: { type: Boolean, default: false, index: true },
     deletedAt: { type: Date, default: null, index: true },
+
+    // dentro del ReservaSchema
+guest: {
+  fullName: { type: String, default: "", trim: true },
+  email: { type: String, default: "", trim: true },
+  phone: { type: String, default: "", trim: true },
+  guests: { type: Number, default: 1, min: 1, max: 20 },
+},
+paymentMethod: { type: String, default: "", trim: true },
+
   },
   {
     timestamps: { createdAt: "createdAt", updatedAt: "updatedAt" },

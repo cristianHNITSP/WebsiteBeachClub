@@ -355,7 +355,7 @@ function createHabitacionesRouter(io) {
       const limitRaw = parseInt(req.query.limit, 10);
 
       const page = Math.max(pageRaw || 1, 1);
-      const limit = Math.min(Math.max(limitRaw || 5, 1), 5); // <= 5 siempre
+      const limit = Math.min(Math.max(limitRaw || 6, 1), 6); // <= 5 siempre
       const skip = (page - 1) * limit;
 
       const filter = buildHabitacionesFilterFromQuery(req.query, { forPublic: true });
