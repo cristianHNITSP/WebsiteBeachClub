@@ -205,6 +205,51 @@ services:
     networks:
       - beachclub-net
 
+  beachclub-shop-service-dev:
+    build:
+      context: ./shop-service
+    container_name: beachclub-shop-service-dev
+    env_file:
+      - ./shop-service/.env
+    environment:
+      NODE_ENV: development
+      MONGO_URI: "mongodb://root:${MONGO_PASSWORD}@beachclub-mongo:27017/beachclub_shop?authSource=admin"
+    depends_on:
+      - beachclub-mongo
+    ports:
+      - "4103:4003"
+    volumes:
+      - ./shop-service:/app
+      - /app/node_modules
+    command: sh -c "npm run dev"
+    restart: unless-stopped
+    profiles: ["dev"]
+    networks:
+      beachclub-net:
+        aliases:
+          - beachclub-shop-service
+  
+  # ==========================================
+  # SHOP SERVICE (PROD)
+  # ==========================================
+  beachclub-shop-service:
+    build:
+      context: ./shop-service
+    container_name: beachclub-shop-service-prod
+    env_file:
+      - ./shop-service/.env
+    environment:
+      NODE_ENV: production
+      MONGO_URI: "mongodb://root:${MONGO_PASSWORD}@beachclub-mongo:27017/beachclub_shop?authSource=admin"
+    depends_on:
+      - beachclub-mongo
+    ports:
+      - "127.0.0.1:4103:4003"
+    restart: unless-stopped
+    profiles: ["prod"]
+    networks:
+      - beachclub-net
+
 networks:
   beachclub-net:
     driver: bridge

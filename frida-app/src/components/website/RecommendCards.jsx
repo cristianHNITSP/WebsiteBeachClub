@@ -1,28 +1,42 @@
 // src/components/Recommendcards.jsx
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import axios from "@api/axios";
 import {
+  Alert,
+  Badge,
+  Button,
   Card,
   Flex,
-  Typography,
-  Space,
+  Image,
+  List,
   Skeleton,
-  Input,
-  Button,
+  Space,
   Tag,
-  Row,
-  Col,
-  Alert,
+  Typography,
+  theme,
 } from "antd";
-import { FireFilled, MailOutlined } from "@ant-design/icons";
+
+import {
+  FireFilled,
+  EnvironmentOutlined,
+  DollarCircleOutlined,
+  ThunderboltOutlined,
+  HeartOutlined,
+  InfoCircleOutlined,
+  RightOutlined,
+} from "@ant-design/icons";
+
+const { Text, Title } = Typography;
 
 function Recommendcards({ beachColors, maxItems = 4 }) {
+  const { token } = theme.useToken();
+
   const [rooms, setRooms] = useState([]);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState("");
 
   const placeholderImg =
-    "https://via.placeholder.com/400x250?text=Habitaci%C3%B3n";
+    "https://via.placeholder.com/900x520?text=Habitaci%C3%B3n";
 
   useEffect(() => {
     let isMounted = true;
@@ -37,7 +51,6 @@ function Recommendcards({ beachColors, maxItems = 4 }) {
         });
 
         const items = Array.isArray(data) ? data : data.items || [];
-
         if (!isMounted) return;
         setRooms(items);
       } catch (err) {
@@ -57,265 +70,274 @@ function Recommendcards({ beachColors, maxItems = 4 }) {
     };
   }, [maxItems]);
 
+  const list = useMemo(() => (Array.isArray(rooms) ? rooms : []), [rooms]);
+
+  const skeletonItems = useMemo(
+    () =>
+      Array.from({ length: maxItems }, (_, i) => ({
+        __skeleton: true,
+        _key: `sk-${i}`,
+      })),
+    [maxItems]
+  );
+
+  const dataSource = loading && list.length === 0 ? skeletonItems : list;
+
+  const money = (n) => {
+    const num = Number(n || 0);
+    try {
+      return new Intl.NumberFormat("es-MX", {
+        style: "currency",
+        currency: "MXN",
+        maximumFractionDigits: 0,
+      }).format(num);
+    } catch {
+      return `$${num}`;
+    }
+  };
+
+  const cardRadius = token.borderRadiusLG;
+  const coverH = 150;
+
   return (
-    <Flex vertical style={{ padding: 10, gap: 16 }}>
-      <Typography.Title
-        level={4}
-        style={{ color: beachColors.deepBlue, marginTop: 1 }}
-      >
-        <FireFilled style={{ color: beachColors.sunset }} /> Habitaciones
-        recomendadas
-      </Typography.Title>
+    <div style={{ overflowX: "hidden" }}>
+      {/* Header compacto */}
+      <div style={{ padding: 6 }}>
+        <Space size={10} align="center" style={{ width: "100%" }}>
+          <FireFilled
+            style={{ color: beachColors?.sunset || token.colorWarning }}
+          />
+          <Title level={5} style={{ margin: 0, color: beachColors?.deepBlue }}>
+            Habitaciones recomendadas
+          </Title>
+        </Space>
+      </div>
 
-      {errorMsg && (
-        <Alert
-          type="error"
-          showIcon
-          message="No se pudieron cargar las recomendaciones"
-          description={errorMsg}
-        />
-      )}
+      {errorMsg ? (
+        <div style={{ padding: 6 }}>
+          <Alert
+            type="error"
+            showIcon
+            message="No se pudieron cargar las recomendaciones"
+            description={errorMsg}
+          />
+        </div>
+      ) : null}
 
-      <Row gutter={[12, 12]}>
-        {loading && !rooms.length
-          ? Array.from({ length: maxItems }).map((_, i) => (
-              <Col xs={24} sm={12} key={i}>
+      <List
+        style={{ padding: 6 }}
+        grid={{ gutter: 10, column: 1 }}
+        dataSource={dataSource}
+        rowKey={(item, index) =>
+          item?._id || item?.codigo || item?._key || `it-${index}`
+        }
+        renderItem={(room, idx) => {
+          // Skeleton
+          if (room?.__skeleton) {
+            return (
+              <List.Item>
                 <Card
+                  size="small"
                   hoverable
-                  style={{
-                    borderRadius: 12,
-                    overflow: "hidden",
-                    height: "100%",
-                  }}
+                  style={{ borderRadius: cardRadius, overflow: "hidden" }}
                   cover={
                     <Skeleton.Image
                       active
-                      style={{
-                        height: 120,
-                        width: "100%",
-                        objectFit: "cover",
-                      }}
+                      style={{ width: "100%", height: coverH }}
                     />
                   }
                 >
                   <Skeleton active paragraph={{ rows: 2 }} />
                 </Card>
-              </Col>
-            ))
-          : rooms.map((room, i) => {
-              const title =
-                room.title || room.name || room.codigo || "Habitación";
-              const desc =
-                room.location ||
-                room.badge ||
-                "Habitación recomendada en el Hotel Beach Club";
-              const img = room.img || placeholderImg;
-              const price = room.price || 0;
-              const favorites = room.favoritesCount || 0;
+              </List.Item>
+            );
+          }
 
-              const discountPercent = room.offer?.discountPercent;
-              const hasDiscount =
-                room.offer?.isSpecial &&
-                typeof discountPercent === "number" &&
-                discountPercent > 0;
+          const title =
+            room?.title || room?.name || room?.codigo || "Habitación";
+          const desc =
+            room?.location || room?.badge || "Recomendación destacada";
+          const img =
+            room?.img ||
+            room?.image ||
+            room?.cover ||
+            room?.thumbnail ||
+            placeholderImg;
 
-              const specialPrice = hasDiscount
-                ? Math.round(price * (1 - discountPercent / 100))
-                : null;
+          const price = Number(room?.price || 0);
+          const favorites = Number(room?.favoritesCount || room?.favs || 0);
 
-              const index = i + 1;
+          const discountPercent = room?.offer?.discountPercent;
+          const hasDiscount =
+            room?.offer?.isSpecial &&
+            typeof discountPercent === "number" &&
+            discountPercent > 0;
 
-              return (
-                <Col xs={24} sm={12} key={room._id || room.codigo || i}>
-                  <Card
-                    hoverable
-                    style={{
-                      borderRadius: 12,
-                      overflow: "hidden",
-                      height: "100%",
-                    }}
-                    cover={
-                      loading ? (
-                        <Skeleton.Image
-                          active
-                          alt={title}
-                          style={{
-                            height: 120,
-                            width: "100%",
-                            objectFit: "cover",
-                          }}
-                        />
-                      ) : (
-                        <img
-                          src={img}
-                          alt={title}
-                          style={{
-                            height: 120,
-                            width: "100%",
-                            objectFit: "cover",
-                          }}
-                        />
-                      )
-                    }
-                  >
+          const specialPrice =
+            hasDiscount && price > 0
+              ? Math.round(price * (1 - discountPercent / 100))
+              : null;
+
+          const index = idx + 1;
+          const ribbonText = hasDiscount ? `-${discountPercent}%` : `#${index}`;
+          const ribbonColor = hasDiscount
+            ? beachColors?.turquoise || token.colorSuccess
+            : beachColors?.oceanBlue || token.colorPrimary;
+
+          return (
+            <List.Item>
+              <Badge.Ribbon text={ribbonText} color={ribbonColor}>
+                <Card
+                  size="small"
+                  hoverable
+                  style={{ borderRadius: cardRadius, overflow: "hidden" }}
+                  cover={
+                    <Image
+                      preview={false}
+                      src={img}
+                      fallback={placeholderImg}
+                      height={coverH}
+                      width="100%"
+                      style={{ objectFit: "cover", display: "block" }}
+                    />
+                  }
+                  
+                  actions={[
                     <Flex
                       justify="space-between"
-                      align="flex-start"
-                      style={{ gap: 8 }}
+                      align="center"
+                      style={{ width: "100%" }}
                     >
-                      <div>
-                        <Space size={6} align="center">
-                          {/* Índice */}
-                          <Tag
-                            color={beachColors.turquoise}
+                      <Button
+                        key="details"
+                        type="link"
+                        icon={<InfoCircleOutlined />}
+                        style={{ fontWeight: 700 }}
+                        onClick={() => {
+                          // opcional: abre modal
+                        }}
+                      >
+                        Detalles
+                      </Button>
+                      ,
+                      <Button
+                        key="view"
+                        type="primary"
+                        icon={<RightOutlined />}
+                        style={{
+                          borderRadius: 999,
+                          fontWeight: 800,
+                          background: `linear-gradient(90deg, ${
+                            beachColors?.turquoise || token.colorPrimary
+                          }, ${beachColors?.oceanBlue || token.colorPrimary})`,
+                          border: "none",
+                        }}
+                        onClick={() => {
+                          // opcional: navegar/seleccionar
+                        }}
+                      >
+                        Ver
+                      </Button>
+                      ,
+                    </Flex>,
+
+
+
+                  ]}
+                >
+                  <Space
+                    direction="vertical"
+                    size={6}
+                    style={{ width: "100%" }}
+                  >
+                    <Text strong ellipsis style={{ fontSize: 13 }}>
+                      {title}
+                    </Text>
+
+                    <Space size={6} align="center" style={{ width: "100%" }}>
+                      <EnvironmentOutlined
+                        style={{
+                          color: beachColors?.oceanBlue || token.colorPrimary,
+                        }}
+                      />
+                      <Text type="secondary" ellipsis style={{ fontSize: 12 }}>
+                        {desc}
+                      </Text>
+                    </Space>
+
+                    <Space size={8} wrap>
+                      {hasDiscount && specialPrice != null ? (
+                        <>
+                          <Text
+                            delete
+                            type="secondary"
+                            style={{ fontSize: 12 }}
+                          >
+                            {money(price)}
+                          </Text>
+                          <Text
+                            strong
                             style={{
-                              borderRadius: 999,
-                              fontSize: 10,
-                              color: "#065f46",
+                              fontSize: 14,
+                              color: beachColors?.deepBlue,
                             }}
                           >
-                            #{index}
+                            <DollarCircleOutlined /> {money(specialPrice)}
+                          </Text>
+                          <Text type="secondary" style={{ fontSize: 12 }}>
+                            / noche
+                          </Text>
+                          <Tag
+                            icon={<ThunderboltOutlined />}
+                            color="success"
+                            style={{
+                              borderRadius: 999,
+                              margin: 0,
+                              fontWeight: 700,
+                            }}
+                          >
+                            Oferta
                           </Tag>
-                          <Typography.Text strong style={{ fontSize: 13 }}>
-                            {title}
-                          </Typography.Text>
-                        </Space>
-                        <Typography.Paragraph
-                          type="secondary"
+                        </>
+                      ) : (
+                        <>
+                          <Text
+                            strong
+                            style={{
+                              fontSize: 14,
+                              color: beachColors?.deepBlue,
+                            }}
+                          >
+                            <DollarCircleOutlined /> {money(price)}
+                          </Text>
+                          <Text type="secondary" style={{ fontSize: 12 }}>
+                            / noche
+                          </Text>
+                        </>
+                      )}
+
+                      {favorites > 0 ? (
+                        <Tag
+                          icon={<HeartOutlined />}
+                          color="error"
                           style={{
-                            margin: "2px 0 0",
-                            fontSize: 12,
-                          }}
-                          ellipsis={{ rows: 2 }}
-                        >
-                          {desc}
-                        </Typography.Paragraph>
-
-                        <Space
-                          size={6}
-                          style={{
-                            marginTop: 6,
-                            flexWrap: "wrap",
+                            borderRadius: 999,
+                            margin: 0,
+                            fontWeight: 700,
                           }}
                         >
-                          {/* Precio base / oferta */}
-                          {hasDiscount && specialPrice != null ? (
-                            <>
-                              <Typography.Text
-                                delete
-                                type="secondary"
-                                style={{ fontSize: 11 }}
-                              >
-                                ${price.toLocaleString("es-MX")}
-                              </Typography.Text>
-                              <Typography.Text
-                                style={{
-                                  fontSize: 13,
-                                  fontWeight: 600,
-                                  color: beachColors.deepBlue,
-                                }}
-                              >
-                                ${specialPrice.toLocaleString("es-MX")}
-                                <Typography.Text
-                                  type="secondary"
-                                  style={{
-                                    fontSize: 11,
-                                    marginLeft: 4,
-                                  }}
-                                >
-                                  / noche
-                                </Typography.Text>
-                              </Typography.Text>
-                            </>
-                          ) : (
-                            <Typography.Text
-                              style={{
-                                fontSize: 13,
-                                fontWeight: 600,
-                                color: beachColors.deepBlue,
-                              }}
-                            >
-                              ${price.toLocaleString("es-MX")}
-                              <Typography.Text
-                                type="secondary"
-                                style={{
-                                  fontSize: 11,
-                                  marginLeft: 4,
-                                }}
-                              >
-                                / noche
-                              </Typography.Text>
-                            </Typography.Text>
-                          )}
-
-                          {/* Chip descuento tipo índice */}
-                          {hasDiscount && (
-                            <div
-                              style={{
-                                background: beachColors.turquoise,
-                                color: "white",
-                                borderRadius: 6,
-                                padding: "2px 8px",
-                                fontSize: 11,
-                              }}
-                            >
-                              -{discountPercent}% OFF
-                            </div>
-                          )}
-
-                          {favorites > 0 && (
-                            <Typography.Text
-                              type="secondary"
-                              style={{ fontSize: 11 }}
-                            >
-                              {favorites} favs
-                            </Typography.Text>
-                          )}
-                        </Space>
-                      </div>
-                    </Flex>
-                  </Card>
-                </Col>
-              );
-            })}
-      </Row>
-
-      {/* Bloque newsletter 
-      
-            <div
-        style={{
-          marginTop: 8,
-          padding: 20,
-          background: `linear-gradient(135deg, ${beachColors.deepBlue}15, ${beachColors.turquoise}15)`,
-          borderRadius: 16,
+                          {favorites}
+                        </Tag>
+                      ) : null}
+                    </Space>
+                  </Space>
+                </Card>
+              </Badge.Ribbon>
+            </List.Item>
+          );
         }}
-      >
-        <Typography.Title level={5}>
-          <MailOutlined /> Ofertas Exclusivas
-        </Typography.Title>
-        <Typography.Text>
-          Suscríbete y recibe promociones especiales de tus habitaciones
-          favoritas.
-        </Typography.Text>
-        <Input
-          placeholder="Tu email"
-          style={{ marginTop: 12, borderRadius: 8 }}
-        />
-        <Button
-          color="cyan"
-          variant="solid"
-          block
-          style={{
-            marginTop: 8,
-            borderRadius: 8,
-          }}
-        >
-          Suscribirme
-        </Button>
-      </div>
-      
-      */}
-    </Flex>
+      />
+    </div>
   );
 }
 
