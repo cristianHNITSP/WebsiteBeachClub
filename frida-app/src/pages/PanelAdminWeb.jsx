@@ -6,6 +6,7 @@ import {
   CalendarOutlined,
   UserOutlined,
   AppstoreOutlined,
+    ShoppingCartOutlined,
 } from "@ant-design/icons";
 import { neutrals } from "../theme/beachTheme";
 import AdminHeader from "../layout/AdminHeader";
@@ -13,6 +14,7 @@ import DashboardView from "../views/DashboardView";
 import HabitacionesView from "../views/HabitacionesReservaView";
 import PromocionesView from "../views/PromocionesView";
 import UsuariosView from "../views/UsuariosView";
+import MiniTiendaView from "../views/MiniTiendaView";
 import GestionHabitacionesView from "../views/GestionHabitacionesView";
 import "./PanelAdminWeb.css";
 
@@ -28,6 +30,7 @@ const VALID_TABS = [
   "gestionHabitaciones",
   "promociones",
   "usuarios",
+  "miniTienda", //nuevo
 ];
 
 // Lee la pestaña inicial desde localStorage
@@ -105,6 +108,12 @@ const PanelAdminWeb = ({ currentUser, onCurrentUserUpdated }) => {
   const canViewPromociones =
     permissions.includes("view_hero_slides") || isAdmin;
 
+
+  const canViewMiniTienda = 
+    permissions.includes("view_shop") || 
+      permissions.includes("pos_shop") || isAdmin;
+
+
   /* ==========================
      TABS FILTRADAS POR PERMISO
      ========================== */
@@ -162,6 +171,17 @@ const PanelAdminWeb = ({ currentUser, onCurrentUserUpdated }) => {
       ),
       allowed: canViewUsuarios,
     },
+    {
+  key: "miniTienda",
+  label: (
+    <Space size={6}>
+      <ShoppingCartOutlined />
+      <span style={{ fontSize: isMobile ? 11 : 13 }}>Tienda</span>
+    </Space>
+  ),
+  allowed: canViewMiniTienda,
+},
+
   ];
 
   const availableTabItems = baseTabItems
@@ -192,6 +212,8 @@ const PanelAdminWeb = ({ currentUser, onCurrentUserUpdated }) => {
         return canViewGestionHabitaciones;
       case "usuarios":
         return canViewUsuarios;
+      case "miniTienda":
+        return canViewMiniTienda;
       case "promociones":
         return canViewPromociones;
       default:
@@ -242,7 +264,8 @@ const PanelAdminWeb = ({ currentUser, onCurrentUserUpdated }) => {
 
       case "usuarios":
         return <UsuariosView isMobile={isMobile} currentUser={currentUser} />;
-
+      case "miniTienda":
+        return <MiniTiendaView isMobile={isMobile} currentUser={currentUser} />;
       case "dashboard":
       default:
         return <DashboardView isMobile={isMobile} currentUser={currentUser} />;
