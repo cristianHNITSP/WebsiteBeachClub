@@ -1,17 +1,19 @@
 #version: "3.9"
 
-# Comandos útiles BeachClub:
+#COMANDOS PARA LEVANTAR Y DETENER LOS SERVICIOS DOCKER CON DOCKER COMPOSE:
 # dev:    sudo docker compose --profile dev  up --build
 # prod:   sudo docker compose --profile prod up --build -d
 # down:   sudo docker compose down --remove-orphans
 
+#----------------------------------------------------------------------------------------
+# COMANDOS PARA SEMBRAR DATOS DE PRUEBA EN LOS SERVICIOS:
 #sudo docker exec -it beachclub-users-service-prod node src/seed/seed-users.js
 #sudo docker exec -it beachclub-reservas-service-prod node src/seed/seed-data.js
-
 #sudo docker exec -it beachclub-users-service-dev node src/seed/seed-users.js
 #sudo docker exec -it beachclub-reservas-service-dev node src/seed/seed-data.js
 
-# ver logs -f es para seguir los actualizados
+#----------------------------------------------------------------------------------------
+# VER LOS LOGS DE LOS SERVICIOS:
 # sudo docker logs -f beachclub-users-service-dev
 # sudo docker logs rsboapp-inventory
 # sudo docker logs -f rsboapp-auth
