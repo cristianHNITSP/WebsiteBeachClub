@@ -1,14 +1,19 @@
 #version: "3.9"
 
 #COMANDOS PARA LEVANTAR Y DETENER LOS SERVICIOS DOCKER CON DOCKER COMPOSE:
-# dev:    sudo docker compose --profile dev  up --build
+#LEVANTA LOS SERIVICIOS SIN GENERAR LOGS EN CONSOLA
+# dev:    sudo docker compose --profile dev  up --build -d
 # prod:   sudo docker compose --profile prod up --build -d
 # down:   sudo docker compose down --remove-orphans
 
 #----------------------------------------------------------------------------------------
 # COMANDOS PARA SEMBRAR DATOS DE PRUEBA EN LOS SERVICIOS:
+
+#COMANDOS PROD
 #sudo docker exec -it beachclub-users-service-prod node src/seed/seed-users.js
 #sudo docker exec -it beachclub-reservas-service-prod node src/seed/seed-data.js
+
+#COMANDOS DEV
 #sudo docker exec -it beachclub-users-service-dev node src/seed/seed-users.js
 #sudo docker exec -it beachclub-reservas-service-dev node src/seed/seed-data.js
 
