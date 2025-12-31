@@ -34,7 +34,7 @@ async function seed() {
           "view_hero_slides",
           "manage_hero_slides",
 
-          // ✅ NUEVOS: shop / POS
+          //NUEVOS: shop / POS
           "view_shop",
           "pos_shop",
           "manage_shop",

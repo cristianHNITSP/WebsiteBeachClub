@@ -558,7 +558,7 @@ const GestionHabitacionesView = ({ isMobile, currentUser }) => {
           onRestore={restaurarHabitacion}
           onDeletePermanent={eliminarHabitacionPermanent}
           deletingRoomId={deletingRoomId}
-          onViewFutureReservations={abrirReservasFuturas} // ✅ usa modal de reservas futuras
+          onViewFutureReservations={abrirReservasFuturas} // usa modal de reservas futuras
         />
       </Card>
 

@@ -11,6 +11,7 @@ const productsRoutes = require("./routes/products.routes");
 const salesRoutes = require("./routes/sales.routes");
 const sitesRoutes = require("./routes/sites.routes");
 const stockMovementsRoutes = require("./routes/stockMovements");
+const dashboardRoutes = require("./routes/dashboard.routes");
 
 const app = express();
 
@@ -35,6 +36,7 @@ app.use("/api/shop/products", productsRoutes);
 app.use("/api/shop/sales", salesRoutes);
 app.use("/api/shop/stock-movements", stockMovementsRoutes);
 app.use("/api/shop/sites", sitesRoutes);
+app.use("/api/shop/dashboard", dashboardRoutes); 
 
 const port = Number(process.env.PORT || 4003);
 

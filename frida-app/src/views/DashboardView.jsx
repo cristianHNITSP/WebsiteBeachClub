@@ -1,5 +1,5 @@
-// src/views/DashboardView.jsx
-import React, { useEffect, useMemo, useState } from "react";
+// frida-app/src/views/DashboardView.jsx
+import { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import {
   Card,
@@ -12,6 +12,7 @@ import {
   Typography,
   Tooltip,
   Badge,
+  Tabs,
 } from "antd";
 
 import {
@@ -22,6 +23,8 @@ import {
   ThunderboltOutlined,
   ClusterOutlined,
   PieChartOutlined,
+  ShoppingCartOutlined,
+  StockOutlined,
 } from "@ant-design/icons";
 
 import { beachColors, neutrals } from "../theme/beachTheme";
@@ -82,7 +85,10 @@ const DashboardView = ({ isMobile }) => {
   // Flag para animación de entrada
   const [mounted, setMounted] = useState(false);
 
-  // Resumen real de HOY
+  // Tab actual: hotel / shop
+  const [activeTab, setActiveTab] = useState("hotel");
+
+  // Resumen real de HOY (reservas)
   const [hoy, setHoy] = useState({
     reservas: 0, // reservas activas hoy (overlap)
     checkins: 0, // previstas hoy (startDate==hoy y sin checkinAt)
@@ -111,8 +117,29 @@ const DashboardView = ({ isMobile }) => {
     },
   });
 
+  /* ========== SHOP / POS ========== */
+
+  const [shopSummary, setShopSummary] = useState({
+    rangeLabel: "",
+    rangeTotal: 0,
+    rangeCount: 0,
+    todayTotal: 0,
+    todayCount: 0,
+    avgTicket: 0,
+    bySection: [],
+    byPayment: [],
+  });
+
+  const [lowStock, setLowStock] = useState([]);
+  const [recentMovements, setRecentMovements] = useState([]);
+
   const apiBase = useMemo(() => {
     return import.meta.env.VITE_RESERVAS_API_URL || "";
+  }, []);
+
+  const shopBase = useMemo(() => {
+    // Si está vacío, pega contra /api/shop/... en el mismo host
+    return import.meta.env.VITE_SHOP_API_URL || "";
   }, []);
 
   useEffect(() => {
@@ -296,8 +323,53 @@ const DashboardView = ({ isMobile }) => {
           channels:
             statsData.channels || { totalReservations: 0, byChannel: [] },
         });
+
+        /* ======= SHOP / POS OPCIONAL ======= */
+        try {
+          const shopUrl = shopBase
+            ? `${shopBase}/api/shop/dashboard`
+            : `/api/shop/dashboard`;
+
+          const shopRes = await axios.get(shopUrl, {
+            withCredentials: true,
+          });
+
+          const shopData = shopRes.data || {};
+          const salesSummary = shopData.salesSummary || {};
+
+          setShopSummary({
+            rangeLabel: shopData.rangeLabel || "",
+            rangeTotal: Number(salesSummary.rangeTotal || 0),
+            rangeCount: Number(salesSummary.rangeCount || 0),
+            todayTotal: Number(salesSummary.todayTotal || 0),
+            todayCount: Number(salesSummary.todayCount || 0),
+            avgTicket: round2(salesSummary.avgTicket || 0),
+            bySection: Array.isArray(salesSummary.bySection)
+              ? salesSummary.bySection
+              : [],
+            byPayment: Array.isArray(salesSummary.byPayment)
+              ? salesSummary.byPayment
+              : [],
+          });
+
+          setLowStock(
+            Array.isArray(shopData.lowStock) ? shopData.lowStock : []
+          );
+          setRecentMovements(
+            Array.isArray(shopData.recentMovements)
+              ? shopData.recentMovements
+              : []
+          );
+        } catch (errShop) {
+          // No tiramos el dashboard si shop falla
+          console.warn(
+            "[Dashboard] Shop dashboard no disponible:",
+            errShop?.response?.status,
+            errShop?.message
+          );
+        }
       } catch (e) {
-        console.error("[Dashboard] Error cargando datos:", e);
+        console.error("[Dashboard] Error cargando datos (core reservas):", e);
       } finally {
         if (alive) setLoading(false);
       }
@@ -307,9 +379,9 @@ const DashboardView = ({ isMobile }) => {
     return () => {
       alive = false;
     };
-  }, [apiBase]);
+  }, [apiBase, shopBase]);
 
-  /* ========== MÉTRICAS DERIVADAS ========== */
+  /* ========== MÉTRICAS DERIVADAS (RESERVAS) ========== */
 
   const disponibilidad = useMemo(() => {
     const total = disp.totalRooms || 0;
@@ -545,7 +617,6 @@ const DashboardView = ({ isMobile }) => {
     <div
       style={{
         minHeight: "100%",
-        padding: isMobile ? "8px 0 18px" : "10px 4px 24px",
         background: `radial-gradient(circle at top left, ${beachColors.turquoise}10, transparent 55%), radial-gradient(circle at bottom right, ${beachColors.sand}26, transparent 55%), #f8fafc`,
       }}
     >
@@ -599,8 +670,7 @@ const DashboardView = ({ isMobile }) => {
                 type="secondary"
                 style={{ fontSize: 11, display: "block", marginTop: 2 }}
               >
-                Vista rápida de ocupación, ingresos y comportamiento de
-                reservas.
+                Vista rápida de ocupación, reservas y ventas de tienda (shop).
               </Text>
             </div>
           </Space>
@@ -621,7 +691,7 @@ const DashboardView = ({ isMobile }) => {
                 Hoy: {todayMeridaStr()}
               </Tag>
             </Tooltip>
-            <Tooltip title="Datos consolidados de los últimos meses">
+            <Tooltip title="Datos consolidados de los últimos meses (habitaciones)">
               <Tag
                 icon={<RiseOutlined />}
                 color={beachColors.turquoise}
@@ -638,228 +708,997 @@ const DashboardView = ({ isMobile }) => {
         </Col>
       </Row>
 
-      {/* FILA 1: Resumen de hoy + Rendimiento últimos meses */}
-      <Row gutter={[16, 16]} style={sectionRowAnim(40)}>
-        {/* Resumen de Hoy */}
-        <Col xs={24} lg={15}>
-          <Card
-            hoverable
-            bordered={false}
-            style={{
-              borderRadius: 20,
-              background: `radial-gradient(circle at 0% 0%, rgba(255,255,255,0.18), transparent 55%), linear-gradient(140deg, ${beachColors.oceanBlue}, ${beachColors.teal})`,
-              boxShadow: "0 18px 44px rgba(15,23,42,0.3)",
-              overflow: "hidden",
-              position: "relative",
-            }}
-            bodyStyle={{
-              padding: isMobile ? 18 : 22,
-              paddingBottom: isMobile ? 18 : 24,
-            }}
-          >
-            {/* Decoración suave en esquina */}
-            <div
-              aria-hidden
-              style={{
-                position: "absolute",
-                inset: 0,
-                pointerEvents: "none",
-                background:
-                  "radial-gradient(circle at 80% 0%, rgba(248,250,252,0.16), transparent 60%)",
-              }}
-            />
+      {/* Tabs para separar hotel vs tienda */}
+      <Tabs
+        activeKey={activeTab}
+        onChange={setActiveTab}
+        style={{ marginBottom: 8 }}
+        items={[
+          {
+            key: "hotel",
+            label: "Hotel / Reservas",
+          },
+          {
+            key: "shop",
+            label: "Tienda (POS)",
+          },
+        ]}
+      />
 
-            <Space
-              direction="vertical"
-              size={10}
-              style={{ width: "100%", color: "#fff", position: "relative" }}
-            >
-              <div
+      {/* ================== TAB HOTEL ================== */}
+      {activeTab === "hotel" && (
+        <>
+          {/* FILA 1: Resumen de hoy + Rendimiento últimos meses */}
+          <Row gutter={[16, 16]} style={sectionRowAnim(40)}>
+            {/* Resumen de Hoy */}
+            <Col xs={24} lg={15}>
+              <Card
+                hoverable
+                bordered={false}
                 style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  gap: 8,
-                  alignItems: "flex-start",
+                  borderRadius: 20,
+                  background: `radial-gradient(circle at 0% 0%, rgba(255,255,255,0.18), transparent 55%), linear-gradient(140deg, ${beachColors.oceanBlue}, ${beachColors.teal})`,
+                  boxShadow: "0 18px 44px rgba(15,23,42,0.3)",
+                  overflow: "hidden",
+                  position: "relative",
+                }}
+                bodyStyle={{
+                  padding: isMobile ? 18 : 22,
+                  paddingBottom: isMobile ? 18 : 24,
                 }}
               >
-                <div>
-                  <Text
-                    style={{
-                      fontSize: 11,
-                      textTransform: "uppercase",
-                      letterSpacing: 0.6,
-                      color: "rgba(255,255,255,0.82)",
-                    }}
-                  >
-                    Resumen de hoy {loading ? "· cargando…" : ""}
-                  </Text>
-                  <Title
-                    level={3}
-                    style={{
-                      margin: "4px 0 0 0",
-                      color: "#fff",
-                      fontWeight: 600,
-                      fontSize: isMobile ? 20 : 24,
-                    }}
-                  >
-                    Operación diaria
-                  </Title>
-                  <Text
-                    style={{
-                      fontSize: 12,
-                      color: "rgba(255,255,255,0.80)",
-                    }}
-                  >
-                    Hotel Beach Club · estado en tiempo casi real
-                  </Text>
-                </div>
+                {/* Decoración suave en esquina */}
+                <div
+                  aria-hidden
+                  style={{
+                    position: "absolute",
+                    inset: 0,
+                    pointerEvents: "none",
+                    background:
+                      "radial-gradient(circle at 80% 0%, rgba(248,250,252,0.16), transparent 60%)",
+                  }}
+                />
 
                 <Space
                   direction="vertical"
-                  size={4}
-                  style={{ alignItems: "flex-end" }}
-                >
-                  <Tag
-                    color="rgba(15,23,42,0.26)"
-                    style={{
-                      borderRadius: 999,
-                      border: "none",
-                      color: "#e5e7eb",
-                      fontSize: 10,
-                      padding: "2px 10px",
-                      backdropFilter: "blur(6px)",
-                    }}
-                    icon={<ApartmentOutlined />}
-                  >
-                    Habitaciones totales: {disp.totalRooms || 0}
-                  </Tag>
-                  <Tag
-                    color="rgba(15,23,42,0.18)"
-                    style={{
-                      borderRadius: 999,
-                      border: "none",
-                      color: "#e5e7eb",
-                      fontSize: 10,
-                      padding: "2px 10px",
-                      backdropFilter: "blur(6px)",
-                    }}
-                  >
-                    Papelera: {disp.trashed || 0}
-                  </Tag>
-                </Space>
-              </div>
-
-              <Row gutter={16} style={{ marginTop: 8 }}>
-                <Col xs={12} sm={12} md={12}>
-                  <Statistic
-                    title={
-                      <Text style={{ color: "#e5e7eb", fontSize: 11 }}>
-                        Reservas activas hoy
-                      </Text>
-                    }
-                    value={hoy.reservas}
-                    valueStyle={{
-                      color: "#fff",
-                      fontSize: isMobile ? 24 : 30,
-                      fontWeight: 700,
-                    }}
-                  />
-                </Col>
-                <Col xs={12} sm={12} md={12}>
-                  <Statistic
-                    title={
-                      <Text style={{ color: "#e5e7eb", fontSize: 11 }}>
-                        Check-ins previstos hoy
-                      </Text>
-                    }
-                    value={hoy.checkins}
-                    valueStyle={{
-                      color: "#fff",
-                      fontSize: isMobile ? 24 : 30,
-                      fontWeight: 700,
-                    }}
-                  />
-                </Col>
-              </Row>
-
-              <Row gutter={16}>
-                <Col xs={12} sm={12} md={12}>
-                  <Statistic
-                    title={
-                      <Space size={4}>
-                        <Text style={{ color: "#e5e7eb", fontSize: 10 }}>
-                          Ocupación (hab. operables)
-                        </Text>
-                        <Tooltip title="Ocupación sobre habitaciones disponibles para vender (no cuenta papelera ni fuera de servicio).">
-                          <ThunderboltOutlined
-                            style={{ color: beachColors.sand, fontSize: 12 }}
-                          />
-                        </Tooltip>
-                      </Space>
-                    }
-                    value={hoy.ocupacion}
-                    suffix="%"
-                    valueStyle={{
-                      color: beachColors.sand,
-                      fontSize: isMobile ? 18 : 20,
-                      fontWeight: 600,
-                    }}
-                  />
-                </Col>
-                <Col xs={12} sm={12} md={12}>
-                  <Statistic
-                    title={
-                      <Text style={{ color: "#e5e7eb", fontSize: 10 }}>
-                        Ingreso estimado de hoy
-                      </Text>
-                    }
-                    value={hoy.ingresos}
-                    precision={2}
-                    prefix="$"
-                    valueStyle={{
-                      color: "#fff",
-                      fontSize: isMobile ? 18 : 20,
-                      fontWeight: 500,
-                    }}
-                  />
-                </Col>
-              </Row>
-            </Space>
-          </Card>
-        </Col>
-
-        {/* Rendimiento últimos meses */}
-        <Col xs={24} lg={9}>
-          <Card
-            hoverable
-            bordered={false}
-            title={
-              <Space>
-                <PieChartOutlined
-                  style={{ color: beachColors.oceanBlue, fontSize: 16 }}
-                />
-                <Text
+                  size={10}
                   style={{
-                    fontWeight: 600,
-                    color: neutrals.textMain,
-                    fontSize: 14,
+                    width: "100%",
+                    color: "#fff",
+                    position: "relative",
                   }}
                 >
-                  Rendimiento últimos meses
-                </Text>
-              </Space>
-            }
-            style={sectionCardStyle}
-            bodyStyle={sectionBodyBase}
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      gap: 8,
+                      alignItems: "flex-start",
+                    }}
+                  >
+                    <div>
+                      <Text
+                        style={{
+                          fontSize: 11,
+                          textTransform: "uppercase",
+                          letterSpacing: 0.6,
+                          color: "rgba(255,255,255,0.82)",
+                        }}
+                      >
+                        Resumen de hoy {loading ? "· cargando…" : ""}
+                      </Text>
+                      <Title
+                        level={3}
+                        style={{
+                          margin: "4px 0 0 0",
+                          color: "#fff",
+                          fontWeight: 600,
+                          fontSize: isMobile ? 20 : 24,
+                        }}
+                      >
+                        Operación diaria
+                      </Title>
+                      <Text
+                        style={{
+                          fontSize: 12,
+                          color: "rgba(255,255,255,0.80)",
+                        }}
+                      >
+                        Hotel Beach Club · estado en tiempo casi real
+                      </Text>
+                    </div>
+
+                    <Space
+                      direction="vertical"
+                      size={4}
+                      style={{ alignItems: "flex-end" }}
+                    >
+                      <Tag
+                        color="rgba(15,23,42,0.26)"
+                        style={{
+                          borderRadius: 999,
+                          border: "none",
+                          color: "#e5e7eb",
+                          fontSize: 10,
+                          padding: "2px 10px",
+                          backdropFilter: "blur(6px)",
+                        }}
+                        icon={<ApartmentOutlined />}
+                      >
+                        Habitaciones totales: {disp.totalRooms || 0}
+                      </Tag>
+                      <Tag
+                        color="rgba(15,23,42,0.18)"
+                        style={{
+                          borderRadius: 999,
+                          border: "none",
+                          color: "#e5e7eb",
+                          fontSize: 10,
+                          padding: "2px 10px",
+                          backdropFilter: "blur(6px)",
+                        }}
+                      >
+                        Papelera: {disp.trashed || 0}
+                      </Tag>
+                    </Space>
+                  </div>
+
+                  <Row gutter={16} style={{ marginTop: 8 }}>
+                    <Col xs={12} sm={12} md={12}>
+                      <Statistic
+                        title={
+                          <Text style={{ color: "#e5e7eb", fontSize: 11 }}>
+                            Reservas activas hoy
+                          </Text>
+                        }
+                        value={hoy.reservas}
+                        valueStyle={{
+                          color: "#fff",
+                          fontSize: isMobile ? 24 : 30,
+                          fontWeight: 700,
+                        }}
+                      />
+                    </Col>
+                    <Col xs={12} sm={12} md={12}>
+                      <Statistic
+                        title={
+                          <Text style={{ color: "#e5e7eb", fontSize: 11 }}>
+                            Check-ins previstos hoy
+                          </Text>
+                        }
+                        value={hoy.checkins}
+                        valueStyle={{
+                          color: "#fff",
+                          fontSize: isMobile ? 24 : 30,
+                          fontWeight: 700,
+                        }}
+                      />
+                    </Col>
+                  </Row>
+
+                  <Row gutter={16}>
+                    <Col xs={12} sm={12} md={12}>
+                      <Statistic
+                        title={
+                          <Space size={4}>
+                            <Text style={{ color: "#e5e7eb", fontSize: 10 }}>
+                              Ocupación (hab. operables)
+                            </Text>
+                            <Tooltip title="Ocupación sobre habitaciones disponibles para vender (no cuenta papelera ni fuera de servicio).">
+                              <ThunderboltOutlined
+                                style={{
+                                  color: beachColors.sand,
+                                  fontSize: 12,
+                                }}
+                              />
+                            </Tooltip>
+                          </Space>
+                        }
+                        value={hoy.ocupacion}
+                        suffix="%"
+                        valueStyle={{
+                          color: beachColors.sand,
+                          fontSize: isMobile ? 18 : 20,
+                          fontWeight: 600,
+                        }}
+                      />
+                    </Col>
+                    <Col xs={12} sm={12} md={12}>
+                      <Statistic
+                        title={
+                          <Text style={{ color: "#e5e7eb", fontSize: 10 }}>
+                            Ingreso estimado de hoy
+                          </Text>
+                        }
+                        value={hoy.ingresos}
+                        precision={2}
+                        prefix="$"
+                        valueStyle={{
+                          color: "#fff",
+                          fontSize: isMobile ? 18 : 20,
+                          fontWeight: 500,
+                        }}
+                      />
+                    </Col>
+                  </Row>
+                </Space>
+              </Card>
+            </Col>
+
+            {/* Rendimiento últimos meses */}
+            <Col xs={24} lg={9}>
+              <Card
+                hoverable
+                bordered={false}
+                title={
+                  <Space>
+                    <PieChartOutlined
+                      style={{ color: beachColors.oceanBlue, fontSize: 16 }}
+                    />
+                    <Text
+                      style={{
+                        fontWeight: 600,
+                        color: neutrals.textMain,
+                        fontSize: 14,
+                      }}
+                    >
+                      Rendimiento últimos meses
+                    </Text>
+                  </Space>
+                }
+                style={sectionCardStyle}
+                bodyStyle={sectionBodyBase}
+              >
+                {!hasStats ? (
+                  <Text type="secondary" style={{ fontSize: 12 }}>
+                    Aún no hay suficientes datos de reservas para mostrar
+                    estadísticas mensuales.
+                  </Text>
+                ) : (
+                  <Space
+                    direction="vertical"
+                    size={12}
+                    style={{ width: "100%" }}
+                  >
+                    {/* KPIs compactos */}
+                    <Row gutter={12}>
+                      <Col span={12}>
+                        <Statistic
+                          title={
+                            <Text
+                              style={{
+                                fontSize: 10,
+                                color: neutrals.textMuted,
+                              }}
+                            >
+                              Ocupación promedio
+                            </Text>
+                          }
+                          value={averageOccupancy}
+                          suffix="%"
+                          valueStyle={{
+                            fontSize: 18,
+                            fontWeight: 600,
+                            color: neutrals.textMain,
+                          }}
+                        />
+                      </Col>
+                      <Col span={12}>
+                        <Statistic
+                          title={
+                            <Text
+                              style={{
+                                fontSize: 10,
+                                color: neutrals.textMuted,
+                              }}
+                            >
+                              Hab. rentadas ({stats.months.length} meses)
+                            </Text>
+                          }
+                          value={totalRoomsRented}
+                          valueStyle={{
+                            fontSize: 18,
+                            fontWeight: 600,
+                            color: neutrals.textMain,
+                          }}
+                        />
+                      </Col>
+                    </Row>
+
+                    <Row gutter={12}>
+                      <Col span={12}>
+                        <Statistic
+                          title={
+                            <Text
+                              style={{
+                                fontSize: 10,
+                                color: neutrals.textMuted,
+                              }}
+                            >
+                              ADR promedio
+                            </Text>
+                          }
+                          value={adr}
+                          prefix="$"
+                          valueStyle={{
+                            fontSize: 16,
+                            fontWeight: 600,
+                            color: beachColors.oceanBlue,
+                          }}
+                        />
+                      </Col>
+                      <Col span={12}>
+                        <Statistic
+                          title={
+                            <Text
+                              style={{
+                                fontSize: 10,
+                                color: neutrals.textMuted,
+                              }}
+                            >
+                              RevPAR promedio
+                            </Text>
+                          }
+                          value={revpar}
+                          prefix="$"
+                          valueStyle={{
+                            fontSize: 16,
+                            fontWeight: 600,
+                            color: beachColors.teal,
+                          }}
+                        />
+                      </Col>
+                    </Row>
+
+                    <Row gutter={12}>
+                      <Col span={24}>
+                        <Statistic
+                          title={
+                            <Text
+                              style={{
+                                fontSize: 10,
+                                color: neutrals.textMuted,
+                              }}
+                            >
+                              Ingresos acumulados
+                            </Text>
+                          }
+                          value={formatCurrency(totalRevenue, {
+                            noDecimals: true,
+                          })}
+                          valueStyle={{
+                            fontSize: 18,
+                            fontWeight: 600,
+                            color: beachColors.oceanBlue,
+                          }}
+                        />
+                      </Col>
+                    </Row>
+
+                    {/* Último mes + tendencia */}
+                    {lastMonth && (
+                      <div
+                        style={{
+                          marginTop: 4,
+                          padding: "8px 10px",
+                          borderRadius: 10,
+                          background: "rgba(148,163,184,0.08)",
+                        }}
+                      >
+                        <div
+                          style={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            fontSize: 11,
+                            color: neutrals.textMuted,
+                          }}
+                        >
+                          <span>
+                            Último mes ·{" "}
+                            <strong style={{ color: neutrals.textMain }}>
+                              {lastMonth.label || lastMonth.month}
+                            </strong>
+                          </span>
+                          <span>
+                            {lastMonth.occupancyPct ?? 0}% ·{" "}
+                            {formatCurrency(lastMonth.revenue || 0, {
+                              noDecimals: true,
+                            })}
+                          </span>
+                        </div>
+                        {occupancyTrend !== null && (
+                          <div
+                            style={{
+                              marginTop: 2,
+                              fontSize: 10,
+                              color:
+                                occupancyTrend >= 0 ? "#16a34a" : "#b91c1c",
+                            }}
+                          >
+                            {occupancyTrend >= 0 ? "▲" : "▼"}{" "}
+                            {Math.abs(occupancyTrend)} pts vs mes anterior
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </Space>
+                )}
+              </Card>
+            </Col>
+          </Row>
+
+          {/* FILA 2: Disponibilidad + Promos */}
+          <Row
+            gutter={[16, 16]}
+            style={{ marginTop: 12, ...sectionRowAnim(80) }}
           >
-            {!hasStats ? (
-              <Text type="secondary" style={{ fontSize: 12 }}>
-                Aún no hay suficientes datos de reservas para mostrar
-                estadísticas mensuales.
-              </Text>
-            ) : (
+            {/* Disponibilidad */}
+            <Col xs={24} lg={15}>
+              <Card
+                hoverable
+                bordered={false}
+                title={
+                  <Space size={8} wrap>
+                    <ClusterOutlined
+                      style={{ color: beachColors.oceanBlue, fontSize: 16 }}
+                    />
+                    <Text
+                      style={{
+                        fontWeight: 600,
+                        color: neutrals.textMain,
+                        fontSize: 14,
+                      }}
+                    >
+                      Disponibilidad de habitaciones
+                    </Text>
+                    <Tag
+                      color={beachColors.turquoise}
+                      style={{
+                        borderRadius: 999,
+                        fontSize: 10,
+                        color: "#064e3b",
+                      }}
+                    >
+                      Ocupación actual: {hoy.ocupacion}%
+                    </Tag>
+                  </Space>
+                }
+                style={sectionCardStyle}
+                bodyStyle={{
+                  ...sectionBodyBase,
+                  paddingTop: 10,
+                }}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "flex-end",
+                    gap: isMobile ? 16 : 24,
+                    height: isMobile ? 120 : 140,
+                  }}
+                >
+                  {disponibilidad.map((item) => (
+                    <div
+                      key={item.label}
+                      style={{
+                        flex: 1,
+                        display: "flex",
+                        flexDirection: "column",
+                        alignItems: "center",
+                        justifyContent: "flex-end",
+                        gap: 4,
+                      }}
+                    >
+                      <div
+                        style={{
+                          width: isMobile ? 22 : 30,
+                          height:
+                            ((item.porcentaje || 0) / 100) *
+                            (isMobile ? 90 : 120),
+                          borderRadius: 10,
+                          background: `linear-gradient(180deg, ${item.color}, rgba(15,23,42,0.70))`,
+                          boxShadow: "0 6px 14px rgba(15,23,42,0.20)",
+                          transition: "height 0.35s ease-out",
+                        }}
+                      />
+                      <Text
+                        style={{ fontSize: 10, color: neutrals.textMuted }}
+                      >
+                        {item.label}
+                      </Text>
+                      <Text
+                        style={{ fontSize: 9, color: neutrals.textMuted }}
+                      >
+                        {item.porcentaje}%
+                      </Text>
+                    </div>
+                  ))}
+                </div>
+              </Card>
+            </Col>
+
+            {/* Últimas promociones (reales desde habitaciones) */}
+            <Col xs={24} lg={9}>
+              <Card
+                hoverable
+                bordered={false}
+                title={
+                  <Space>
+                    <RiseOutlined
+                      style={{ color: beachColors.teal, fontSize: 16 }}
+                    />
+                    <Text
+                      style={{
+                        fontWeight: 600,
+                        color: neutrals.textMain,
+                        fontSize: 14,
+                      }}
+                    >
+                      Últimas promociones
+                    </Text>
+                  </Space>
+                }
+                style={sectionCardStyle}
+                bodyStyle={{
+                  ...sectionBodyBase,
+                  padding: isMobile ? 10 : 14,
+                }}
+              >
+                {promos.length === 0 ? (
+                  <Text type="secondary" style={{ fontSize: 12 }}>
+                    Aún no hay promociones activas en habitaciones.
+                  </Text>
+                ) : (
+                  <List
+                    itemLayout="horizontal"
+                    dataSource={promos}
+                    split={false}
+                    renderItem={(item, index) => (
+                      <List.Item
+                        style={{
+                          padding: "6px 8px",
+                          marginBottom: index === promos.length - 1 ? 0 : 4,
+                          borderRadius: 10,
+                          background:
+                            index === 0
+                              ? "rgba(46,196,182,0.06)"
+                              : "transparent",
+                        }}
+                      >
+                        <List.Item.Meta
+                          title={
+                            <Text
+                              style={{
+                                fontWeight: 500,
+                                color: neutrals.textMain,
+                                fontSize: 13,
+                              }}
+                            >
+                              {item.nombre}
+                            </Text>
+                          }
+                          description={
+                            <Space size={10}>
+                              <Text
+                                type="secondary"
+                                style={{ fontSize: 11 }}
+                              >
+                                {item.canal}
+                              </Text>
+                              <Text
+                                type="secondary"
+                                style={{ fontSize: 11 }}
+                              >
+                                {formatShortDate(item.fecha)}
+                              </Text>
+                            </Space>
+                          }
+                        />
+                      </List.Item>
+                    )}
+                  />
+                )}
+              </Card>
+            </Col>
+          </Row>
+
+          {/* FILA 3: Comportamiento de estancias + Canales */}
+          <Row
+            gutter={[16, 16]}
+            style={{
+              marginTop: 12,
+              marginBottom: 16,
+              ...sectionRowAnim(120),
+            }}
+          >
+            {/* Comportamiento de estancias */}
+            <Col xs={24} lg={12}>
+              <Card
+                hoverable
+                bordered={false}
+                title={
+                  <Space>
+                    <HomeOutlined
+                      style={{ color: beachColors.sunset, fontSize: 16 }}
+                    />
+                    <Text
+                      style={{
+                        fontWeight: 600,
+                        color: neutrals.textMain,
+                        fontSize: 14,
+                      }}
+                    >
+                      Comportamiento de estancias
+                    </Text>
+                  </Space>
+                }
+                style={sectionCardStyle}
+                bodyStyle={sectionBodyBase}
+              >
+                {!hasStats ? (
+                  <Text type="secondary" style={{ fontSize: 12 }}>
+                    Aún no hay datos suficientes para mostrar patrones de
+                    estancias.
+                  </Text>
+                ) : (
+                  <Space
+                    direction="vertical"
+                    size={10}
+                    style={{ width: "100%" }}
+                  >
+                    {/* Estancia y lead time */}
+                    <Row gutter={12}>
+                      <Col span={12}>
+                        <Statistic
+                          title={
+                            <Text
+                              style={{
+                                fontSize: 10,
+                                color: neutrals.textMuted,
+                              }}
+                            >
+                              Estancia promedio
+                            </Text>
+                          }
+                          value={avgStay}
+                          suffix=" noches"
+                          valueStyle={{
+                            fontSize: 16,
+                            fontWeight: 600,
+                            color: neutrals.textMain,
+                          }}
+                        />
+                      </Col>
+                      <Col span={12}>
+                        <Statistic
+                          title={
+                            <Text
+                              style={{
+                                fontSize: 10,
+                                color: neutrals.textMuted,
+                              }}
+                            >
+                              Anticipación promedio
+                            </Text>
+                          }
+                          value={avgLead}
+                          suffix=" días"
+                          valueStyle={{
+                            fontSize: 16,
+                            fontWeight: 600,
+                            color: neutrals.textMain,
+                          }}
+                        />
+                      </Col>
+                    </Row>
+
+                    {/* Ocupación por día de la semana */}
+                    <div>
+                      <Text
+                        strong
+                        style={{
+                          fontSize: 11,
+                          color: neutrals.textMain,
+                        }}
+                      >
+                        Ocupación por día de la semana
+                      </Text>
+                      <div
+                        style={{
+                          marginTop: 6,
+                          display: "flex",
+                          gap: 8,
+                        }}
+                      >
+                        {weekdaySummary.map((d) => (
+                          <div
+                            key={d.key}
+                            style={{
+                              flex: 1,
+                              display: "flex",
+                              flexDirection: "column",
+                              alignItems: "center",
+                              gap: 2,
+                            }}
+                          >
+                            <div
+                              style={{
+                                height: 40,
+                                width: 8,
+                                borderRadius: 999,
+                                background: "#e5e7eb",
+                                overflow: "hidden",
+                                position: "relative",
+                              }}
+                            >
+                              <div
+                                style={{
+                                  position: "absolute",
+                                  bottom: 0,
+                                  left: 0,
+                                  right: 0,
+                                  height: `${Math.min(100, d.value)}%`,
+                                  background: `linear-gradient(180deg, ${beachColors.teal}, ${beachColors.oceanBlue})`,
+                                  borderRadius: 999,
+                                  transition: "height 0.3s ease-out",
+                                }}
+                              />
+                            </div>
+                            <Text
+                              style={{
+                                fontSize: 9,
+                                color: neutrals.textMuted,
+                              }}
+                            >
+                              {d.label}
+                            </Text>
+                            <Text
+                              style={{
+                                fontSize: 9,
+                                color: neutrals.textMuted,
+                              }}
+                            >
+                              {d.value}%
+                            </Text>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Ocupación por tipo de habitación */}
+                    <div>
+                      <Text
+                        strong
+                        style={{
+                          fontSize: 11,
+                          color: neutrals.textMain,
+                        }}
+                      >
+                        Tipos de habitación más demandados
+                      </Text>
+                      <List
+                        size="small"
+                        dataSource={roomTypeSummary}
+                        split={false}
+                        style={{ marginTop: 6 }}
+                        renderItem={(rt) => (
+                          <List.Item
+                            style={{
+                              padding: "4px 0",
+                              display: "flex",
+                              justifyContent: "space-between",
+                              fontSize: 11,
+                            }}
+                          >
+                            <span style={{ color: neutrals.textMain }}>
+                              {rt.roomType}
+                            </span>
+                            <Space size={8}>
+                              <span style={{ color: neutrals.textMuted }}>
+                                {rt.rooms} hab.
+                              </span>
+                              <span>{rt.occupancy}% occ.</span>
+                            </Space>
+                          </List.Item>
+                        )}
+                      />
+                    </div>
+                  </Space>
+                )}
+              </Card>
+            </Col>
+
+            {/* Canales de reservación */}
+            <Col xs={24} lg={12}>
+              <Card
+                hoverable
+                bordered={false}
+                title={
+                  <Space>
+                    <PieChartOutlined
+                      style={{ color: beachColors.oceanBlue, fontSize: 16 }}
+                    />
+                    <Text
+                      style={{
+                        fontWeight: 600,
+                        color: neutrals.textMain,
+                        fontSize: 14,
+                      }}
+                    >
+                      Canales de reservación
+                    </Text>
+                  </Space>
+                }
+                style={sectionCardStyle}
+                bodyStyle={sectionBodyBase}
+              >
+                {!channelSummary.length ? (
+                  <Text type="secondary" style={{ fontSize: 12 }}>
+                    Todavía no hay información de canales de reservación.
+                  </Text>
+                ) : (
+                  <Space
+                    direction="vertical"
+                    size={10}
+                    style={{ width: "100%" }}
+                  >
+                    {/* Canal líder */}
+                    {bestChannel && (
+                      <div
+                        style={{
+                          padding: "8px 10px",
+                          borderRadius: 10,
+                          background: "rgba(59,130,246,0.06)",
+                        }}
+                      >
+                        <Text
+                          style={{
+                            fontSize: 11,
+                            color: neutrals.textMuted,
+                          }}
+                        >
+                          Canal principal actual:{" "}
+                          <strong style={{ color: neutrals.textMain }}>
+                            {bestChannel.channel}
+                          </strong>{" "}
+                          ({bestChannel.share}% de las reservas)
+                        </Text>
+                      </div>
+                    )}
+
+                    {/* Chips rápidos */}
+                    <Space size={8} wrap>
+                      {channelSummary.map((ch) => (
+                        <Tag
+                          key={ch.channel}
+                          color={
+                            bestChannel &&
+                            bestChannel.channel === ch.channel
+                              ? beachColors.turquoise
+                              : "rgba(148,163,184,0.12)"
+                          }
+                          style={{
+                            borderRadius: 999,
+                            fontSize: 10,
+                            border: "none",
+                            color:
+                              bestChannel &&
+                              bestChannel.channel === ch.channel
+                                ? "#064e3b"
+                                : neutrals.textMain,
+                            padding: "2px 10px",
+                          }}
+                        >
+                          {ch.channel}: {ch.count} reservas
+                        </Tag>
+                      ))}
+                    </Space>
+
+                    {/* Barra por canal */}
+                    <div>
+                      <Text
+                        strong
+                        style={{
+                          fontSize: 11,
+                          color: neutrals.textMain,
+                        }}
+                      >
+                        Distribución por canal
+                      </Text>
+                      <div
+                        style={{
+                          marginTop: 6,
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: 6,
+                        }}
+                      >
+                        {channelSummary.map((ch) => (
+                          <div key={ch.channel}>
+                            <div
+                              style={{
+                                display: "flex",
+                                justifyContent: "space-between",
+                                fontSize: 10,
+                                color: neutrals.textMuted,
+                              }}
+                            >
+                              <span>{ch.channel}</span>
+                              <span>
+                                {ch.share}% ·{" "}
+                                {formatCurrency(ch.revenue || 0, {
+                                  noDecimals: true,
+                                })}
+                              </span>
+                            </div>
+                            <div
+                              style={{
+                                position: "relative",
+                                height: 6,
+                                borderRadius: 999,
+                                background: "#e5e7eb",
+                                overflow: "hidden",
+                                marginTop: 2,
+                              }}
+                            >
+                              <div
+                                style={{
+                                  position: "absolute",
+                                  inset: 0,
+                                  width: `${Math.min(100, ch.share)}%`,
+                                  background: `linear-gradient(90deg, ${beachColors.oceanBlue}, ${beachColors.teal})`,
+                                  borderRadius: 999,
+                                  transition: "width 0.35s ease-out",
+                                }}
+                              />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </Space>
+                )}
+              </Card>
+            </Col>
+          </Row>
+        </>
+      )}
+
+      {/* ================== TAB TIENDA / POS ================== */}
+      {activeTab === "shop" && (
+        <Row
+          gutter={[16, 16]}
+          style={{
+            marginTop: 4,
+            marginBottom: 16,
+            ...sectionRowAnim(40),
+          }}
+        >
+          {/* Resumen de ventas de shop */}
+          <Col xs={24} lg={10}>
+            <Card
+              hoverable
+              bordered={false}
+              title={
+                <Space>
+                  <ShoppingCartOutlined
+                    style={{ color: beachColors.oceanBlue, fontSize: 16 }}
+                  />
+                  <Text
+                    style={{
+                      fontWeight: 600,
+                      color: neutrals.textMain,
+                      fontSize: 14,
+                    }}
+                  >
+                    Ventas de tienda (POS)
+                  </Text>
+                </Space>
+              }
+              style={sectionCardStyle}
+              bodyStyle={sectionBodyBase}
+            >
               <Space direction="vertical" size={12} style={{ width: "100%" }}>
-                {/* KPIs compactos */}
                 <Row gutter={12}>
                   <Col span={12}>
                     <Statistic
@@ -870,15 +1709,15 @@ const DashboardView = ({ isMobile }) => {
                             color: neutrals.textMuted,
                           }}
                         >
-                          Ocupación promedio
+                          Ventas de hoy (shop)
                         </Text>
                       }
-                      value={averageOccupancy}
-                      suffix="%"
+                      value={shopSummary.todayTotal}
+                      prefix="$"
                       valueStyle={{
                         fontSize: 18,
                         fontWeight: 600,
-                        color: neutrals.textMain,
+                        color: beachColors.oceanBlue,
                       }}
                     />
                   </Col>
@@ -891,10 +1730,10 @@ const DashboardView = ({ isMobile }) => {
                             color: neutrals.textMuted,
                           }}
                         >
-                          Hab. rentadas ({stats.months.length} meses)
+                          Tickets de hoy
                         </Text>
                       }
-                      value={totalRoomsRented}
+                      value={shopSummary.todayCount}
                       valueStyle={{
                         fontSize: 18,
                         fontWeight: 600,
@@ -914,31 +1753,10 @@ const DashboardView = ({ isMobile }) => {
                             color: neutrals.textMuted,
                           }}
                         >
-                          ADR promedio
+                          Ventas últimos 7 días
                         </Text>
                       }
-                      value={adr}
-                      prefix="$"
-                      valueStyle={{
-                        fontSize: 16,
-                        fontWeight: 600,
-                        color: beachColors.oceanBlue,
-                      }}
-                    />
-                  </Col>
-                  <Col span={12}>
-                    <Statistic
-                      title={
-                        <Text
-                          style={{
-                            fontSize: 10,
-                            color: neutrals.textMuted,
-                          }}
-                        >
-                          RevPAR promedio
-                        </Text>
-                      }
-                      value={revpar}
+                      value={shopSummary.rangeTotal}
                       prefix="$"
                       valueStyle={{
                         fontSize: 16,
@@ -947,10 +1765,7 @@ const DashboardView = ({ isMobile }) => {
                       }}
                     />
                   </Col>
-                </Row>
-
-                <Row gutter={12}>
-                  <Col span={24}>
+                  <Col span={12}>
                     <Statistic
                       title={
                         <Text
@@ -959,528 +1774,126 @@ const DashboardView = ({ isMobile }) => {
                             color: neutrals.textMuted,
                           }}
                         >
-                          Ingresos acumulados
+                          Ticket promedio
                         </Text>
                       }
-                      value={formatCurrency(totalRevenue, {
-                        noDecimals: true,
-                      })}
+                      value={shopSummary.avgTicket}
+                      prefix="$"
                       valueStyle={{
-                        fontSize: 18,
+                        fontSize: 16,
                         fontWeight: 600,
-                        color: beachColors.oceanBlue,
+                        color: neutrals.textMain,
                       }}
                     />
                   </Col>
                 </Row>
 
-                {/* Último mes + tendencia */}
-                {lastMonth && (
-                  <div
+                {shopSummary.rangeLabel && (
+                  <Text
+                    type="secondary"
                     style={{
+                      fontSize: 10,
                       marginTop: 4,
-                      padding: "8px 10px",
-                      borderRadius: 10,
-                      background: "rgba(148,163,184,0.08)",
                     }}
                   >
-                    <div
-                      style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        fontSize: 11,
-                        color: neutrals.textMuted,
-                      }}
-                    >
-                      <span>
-                        Último mes ·{" "}
-                        <strong style={{ color: neutrals.textMain }}>
-                          {lastMonth.label || lastMonth.month}
-                        </strong>
-                      </span>
-                      <span>
-                        {lastMonth.occupancyPct ?? 0}% ·{" "}
-                        {formatCurrency(lastMonth.revenue || 0, {
-                          noDecimals: true,
-                        })}
-                      </span>
-                    </div>
-                    {occupancyTrend !== null && (
-                      <div
-                        style={{
-                          marginTop: 2,
-                          fontSize: 10,
-                          color:
-                            occupancyTrend >= 0 ? "#16a34a" : "#b91c1c",
-                        }}
-                      >
-                        {occupancyTrend >= 0 ? "▲" : "▼"}{" "}
-                        {Math.abs(occupancyTrend)} pts vs mes anterior
-                      </div>
-                    )}
-                  </div>
+                    Período analizado: {shopSummary.rangeLabel}
+                  </Text>
                 )}
-              </Space>
-            )}
-          </Card>
-        </Col>
-      </Row>
 
-      {/* FILA 2: Disponibilidad + Promos */}
-      <Row
-        gutter={[16, 16]}
-        style={{ marginTop: 12, ...sectionRowAnim(80) }}
-      >
-        {/* Disponibilidad */}
-        <Col xs={24} lg={15}>
-          <Card
-            hoverable
-            bordered={false}
-            title={
-              <Space size={8} wrap>
-                <ClusterOutlined
-                  style={{ color: beachColors.oceanBlue, fontSize: 16 }}
-                />
-                <Text
-                  style={{
-                    fontWeight: 600,
-                    color: neutrals.textMain,
-                    fontSize: 14,
-                  }}
-                >
-                  Disponibilidad de habitaciones
-                </Text>
-                <Tag
-                  color={beachColors.turquoise}
-                  style={{
-                    borderRadius: 999,
-                    fontSize: 10,
-                    color: "#064e3b",
-                  }}
-                >
-                  Ocupación actual: {hoy.ocupacion}%
-                </Tag>
-              </Space>
-            }
-            style={sectionCardStyle}
-            bodyStyle={{
-              ...sectionBodyBase,
-              paddingTop: 10,
-            }}
-          >
-            <div
-              style={{
-                display: "flex",
-                alignItems: "flex-end",
-                gap: isMobile ? 16 : 24,
-                height: isMobile ? 120 : 140,
-              }}
-            >
-              {disponibilidad.map((item) => (
-                <div
-                  key={item.label}
-                  style={{
-                    flex: 1,
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "center",
-                    justifyContent: "flex-end",
-                    gap: 4,
-                  }}
-                >
-                  <div
-                    style={{
-                      width: isMobile ? 22 : 30,
-                      height:
-                        ((item.porcentaje || 0) / 100) *
-                        (isMobile ? 90 : 120),
-                      borderRadius: 10,
-                      background: `linear-gradient(180deg, ${item.color}, rgba(15,23,42,0.70))`,
-                      boxShadow: "0 6px 14px rgba(15,23,42,0.20)",
-                      transition: "height 0.35s ease-out",
-                    }}
-                  />
-                  <Text style={{ fontSize: 10, color: neutrals.textMuted }}>
-                    {item.label}
-                  </Text>
-                  <Text style={{ fontSize: 9, color: neutrals.textMuted }}>
-                    {item.porcentaje}%
-                  </Text>
-                </div>
-              ))}
-            </div>
-          </Card>
-        </Col>
-
-        {/* Últimas promociones (reales desde habitaciones) */}
-        <Col xs={24} lg={9}>
-          <Card
-            hoverable
-            bordered={false}
-            title={
-              <Space>
-                <RiseOutlined
-                  style={{ color: beachColors.teal, fontSize: 16 }}
-                />
-                <Text
-                  style={{
-                    fontWeight: 600,
-                    color: neutrals.textMain,
-                    fontSize: 14,
-                  }}
-                >
-                  Últimas promociones
-                </Text>
-              </Space>
-            }
-            style={sectionCardStyle}
-            bodyStyle={{
-              ...sectionBodyBase,
-              padding: isMobile ? 10 : 14,
-            }}
-          >
-            {promos.length === 0 ? (
-              <Text type="secondary" style={{ fontSize: 12 }}>
-                Aún no hay promociones activas en habitaciones.
-              </Text>
-            ) : (
-              <List
-                itemLayout="horizontal"
-                dataSource={promos}
-                split={false}
-                renderItem={(item, index) => (
-                  <List.Item
-                    style={{
-                      padding: "6px 8px",
-                      marginBottom: index === promos.length - 1 ? 0 : 4,
-                      borderRadius: 10,
-                      background:
-                        index === 0
-                          ? "rgba(46,196,182,0.06)"
-                          : "transparent",
-                    }}
-                  >
-                    <List.Item.Meta
-                      title={
-                        <Text
-                          style={{
-                            fontWeight: 500,
-                            color: neutrals.textMain,
-                            fontSize: 13,
-                          }}
-                        >
-                          {item.nombre}
-                        </Text>
-                      }
-                      description={
-                        <Space size={10}>
-                          <Text
-                            type="secondary"
-                            style={{ fontSize: 11 }}
-                          >
-                            {item.canal}
-                          </Text>
-                          <Text
-                            type="secondary"
-                            style={{ fontSize: 11 }}
-                          >
-                            {formatShortDate(item.fecha)}
-                          </Text>
-                        </Space>
-                      }
-                    />
-                  </List.Item>
-                )}
-              />
-            )}
-          </Card>
-        </Col>
-      </Row>
-
-      {/* FILA 3: Comportamiento de estancias + Canales */}
-      <Row
-        gutter={[16, 16]}
-        style={{
-          marginTop: 12,
-          marginBottom: 12,
-          ...sectionRowAnim(120),
-        }}
-      >
-        {/* Comportamiento de estancias */}
-        <Col xs={24} lg={12}>
-          <Card
-            hoverable
-            bordered={false}
-            title={
-              <Space>
-                <HomeOutlined
-                  style={{ color: beachColors.sunset, fontSize: 16 }}
-                />
-                <Text
-                  style={{
-                    fontWeight: 600,
-                    color: neutrals.textMain,
-                    fontSize: 14,
-                  }}
-                >
-                  Comportamiento de estancias
-                </Text>
-              </Space>
-            }
-            style={sectionCardStyle}
-            bodyStyle={sectionBodyBase}
-          >
-            {!hasStats ? (
-              <Text type="secondary" style={{ fontSize: 12 }}>
-                Aún no hay datos suficientes para mostrar patrones de
-                estancias.
-              </Text>
-            ) : (
-              <Space direction="vertical" size={10} style={{ width: "100%" }}>
-                {/* Estancia y lead time */}
-                <Row gutter={12}>
-                  <Col span={12}>
-                    <Statistic
-                      title={
-                        <Text
-                          style={{
-                            fontSize: 10,
-                            color: neutrals.textMuted,
-                          }}
-                        >
-                          Estancia promedio
-                        </Text>
-                      }
-                      value={avgStay}
-                      suffix=" noches"
-                      valueStyle={{
-                        fontSize: 16,
-                        fontWeight: 600,
-                        color: neutrals.textMain,
-                      }}
-                    />
-                  </Col>
-                  <Col span={12}>
-                    <Statistic
-                      title={
-                        <Text
-                          style={{
-                            fontSize: 10,
-                            color: neutrals.textMuted,
-                          }}
-                        >
-                          Anticipación promedio
-                        </Text>
-                      }
-                      value={avgLead}
-                      suffix=" días"
-                      valueStyle={{
-                        fontSize: 16,
-                        fontWeight: 600,
-                        color: neutrals.textMain,
-                      }}
-                    />
-                  </Col>
-                </Row>
-
-                {/* Ocupación por día de la semana */}
-                <div>
-                  <Text
-                    strong
-                    style={{
-                      fontSize: 11,
-                      color: neutrals.textMain,
-                    }}
-                  >
-                    Ocupación por día de la semana
-                  </Text>
-                  <div
-                    style={{
-                      marginTop: 6,
-                      display: "flex",
-                      gap: 8,
-                    }}
-                  >
-                    {weekdaySummary.map((d) => (
-                      <div
-                        key={d.key}
-                        style={{
-                          flex: 1,
-                          display: "flex",
-                          flexDirection: "column",
-                          alignItems: "center",
-                          gap: 2,
-                        }}
-                      >
-                        <div
-                          style={{
-                            height: 40,
-                            width: 8,
-                            borderRadius: 999,
-                            background: "#e5e7eb",
-                            overflow: "hidden",
-                            position: "relative",
-                          }}
-                        >
-                          <div
-                            style={{
-                              position: "absolute",
-                              bottom: 0,
-                              left: 0,
-                              right: 0,
-                              height: `${Math.min(100, d.value)}%`,
-                              background: `linear-gradient(180deg, ${beachColors.teal}, ${beachColors.oceanBlue})`,
-                              borderRadius: 999,
-                              transition: "height 0.3s ease-out",
-                            }}
-                          />
-                        </div>
-                        <Text
-                          style={{
-                            fontSize: 9,
-                            color: neutrals.textMuted,
-                          }}
-                        >
-                          {d.label}
-                        </Text>
-                        <Text
-                          style={{
-                            fontSize: 9,
-                            color: neutrals.textMuted,
-                          }}
-                        >
-                          {d.value}%
-                        </Text>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Ocupación por tipo de habitación */}
-                <div>
-                  <Text
-                    strong
-                    style={{
-                      fontSize: 11,
-                      color: neutrals.textMain,
-                    }}
-                  >
-                    Tipos de habitación más demandados
-                  </Text>
-                  <List
-                    size="small"
-                    dataSource={roomTypeSummary}
-                    split={false}
-                    style={{ marginTop: 6 }}
-                    renderItem={(rt) => (
-                      <List.Item
-                        style={{
-                          padding: "4px 0",
-                          display: "flex",
-                          justifyContent: "space-between",
-                          fontSize: 11,
-                        }}
-                      >
-                        <span style={{ color: neutrals.textMain }}>
-                          {rt.roomType}
-                        </span>
-                        <Space size={8}>
-                          <span style={{ color: neutrals.textMuted }}>
-                            {rt.rooms} hab.
-                          </span>
-                          <span>{rt.occupancy}% occ.</span>
-                        </Space>
-                      </List.Item>
-                    )}
-                  />
-                </div>
-              </Space>
-            )}
-          </Card>
-        </Col>
-
-        {/* Canales de reservación */}
-        <Col xs={24} lg={12}>
-          <Card
-            hoverable
-            bordered={false}
-            title={
-              <Space>
-                <PieChartOutlined
-                  style={{ color: beachColors.oceanBlue, fontSize: 16 }}
-                />
-                <Text
-                  style={{
-                    fontWeight: 600,
-                    color: neutrals.textMain,
-                    fontSize: 14,
-                  }}
-                >
-                  Canales de reservación
-                </Text>
-              </Space>
-            }
-            style={sectionCardStyle}
-            bodyStyle={sectionBodyBase}
-          >
-            {!channelSummary.length ? (
-              <Text type="secondary" style={{ fontSize: 12 }}>
-                Todavía no hay información de canales de reservación.
-              </Text>
-            ) : (
-              <Space direction="vertical" size={10} style={{ width: "100%" }}>
-                {/* Canal líder */}
-                {bestChannel && (
-                  <div
-                    style={{
-                      padding: "8px 10px",
-                      borderRadius: 10,
-                      background: "rgba(59,130,246,0.06)",
-                    }}
-                  >
+                {/* Distribución por sección */}
+                {shopSummary.bySection.length > 0 && (
+                  <div style={{ marginTop: 8 }}>
                     <Text
+                      strong
                       style={{
                         fontSize: 11,
-                        color: neutrals.textMuted,
+                        color: neutrals.textMain,
                       }}
                     >
-                      Canal principal actual:{" "}
-                      <strong style={{ color: neutrals.textMain }}>
-                        {bestChannel.channel}
-                      </strong>{" "}
-                      ({bestChannel.share}% de las reservas)
+                      Por sección
                     </Text>
+                    <Space size={6} wrap style={{ marginTop: 4 }}>
+                      {shopSummary.bySection.map((s) => (
+                        <Tag
+                          key={s.section}
+                          style={{
+                            borderRadius: 999,
+                            border: "none",
+                            fontSize: 10,
+                            background: "rgba(148,163,184,0.14)",
+                          }}
+                        >
+                          {s.section === "alcohol" ? "Alcohol" : "Normal"} ·{" "}
+                          {formatCurrency(s.amount, { noDecimals: true })} ·{" "}
+                          {s.count} tickets
+                        </Tag>
+                      ))}
+                    </Space>
                   </div>
                 )}
 
-                {/* Chips rápidos */}
-                <Space size={8} wrap>
-                  {channelSummary.map((ch) => (
-                    <Tag
-                      key={ch.channel}
-                      color={
-                        bestChannel && bestChannel.channel === ch.channel
-                          ? beachColors.turquoise
-                          : "rgba(148,163,184,0.12)"
-                      }
+                {/* Distribución por método de pago */}
+                {shopSummary.byPayment.length > 0 && (
+                  <div style={{ marginTop: 8 }}>
+                    <Text
+                      strong
                       style={{
-                        borderRadius: 999,
-                        fontSize: 10,
-                        border: "none",
-                        color:
-                          bestChannel &&
-                          bestChannel.channel === ch.channel
-                            ? "#064e3b"
-                            : neutrals.textMain,
-                        padding: "2px 10px",
+                        fontSize: 11,
+                        color: neutrals.textMain,
                       }}
                     >
-                      {ch.channel}: {ch.count} reservas
-                    </Tag>
-                  ))}
-                </Space>
+                      Métodos de pago
+                    </Text>
+                    <Space size={6} wrap style={{ marginTop: 4 }}>
+                      {shopSummary.byPayment.map((p) => (
+                        <Tag
+                          key={p.paymentMethod}
+                          color="rgba(148,163,184,0.16)"
+                          style={{
+                            borderRadius: 999,
+                            border: "none",
+                            fontSize: 10,
+                            color: neutrals.textMain,
+                          }}
+                        >
+                          {p.paymentMethod} ·{" "}
+                          {formatCurrency(p.amount, { noDecimals: true })} ·{" "}
+                          {p.count} tickets
+                        </Tag>
+                      ))}
+                    </Space>
+                  </div>
+                )}
+              </Space>
+            </Card>
+          </Col>
 
-                {/* Barra por canal */}
+          {/* Stock crítico + movimientos de stock */}
+          <Col xs={24} lg={14}>
+            <Card
+              hoverable
+              bordered={false}
+              title={
+                <Space>
+                  <StockOutlined
+                    style={{ color: beachColors.sunset, fontSize: 16 }}
+                  />
+                  <Text
+                    style={{
+                      fontWeight: 600,
+                      color: neutrals.textMain,
+                      fontSize: 14,
+                    }}
+                  >
+                    Stock y movimientos de tienda
+                  </Text>
+                </Space>
+              }
+              style={sectionCardStyle}
+              bodyStyle={sectionBodyBase}
+            >
+              <Space direction="vertical" size={12} style={{ width: "100%" }}>
+                {/* Stock crítico */}
                 <div>
                   <Text
                     strong
@@ -1489,64 +1902,156 @@ const DashboardView = ({ isMobile }) => {
                       color: neutrals.textMain,
                     }}
                   >
-                    Distribución por canal
+                    Productos en stock crítico
                   </Text>
-                  <div
-                    style={{
-                      marginTop: 6,
-                      display: "flex",
-                      flexDirection: "column",
-                      gap: 6,
-                    }}
-                  >
-                    {channelSummary.map((ch) => (
-                      <div key={ch.channel}>
-                        <div
+                  {lowStock.length === 0 ? (
+                    <Text type="secondary" style={{ fontSize: 12 }}>
+                      No hay productos en nivel crítico de stock.
+                    </Text>
+                  ) : (
+                    <List
+                      size="small"
+                      dataSource={lowStock}
+                      split={false}
+                      style={{ marginTop: 6 }}
+                      renderItem={(p) => (
+                        <List.Item
                           style={{
+                            padding: "4px 0",
                             display: "flex",
                             justifyContent: "space-between",
-                            fontSize: 10,
-                            color: neutrals.textMuted,
+                            fontSize: 11,
                           }}
                         >
-                          <span>{ch.channel}</span>
-                          <span>
-                            {ch.share}% ·{" "}
-                            {formatCurrency(ch.revenue || 0, {
-                              noDecimals: true,
-                            })}
+                          <span style={{ color: neutrals.textMain }}>
+                            {p.name}{" "}
+                            <Text
+                              type="secondary"
+                              style={{ fontSize: 10 }}
+                            >
+                              · {p.site}
+                            </Text>
                           </span>
-                        </div>
-                        <div
+                          <Space size={6}>
+                            <Text
+                              style={{
+                                fontSize: 10,
+                                color: "#b91c1c",
+                              }}
+                            >
+                              {p.stock}/{p.minStock}
+                            </Text>
+                            <Tag
+                              color="error"
+                              style={{
+                                borderRadius: 999,
+                                fontSize: 9,
+                                padding: "0 8px",
+                              }}
+                            >
+                              Bajo stock
+                            </Tag>
+                          </Space>
+                        </List.Item>
+                      )}
+                    />
+                  )}
+                </div>
+
+                {/* Movimientos recientes */}
+                <div>
+                  <Text
+                    strong
+                    style={{
+                      fontSize: 11,
+                      color: neutrals.textMain,
+                    }}
+                  >
+                    Últimos movimientos de stock
+                  </Text>
+                  {recentMovements.length === 0 ? (
+                    <Text type="secondary" style={{ fontSize: 12 }}>
+                      Aún no hay movimientos registrados en este período.
+                    </Text>
+                  ) : (
+                    <List
+                      size="small"
+                      dataSource={recentMovements}
+                      split={false}
+                      style={{ marginTop: 6 }}
+                      renderItem={(m) => (
+                        <List.Item
                           style={{
-                            position: "relative",
-                            height: 6,
-                            borderRadius: 999,
-                            background: "#e5e7eb",
-                            overflow: "hidden",
-                            marginTop: 2,
+                            padding: "4px 2px",
+                            display: "flex",
+                            justifyContent: "space-between",
+                            fontSize: 11,
                           }}
                         >
+                          <div>
+                            <Text style={{ color: neutrals.textMain }}>
+                              {m.productName}
+                            </Text>
+                            <Text
+                              type="secondary"
+                              style={{ fontSize: 10, marginLeft: 4 }}
+                            >
+                              · {m.site}
+                            </Text>
+                            {m.reason && (
+                              <Text
+                                type="secondary"
+                                style={{
+                                  fontSize: 10,
+                                  display: "block",
+                                }}
+                              >
+                                {m.reason}
+                              </Text>
+                            )}
+                          </div>
                           <div
                             style={{
-                              position: "absolute",
-                              inset: 0,
-                              width: `${Math.min(100, ch.share)}%`,
-                              background: `linear-gradient(90deg, ${beachColors.oceanBlue}, ${beachColors.teal})`,
-                              borderRadius: 999,
-                              transition: "width 0.35s ease-out",
+                              textAlign: "right",
+                              minWidth: 80,
                             }}
-                          />
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+                          >
+                            <Text
+                              style={{
+                                fontSize: 10,
+                                color:
+                                  m.delta >= 0 ? "#15803d" : "#b91c1c",
+                              }}
+                            >
+                              {m.type === "sale"
+                                ? "Venta"
+                                : m.type === "restock"
+                                ? "Entrada"
+                                : "Ajuste"}
+                              {" · "}
+                              {m.delta > 0 ? "+" : ""}
+                              {m.delta}
+                            </Text>
+                            <Text
+                              type="secondary"
+                              style={{
+                                fontSize: 9,
+                                display: "block",
+                              }}
+                            >
+                              {formatShortDate(m.createdAt)}
+                            </Text>
+                          </div>
+                        </List.Item>
+                      )}
+                    />
+                  )}
                 </div>
               </Space>
-            )}
-          </Card>
-        </Col>
-      </Row>
+            </Card>
+          </Col>
+        </Row>
+      )}
     </div>
   );
 };
