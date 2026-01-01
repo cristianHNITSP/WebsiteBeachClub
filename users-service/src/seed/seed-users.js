@@ -1,20 +1,57 @@
-// scripts/seed-users.js
 require("dotenv").config();
 const mongoose = require("mongoose");
 const bcrypt = require("bcrypt");
+
 const { connectDB } = require("../config/db");
+
 const User = require("../models/User");
 const Role = require("../models/Role");
+const Sede = require("../models/Sede");
 
 async function seed() {
   try {
     await connectDB();
 
-    console.log("📝 Borrando usuarios y roles existentes...");
+    console.log("🧹 Limpiando datos existentes...");
     await User.deleteMany({});
     await Role.deleteMany({});
+    // NO borramos sedes si ya existen en prod
+    // await Sede.deleteMany({});
 
-    console.log("🧩 Creando roles...");
+    console.log("Creando / verificando sedes...");
+
+    const sedes = await Sede.insertMany(
+      [
+        {
+          key: "casa-frida",
+          name: "Casa Frida",
+          description: "Casa boutique frente al mar",
+        },
+        {
+          key: "cabanas-frida",
+          name: "Cabañas Frida",
+          description: "Complejo de cabañas boutique",
+        },
+      ],
+      { ordered: false }
+    ).catch(() => {
+      // Si ya existen (duplicado), simplemente continuamos
+    });
+
+    // Recuperamos sedes SIEMPRE desde DB
+    const casaFrida = await Sede.findOne({ key: "casa-frida" });
+    const cabanasFrida = await Sede.findOne({ key: "cabanas-frida" });
+
+    if (!casaFrida || !cabanasFrida) {
+      throw new Error("No se pudieron inicializar las sedes");
+    }
+
+    console.log("Sedes listas:", [
+      casaFrida.name,
+      cabanasFrida.name,
+    ]);
+
+    console.log("Creando roles...");
 
     const [adminRole, staffRole] = await Role.insertMany([
       {
@@ -34,7 +71,7 @@ async function seed() {
           "view_hero_slides",
           "manage_hero_slides",
 
-          //NUEVOS: shop / POS
+          // shop / POS
           "view_shop",
           "pos_shop",
           "manage_shop",
@@ -53,17 +90,24 @@ async function seed() {
           // carrusel (solo ver)
           "view_hero_slides",
 
-          // ✅ NUEVOS: shop / POS (staff vende, pero no administra catálogo)
+          // shop / POS
           "view_shop",
           "pos_shop",
         ],
       },
     ]);
 
-    console.log("✅ Roles creados:", [adminRole.key, staffRole.key]);
+    console.log("Roles creados:", [
+      adminRole.key,
+      staffRole.key,
+    ]);
+
+    console.log("Generando contraseñas...");
 
     const passwordAdmin = await bcrypt.hash("admin1234", 10);
     const passwordStaff = await bcrypt.hash("staff1234", 10);
+
+    console.log("Creando usuarios...");
 
     const users = await User.insertMany([
       {
@@ -71,20 +115,32 @@ async function seed() {
         email: "admin@beachclub.com",
         password: passwordAdmin,
         role: "administrador",
+        sede: casaFrida._id, // referencia REAL
         isActive: true,
       },
       {
-        name: "Recepcionista",
+        name: "Recepcionista Casa Frida",
         email: "recepcion@beachclub.com",
         password: passwordStaff,
         role: "staff",
+        sede: casaFrida._id, // se puede cambiar a cabanasFrida
         isActive: true,
       },
     ]);
 
-    console.log("✅ Usuarios creados:", users.map((u) => `${u.email} (${u.role})`));
+    console.log(
+      "Usuarios creados:",
+      users.map(
+        (u) =>
+          `${u.email} (${u.role}) → sede: ${
+            u.sede.toString()
+          }`
+      )
+    );
+
+    console.log("Seed completado correctamente");
   } catch (err) {
-    console.error("❌ Error en seed-users:", err);
+    console.error("Error en seed-users:", err);
   } finally {
     await mongoose.disconnect();
     process.exit(0);

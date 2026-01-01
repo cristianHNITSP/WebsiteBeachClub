@@ -1,5 +1,5 @@
 // src/views/MiniTiendaView.jsx
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Card,
   Space,
@@ -11,7 +11,6 @@ import {
   Row,
   Col,
   Badge,
-  Drawer,
   List,
   Divider,
   Tooltip,
@@ -46,6 +45,8 @@ import {
   UndoOutlined,
   FileTextOutlined,
   HistoryOutlined,
+  CloseOutlined,
+  InfoCircleOutlined,
 } from "@ant-design/icons";
 import axios from "@api/axios";
 import { beachColors, neutrals } from "../theme/beachTheme";
@@ -111,13 +112,9 @@ const MotionStyles = () => (
     .mtPillBtn { transition: transform 140ms ease; }
     .mtPillBtn:active { transform: scale(0.98); }
 
-    /* ✅ Fix: evita "sobreposición" del grupo derecho */
     .mtHeaderRight { position: relative; z-index: 3; }
-
-    /* ✅ Fix: search con flex + minWidth para que no se monte */
     .mtSearchWrap { flex: 1 1 320px; min-width: 220px; }
 
-    /* ✅ opcional: redondeo consistente cuando hay enterButton */
     .mtSearchWrap .ant-input-group .ant-input-affix-wrapper {
       border-radius: 999px 0 0 999px !important;
     }
@@ -126,6 +123,31 @@ const MotionStyles = () => (
     }
   `}</style>
 );
+
+/** Panel plegable tipo “empuja hacia abajo” (sin Drawer) */
+const SlidePanel = ({
+  open,
+  children,
+  maxHeight = 900,
+  style,
+  innerStyle,
+}) => {
+  return (
+    <div
+      style={{
+        maxHeight: open ? maxHeight : 0,
+        opacity: open ? 1 : 0,
+        marginTop: open ? 12 : 0,
+        overflow: "hidden",
+        transform: open ? "translateY(0)" : "translateY(-8px)",
+        transition: "all 0.25s ease",
+        ...style,
+      }}
+    >
+      {open && <div style={{ padding: 0, ...innerStyle }}>{children}</div>}
+    </div>
+  );
+};
 
 export default function MiniTiendaView({ isMobile, currentUser }) {
   const [msgApi, msgCtx] = message.useMessage();
@@ -154,26 +176,30 @@ export default function MiniTiendaView({ isMobile, currentUser }) {
   const [searchDraft, setSearchDraft] = useState("");
   const [search, setSearch] = useState("");
 
+  // ✅ Paneles (sin Drawer)
   const [cartOpen, setCartOpen] = useState(false);
+  const [adminOpen, setAdminOpen] = useState(false);
+
   const [cart, setCart] = useState([]);
 
-  // Admin modals
+  // Gestión: modales
   const [catModalOpen, setCatModalOpen] = useState(false);
   const [prodModalOpen, setProdModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
   const [editingCategory, setEditingCategory] = useState(null);
 
-  // Admin drawer (Papelera + Logs)
-  const [adminOpen, setAdminOpen] = useState(false);
+  // Gestión: papelera + historial
   const [trashLoading, setTrashLoading] = useState(false);
-  const [logsLoading, setLogsLoading] = useState(false);
+  const [historyLoading, setHistoryLoading] = useState(false);
   const [trashProducts, setTrashProducts] = useState([]);
   const [trashCategories, setTrashCategories] = useState([]);
-  const [stockLogs, setStockLogs] = useState([]); // StockMovement
-  const [salesLogs, setSalesLogs] = useState([]); // Sale
+  const [stockLogs, setStockLogs] = useState([]);
+  const [salesLogs, setSalesLogs] = useState([]);
 
   const [catForm] = Form.useForm();
   const [prodForm] = Form.useForm();
+
+  const bootRef = useRef(false);
 
   const cartCount = useMemo(() => cart.reduce((a, x) => a + x.qty, 0), [cart]);
   const cartTotal = useMemo(
@@ -191,18 +217,88 @@ export default function MiniTiendaView({ isMobile, currentUser }) {
     [sites]
   );
 
-  const showAxiosError = (e, fallback) => {
-    const msg =
+  /** Mensajes humanos (sin “logs”, “permiso_xxx” visible) */
+  const notifyNoAccess = (action = "realizar esta acción") => {
+    msgApi.warning({
+      content: `Tu usuario no puede ${action}. Si lo necesitas, pide apoyo al administrador.`,
+      duration: 2.6,
+    });
+  };
+
+  /** Error UX: mensaje corto + “Ver detalles” opcional */
+  const notifyError = (e, userMsg = "Ocurrió un problema") => {
+    const status = e?.response?.status;
+    const detail =
       e?.response?.data?.message ||
       e?.response?.data?.error ||
       e?.message ||
-      fallback ||
-      "Ocurrió un error";
-    msgApi.error(msg);
+      "";
+
+    const friendly =
+      status === 401
+        ? "Tu sesión expiró. Vuelve a iniciar sesión."
+        : status === 403
+        ? "No tienes acceso para realizar esta acción."
+        : userMsg;
+
+    msgApi.error({
+      content: (
+        <Space size={10} wrap>
+          <span>{friendly}</span>
+          {detail ? (
+            <Button
+              type="link"
+              size="small"
+              icon={<InfoCircleOutlined />}
+              onClick={() =>
+                Modal.info({
+                  title: "Detalles (para soporte)",
+                  centered: true,
+                  okText: "Entendido",
+                  content: (
+                    <div style={{ marginTop: 8 }}>
+                      <Text type="secondary" style={{ fontSize: 12 }}>
+                        Copia esto y envíalo a soporte/administración si es
+                        necesario:
+                      </Text>
+                      <pre
+                        style={{
+                          marginTop: 8,
+                          padding: 10,
+                          borderRadius: 10,
+                          background: "#0b1220",
+                          color: "#e5e7eb",
+                          fontSize: 12,
+                          overflowX: "auto",
+                          whiteSpace: "pre-wrap",
+                          wordBreak: "break-word",
+                        }}
+                      >
+                        {String(detail)}
+                      </pre>
+                    </div>
+                  ),
+                })
+              }
+            >
+              Ver detalles
+            </Button>
+          ) : null}
+        </Space>
+      ),
+      duration: 3,
+    });
   };
 
+  const notifyOk = (text) =>
+    msgApi.success({
+      content: text,
+      icon: <CheckCircleOutlined />,
+      duration: 2,
+    });
+
   // ---------- LOADERS ----------
-  const loadSites = async () => {
+  const loadSites = async ({ silent = false } = {}) => {
     setSitesLoading(true);
     try {
       const { data } = await axios.get("/api/shop/sites", {
@@ -211,15 +307,16 @@ export default function MiniTiendaView({ isMobile, currentUser }) {
       const arr = Array.isArray(data?.items) ? data.items : [];
       setSites(arr);
       if (!site && arr.length) setSite(arr[0]);
+      if (!silent && bootRef.current) notifyOk("Sedes actualizadas.");
     } catch (e) {
       console.error(e);
-      showAxiosError(e, "No se pudieron cargar sedes");
+      notifyError(e, "No pudimos cargar las sedes.");
     } finally {
       setSitesLoading(false);
     }
   };
 
-  const loadCategories = async (sec) => {
+  const loadCategories = async (sec, { silent = false } = {}) => {
     setCatsLoading(true);
     try {
       const { data } = await axios.get("/api/shop/categories", {
@@ -235,15 +332,17 @@ export default function MiniTiendaView({ isMobile, currentUser }) {
       } else {
         setCategoryId("");
       }
+
+      if (!silent && bootRef.current) notifyOk("Categorías actualizadas.");
     } catch (e) {
       console.error(e);
-      showAxiosError(e, "No se pudieron cargar categorías");
+      notifyError(e, "No pudimos cargar las categorías.");
     } finally {
       setCatsLoading(false);
     }
   };
 
-  const loadProducts = async () => {
+  const loadProducts = async ({ silent = false } = {}) => {
     if (!site || !section) return;
     setLoading(true);
     try {
@@ -253,14 +352,15 @@ export default function MiniTiendaView({ isMobile, currentUser }) {
           site,
           section,
           categoryId: categoryId || undefined,
-          search: search || undefined, // backend fuzzy
+          search: search || undefined,
           onlyActive: "1",
         },
       });
       setProducts(Array.isArray(data?.items) ? data.items : []);
+      if (!silent && bootRef.current) notifyOk("Productos actualizados.");
     } catch (e) {
       console.error(e);
-      showAxiosError(e, "No se pudieron cargar productos");
+      notifyError(e, "No pudimos cargar los productos.");
     } finally {
       setLoading(false);
     }
@@ -269,37 +369,39 @@ export default function MiniTiendaView({ isMobile, currentUser }) {
   // ---------- BOOT ----------
   useEffect(() => {
     if (!canView) return;
-    loadSites();
-    loadCategories(section);
+    loadSites({ silent: true });
+    loadCategories(section, { silent: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [canView]);
 
-  // change section
   useEffect(() => {
     if (!canView) return;
-    loadCategories(section);
+    loadCategories(section, { silent: true });
     setSearchDraft("");
     setSearch("");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [section]);
 
-  // debounce searchDraft
   useEffect(() => {
     const t = setTimeout(() => setSearch(searchDraft.trim()), 260);
     return () => clearTimeout(t);
   }, [searchDraft]);
 
-  // load products on filters
   useEffect(() => {
     if (!canView) return;
-    loadProducts();
+    loadProducts({ silent: true });
+    if (!bootRef.current) bootRef.current = true;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [site, section, categoryId, search]);
 
   // ---------- CART ----------
   const addToCart = (p) => {
     if (canPOS) {
-      if ((p?.stock || 0) <= 0) return msgApi.warning("Sin stock.");
+      if ((p?.stock || 0) <= 0) {
+        msgApi.warning("Este producto está agotado.");
+        return;
+      }
+
       setCart((prev) => {
         const i = prev.findIndex((x) => x.productId === p._id);
         if (i >= 0) {
@@ -324,14 +426,15 @@ export default function MiniTiendaView({ isMobile, currentUser }) {
           },
         ];
       });
+
       setCartOpen(true);
+      msgApi.open({ type: "success", content: "Agregado al carrito.", duration: 1.3 });
       return;
     }
 
-    // Si no puede vender pero sí administrar, click abre editar
     if (canManage) return openEditProduct(p);
 
-    msgApi.warning("Tu usuario no tiene permiso para vender (pos_shop).");
+    notifyNoAccess("vender desde la tienda");
   };
 
   const inc = (productId) => {
@@ -356,6 +459,11 @@ export default function MiniTiendaView({ isMobile, currentUser }) {
     setCart((prev) => prev.filter((x) => x.productId !== productId));
   };
 
+  const clearCart = () => {
+    setCart([]);
+    msgApi.info("Carrito vaciado.");
+  };
+
   const confirmIfCartDirty = async ({ title, content, onOk }) => {
     if (!cart.length) return onOk();
     Modal.confirm({
@@ -376,7 +484,8 @@ export default function MiniTiendaView({ isMobile, currentUser }) {
   const handleChangeSite = (next) => {
     confirmIfCartDirty({
       title: "Cambiar sede",
-      content: "Tu carrito se vaciará al cambiar la sede. ¿Continuar?",
+      content:
+        "Para evitar confusiones, el carrito se vaciará al cambiar la sede. ¿Continuar?",
       onOk: () => setSite(next),
     });
   };
@@ -384,7 +493,8 @@ export default function MiniTiendaView({ isMobile, currentUser }) {
   const handleChangeSection = (next) => {
     confirmIfCartDirty({
       title: "Cambiar sección",
-      content: "Tu carrito se vaciará al cambiar de sección. ¿Continuar?",
+      content:
+        "Para evitar confusiones, el carrito se vaciará al cambiar de sección. ¿Continuar?",
       onOk: () => {
         setSection(next);
         setSearchDraft("");
@@ -395,10 +505,10 @@ export default function MiniTiendaView({ isMobile, currentUser }) {
 
   const checkout = async () => {
     if (!cart.length) return;
-    if (!site) return msgApi.error("Selecciona una sede.");
-    if (!canPOS) return msgApi.warning("Sin permiso pos_shop.");
+    if (!site) return msgApi.error("Selecciona una sede para continuar.");
+    if (!canPOS) return notifyNoAccess("confirmar ventas");
 
-    const hide = msgApi.loading("Registrando venta…", 0);
+    msgApi.loading({ content: "Registrando la venta…", key: "checkout", duration: 0 });
     try {
       const payload = {
         site,
@@ -410,26 +520,25 @@ export default function MiniTiendaView({ isMobile, currentUser }) {
 
       await axios.post("/api/shop/sales", payload, { withCredentials: true });
 
-      hide();
       msgApi.success({
-        content: "Venta registrada ✅",
-        icon: <CheckCircleOutlined />,
+        content: "Venta registrada correctamente ✅",
+        key: "checkout",
         duration: 2,
       });
 
       setCart([]);
       setCartOpen(false);
-      loadProducts();
+      loadProducts({ silent: true });
     } catch (e) {
-      hide();
       console.error(e);
-      showAxiosError(e, "No se pudo completar la venta");
+      msgApi.destroy("checkout");
+      notifyError(e, "No pudimos completar la venta.");
     }
   };
 
-  // ---------- ADMIN: CATEGORIES ----------
+  // ---------- GESTIÓN: CATEGORIES ----------
   const openCreateCategory = () => {
-    if (!canManage) return msgApi.warning("No tienes permiso manage_shop.");
+    if (!canManage) return notifyNoAccess("gestionar categorías");
     setEditingCategory(null);
     catForm.resetFields();
     catForm.setFieldsValue({ name: "", section });
@@ -437,7 +546,7 @@ export default function MiniTiendaView({ isMobile, currentUser }) {
   };
 
   const openEditCategory = (cat) => {
-    if (!canManage) return msgApi.warning("No tienes permiso manage_shop.");
+    if (!canManage) return notifyNoAccess("editar categorías");
     setEditingCategory(cat);
     catForm.resetFields();
     catForm.setFieldsValue({ name: cat.name, section: cat.section });
@@ -445,16 +554,17 @@ export default function MiniTiendaView({ isMobile, currentUser }) {
   };
 
   const saveCategory = async () => {
-    if (!canManage) return msgApi.warning("No tienes permiso manage_shop.");
+    if (!canManage) return notifyNoAccess("guardar categorías");
     try {
       const values = await catForm.validateFields();
       const name = String(values.name || "").trim();
       const sec = values.section;
 
-      const hide = msgApi.loading(
-        editingCategory ? "Guardando categoría…" : "Creando categoría…",
-        0
-      );
+      msgApi.loading({
+        content: editingCategory ? "Guardando cambios…" : "Creando categoría…",
+        key: "catSave",
+        duration: 0,
+      });
 
       if (editingCategory?._id) {
         await axios.patch(
@@ -470,44 +580,46 @@ export default function MiniTiendaView({ isMobile, currentUser }) {
         );
       }
 
-      hide();
-      msgApi.success(
-        editingCategory ? "Categoría actualizada ✅" : "Categoría creada ✅"
-      );
+      msgApi.success({
+        content: editingCategory ? "Categoría actualizada ✅" : "Categoría creada ✅",
+        key: "catSave",
+        duration: 2,
+      });
+
       setCatModalOpen(false);
       setEditingCategory(null);
 
-      await loadCategories(section);
+      await loadCategories(section, { silent: true });
     } catch (e) {
       if (e?.errorFields) return;
       console.error(e);
-      showAxiosError(e, "No se pudo guardar la categoría");
+      msgApi.destroy("catSave");
+      notifyError(e, "No pudimos guardar la categoría.");
     }
   };
 
   const deleteCategory = async (cat) => {
-    if (!canManage) return msgApi.warning("No tienes permiso manage_shop.");
-    const hide = msgApi.loading("Enviando a papelera…", 0);
+    if (!canManage) return notifyNoAccess("eliminar categorías");
+    msgApi.loading({ content: "Enviando a papelera…", key: "catDel", duration: 0 });
     try {
       await axios.delete(`/api/shop/categories/${cat._id}`, {
         withCredentials: true,
       });
-      hide();
-      msgApi.success("Categoría enviada a papelera ✅");
-      await loadCategories(section);
-      await loadProducts();
+      msgApi.success({ content: "Categoría enviada a papelera ✅", key: "catDel", duration: 2 });
+      await loadCategories(section, { silent: true });
+      await loadProducts({ silent: true });
     } catch (e) {
-      hide();
       console.error(e);
-      showAxiosError(e, "No se pudo eliminar la categoría");
+      msgApi.destroy("catDel");
+      notifyError(e, "No pudimos enviar la categoría a papelera.");
     }
   };
 
-  // ---------- ADMIN: PRODUCTS ----------
+  // ---------- GESTIÓN: PRODUCTS ----------
   const openCreateProduct = () => {
-    if (!canManage) return msgApi.warning("No tienes permiso manage_shop.");
-    if (!site) return msgApi.warning("Selecciona una sede.");
-    if (!categoryId) return msgApi.warning("Selecciona una categoría.");
+    if (!canManage) return notifyNoAccess("gestionar productos");
+    if (!site) return msgApi.warning("Selecciona una sede primero.");
+    if (!categoryId) return msgApi.warning("Selecciona una categoría primero.");
 
     setEditingProduct(null);
     prodForm.resetFields();
@@ -526,7 +638,7 @@ export default function MiniTiendaView({ isMobile, currentUser }) {
   };
 
   const openEditProduct = (p) => {
-    if (!canManage) return msgApi.warning("No tienes permiso manage_shop.");
+    if (!canManage) return notifyNoAccess("editar productos");
     setEditingProduct(p);
     prodForm.resetFields();
     prodForm.setFieldsValue({
@@ -544,7 +656,7 @@ export default function MiniTiendaView({ isMobile, currentUser }) {
   };
 
   const saveProduct = async () => {
-    if (!canManage) return msgApi.warning("No tienes permiso manage_shop.");
+    if (!canManage) return notifyNoAccess("guardar productos");
     try {
       const v = await prodForm.validateFields();
       const payload = {
@@ -559,10 +671,11 @@ export default function MiniTiendaView({ isMobile, currentUser }) {
         active: Boolean(v.active),
       };
 
-      const hide = msgApi.loading(
-        editingProduct ? "Guardando cambios…" : "Creando producto…",
-        0
-      );
+      msgApi.loading({
+        content: editingProduct ? "Guardando cambios…" : "Creando producto…",
+        key: "prodSave",
+        duration: 0,
+      });
 
       if (editingProduct?._id) {
         await axios.patch(`/api/shop/products/${editingProduct._id}`, payload, {
@@ -574,62 +687,78 @@ export default function MiniTiendaView({ isMobile, currentUser }) {
         });
       }
 
-      hide();
-      msgApi.success(
-        editingProduct ? "Producto actualizado ✅" : "Producto creado ✅"
-      );
+      msgApi.success({
+        content: editingProduct ? "Producto actualizado ✅" : "Producto creado ✅",
+        key: "prodSave",
+        duration: 2,
+      });
+
       setProdModalOpen(false);
       setEditingProduct(null);
-      await loadProducts();
+      await loadProducts({ silent: true });
     } catch (e) {
       if (e?.errorFields) return;
       console.error(e);
-      showAxiosError(e, "No se pudo guardar el producto");
+      msgApi.destroy("prodSave");
+      notifyError(e, "No pudimos guardar el producto.");
     }
   };
 
   const deleteProduct = async (p) => {
-    if (!canManage) return msgApi.warning("No tienes permiso manage_shop.");
-    const hide = msgApi.loading("Enviando a papelera…", 0);
+    if (!canManage) return notifyNoAccess("eliminar productos");
+    msgApi.loading({ content: "Enviando a papelera…", key: "prodDel", duration: 0 });
     try {
       await axios.delete(`/api/shop/products/${p._id}`, {
         withCredentials: true,
       });
-      hide();
-      msgApi.success("Producto enviado a papelera ✅");
-      await loadProducts();
+      msgApi.success({ content: "Producto enviado a papelera ✅", key: "prodDel", duration: 2 });
+      await loadProducts({ silent: true });
     } catch (e) {
-      hide();
       console.error(e);
-      showAxiosError(e, "No se pudo eliminar el producto");
+      msgApi.destroy("prodDel");
+      notifyError(e, "No pudimos enviar el producto a papelera.");
     }
   };
 
-  // ---------- ADMIN DRAWER: TRASH + LOGS ----------
-  const openAdminDrawer = async () => {
-    if (!canManage) return msgApi.warning("No tienes permiso manage_shop.");
+  // ---------- GESTIÓN (panel): PAPELERA + HISTORIAL ----------
+  const openAdminPanel = async () => {
+    if (!canManage) return notifyNoAccess("abrir gestión");
     setAdminOpen(true);
+    setCartOpen(false);
   };
 
   const loadTrash = async () => {
     if (!canManage) return;
     setTrashLoading(true);
     try {
-      const [tp, tc] = await Promise.all([
-        axios.get("/api/shop/products/trash", {
-          withCredentials: true,
-          params: { site, section },
-        }),
+      const reqs = [
         axios.get("/api/shop/categories/trash", {
           withCredentials: true,
           params: { section },
         }),
-      ]);
+      ];
+
+      // productos trash requiere site
+      if (site) {
+        reqs.unshift(
+          axios.get("/api/shop/products/trash", {
+            withCredentials: true,
+            params: { site, section },
+          })
+        );
+      }
+
+      const res = await Promise.all(reqs);
+
+      // si site existe, [tp, tc]; si no, [tc]
+      const tp = site ? res[0] : null;
+      const tc = site ? res[1] : res[0];
+
       setTrashProducts(Array.isArray(tp?.data?.items) ? tp.data.items : []);
       setTrashCategories(Array.isArray(tc?.data?.items) ? tc.data.items : []);
     } catch (e) {
       console.error(e);
-      showAxiosError(e, "No se pudo cargar la papelera");
+      notifyError(e, "No pudimos cargar la papelera.");
     } finally {
       setTrashLoading(false);
     }
@@ -637,47 +766,46 @@ export default function MiniTiendaView({ isMobile, currentUser }) {
 
   const restoreProduct = async (p) => {
     if (!canManage) return;
-    const hide = msgApi.loading("Restaurando producto…", 0);
+    msgApi.loading({ content: "Restaurando producto…", key: "restoreProd", duration: 0 });
     try {
       await axios.patch(
         `/api/shop/products/${p._id}/restore`,
         {},
         { withCredentials: true }
       );
-      hide();
-      msgApi.success("Producto restaurado ✅");
+      msgApi.success({ content: "Producto restaurado ✅", key: "restoreProd", duration: 2 });
       await loadTrash();
-      await loadProducts();
+      await loadProducts({ silent: true });
     } catch (e) {
-      hide();
       console.error(e);
-      showAxiosError(e, "No se pudo restaurar el producto");
+      msgApi.destroy("restoreProd");
+      notifyError(e, "No pudimos restaurar el producto.");
     }
   };
 
   const restoreCategory = async (c) => {
     if (!canManage) return;
-    const hide = msgApi.loading("Restaurando categoría…", 0);
+    msgApi.loading({ content: "Restaurando categoría…", key: "restoreCat", duration: 0 });
     try {
       await axios.patch(
         `/api/shop/categories/${c._id}/restore`,
         {},
         { withCredentials: true }
       );
-      hide();
-      msgApi.success("Categoría restaurada ✅");
+      msgApi.success({ content: "Categoría restaurada ✅", key: "restoreCat", duration: 2 });
       await loadTrash();
-      await loadCategories(section);
+      await loadCategories(section, { silent: true });
     } catch (e) {
-      hide();
       console.error(e);
-      showAxiosError(e, "No se pudo restaurar la categoría");
+      msgApi.destroy("restoreCat");
+      notifyError(e, "No pudimos restaurar la categoría.");
     }
   };
 
-  const loadLogs = async () => {
+  const loadHistory = async () => {
     if (!canView) return;
-    setLogsLoading(true);
+    if (!site) return;
+    setHistoryLoading(true);
     try {
       const [mov, sales] = await Promise.all([
         axios.get("/api/shop/stock-movements", {
@@ -694,16 +822,16 @@ export default function MiniTiendaView({ isMobile, currentUser }) {
       setSalesLogs(Array.isArray(sales?.data?.items) ? sales.data.items : []);
     } catch (e) {
       console.error(e);
-      showAxiosError(e, "No se pudieron cargar logs");
+      notifyError(e, "No pudimos cargar el historial.");
     } finally {
-      setLogsLoading(false);
+      setHistoryLoading(false);
     }
   };
 
   useEffect(() => {
     if (!adminOpen) return;
     loadTrash();
-    loadLogs();
+    loadHistory();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [adminOpen, site, section]);
 
@@ -712,7 +840,7 @@ export default function MiniTiendaView({ isMobile, currentUser }) {
     return (
       <Card bordered={false} style={{ borderRadius: 16 }}>
         <Text style={{ color: neutrals.textMuted }}>
-          No tienes permisos para ver la Tienda (view_shop).
+          Tu usuario no tiene acceso a esta sección.
         </Text>
       </Card>
     );
@@ -727,15 +855,11 @@ export default function MiniTiendaView({ isMobile, currentUser }) {
 
   const gridKey = `${site}-${section}-${categoryId}-${search}`;
 
-  // ========== Category Pill (⋯ SIEMPRE dentro del fondo) ==========
+  // Category pill
   const CategoryPill = ({ c }) => {
     const active = String(c._id) === String(categoryId);
-
     const bg = active ? beachColors.turquoise : "rgba(148,163,184,0.16)";
     const fg = active ? "#064e3b" : neutrals.textMain;
-
-    const moreFg = active ? "#064e3b" : neutrals.textMain;
-    const moreHoverBg = active ? "rgba(6,78,59,0.12)" : "rgba(15,23,42,0.06)";
 
     const menu = {
       items: [
@@ -751,8 +875,8 @@ export default function MiniTiendaView({ isMobile, currentUser }) {
           icon: <DeleteOutlined />,
           label: (
             <Popconfirm
-              title="Enviar categoría a papelera"
-              description="Soft delete. Puedes restaurarla desde Admin → Papelera."
+              title="Enviar a papelera"
+              description="Podrás restaurar la categoría desde Gestión."
               okText="Enviar"
               cancelText="Cancelar"
               onConfirm={() => deleteCategory(c)}
@@ -799,13 +923,7 @@ export default function MiniTiendaView({ isMobile, currentUser }) {
                 display: "inline-flex",
                 alignItems: "center",
                 justifyContent: "center",
-                color: moreFg,
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = moreHoverBg;
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = "transparent";
+                color: fg,
               }}
             />
           </Dropdown>
@@ -814,7 +932,6 @@ export default function MiniTiendaView({ isMobile, currentUser }) {
     );
   };
 
-  // Cards: altura consistente + botón siempre abajo
   const CARD_MIN_HEIGHT = isMobile ? 186 : 196;
 
   return (
@@ -866,7 +983,7 @@ export default function MiniTiendaView({ isMobile, currentUser }) {
                       fontSize: isMobile ? 18 : 20,
                     }}
                   >
-                    Tienda Panel de Control
+                    Tienda
                   </Title>
 
                   {canManage && (
@@ -878,12 +995,14 @@ export default function MiniTiendaView({ isMobile, currentUser }) {
                         color: "#fff",
                       }}
                     >
-                      Admin
+                      Gestión
                     </Tag>
                   )}
-
-
                 </Space>
+
+                <Text style={{ display: "block", color: "rgba(255,255,255,0.82)", fontSize: 12 }}>
+                  {prettySite(site)} · {section === "normal" ? "Snacks y bebidas" : "Alcohol"}
+                </Text>
               </div>
             </Space>
           </Col>
@@ -910,20 +1029,20 @@ export default function MiniTiendaView({ isMobile, currentUser }) {
                   value={searchDraft}
                   onChange={(e) => setSearchDraft(e.target.value)}
                   onSearch={(v) => setSearchDraft(String(v || ""))}
-                  placeholder="Ingresa el nombre del producto para buscar…"
+                  placeholder="Busca un producto…"
                   allowClear
                   autoComplete="off"
-                  enterButton={isMobile ? <SearchOutlined /> : "Buscar"}
+                 
                   loading={loading}
                   style={{ width: "100%" }}
                 />
               </div>
 
-              <Tooltip title="Recargar productos">
+              <Tooltip title="Actualizar productos">
                 <Button
                   className="mtPillBtn"
                   icon={<ReloadOutlined />}
-                  onClick={loadProducts}
+                  onClick={() => loadProducts({ silent: false })}
                   loading={loading}
                   style={{
                     borderRadius: 999,
@@ -955,8 +1074,8 @@ export default function MiniTiendaView({ isMobile, currentUser }) {
                       {
                         key: "adminCenter",
                         icon: <SettingOutlined />,
-                        label: "Papelera y logs",
-                        onClick: openAdminDrawer,
+                        label: adminOpen ? "Cerrar gestión" : "Abrir gestión",
+                        onClick: () => (adminOpen ? setAdminOpen(false) : openAdminPanel()),
                       },
                     ],
                   }}
@@ -972,7 +1091,7 @@ export default function MiniTiendaView({ isMobile, currentUser }) {
                       fontWeight: 800,
                     }}
                   >
-                    {!isMobile && "Admin"}
+                    {!isMobile && "Gestión"}
                   </Button>
                 </Dropdown>
               )}
@@ -981,7 +1100,10 @@ export default function MiniTiendaView({ isMobile, currentUser }) {
                 <Button
                   className="mtPillBtn"
                   icon={<ShoppingCartOutlined />}
-                  onClick={() => setCartOpen(true)}
+                  onClick={() => {
+                    setCartOpen((v) => !v);
+                    if (!cartOpen) setAdminOpen(false);
+                  }}
                   style={{
                     borderRadius: 999,
                     background: beachColors.sand,
@@ -990,13 +1112,397 @@ export default function MiniTiendaView({ isMobile, currentUser }) {
                     fontWeight: 900,
                   }}
                 >
-                  {!isMobile && "Carrito"}
+                  {!isMobile && (cartOpen ? "Cerrar carrito" : "Carrito")}
                 </Button>
               </Badge>
             </Flex>
           </Col>
         </Row>
       </Card>
+
+      {/* PANEL: CARRITO (sin Drawer) */}
+      <SlidePanel open={cartOpen} maxHeight={820}>
+        <Card
+          bordered={false}
+          style={{
+            borderRadius: 18,
+            marginTop: 12,
+            boxShadow: "0 14px 32px rgba(15,23,42,0.08)",
+            background: "#fff",
+          }}
+          bodyStyle={{ padding: isMobile ? 12 : 14 }}
+          title={
+            <Space>
+              <ShoppingCartOutlined />
+              <span>Carrito · {prettySite(site)}</span>
+            </Space>
+          }
+          extra={
+            <Space>
+              <Popconfirm
+                title="Vaciar carrito"
+                description="Se eliminarán todos los productos del carrito."
+                okText="Vaciar"
+                cancelText="Cancelar"
+                onConfirm={clearCart}
+                disabled={!cart.length}
+              >
+                <Button disabled={!cart.length} icon={<DeleteOutlined />}>
+                  Vaciar
+                </Button>
+              </Popconfirm>
+
+              <Button icon={<CloseOutlined />} onClick={() => setCartOpen(false)}>
+                Cerrar
+              </Button>
+            </Space>
+          }
+        >
+          {cart.length === 0 ? (
+            <Empty description="Tu carrito está vacío" />
+          ) : (
+            <>
+              <List
+                dataSource={cart}
+                renderItem={(it) => (
+                  <List.Item
+                    style={{ padding: "10px 0" }}
+                    actions={[
+                      <Button
+                        key="dec"
+                        icon={<MinusOutlined />}
+                        onClick={() => dec(it.productId)}
+                        style={{ borderRadius: 10 }}
+                      />,
+                      <Text
+                        key="qty"
+                        style={{
+                          minWidth: 18,
+                          textAlign: "center",
+                          fontWeight: 900,
+                        }}
+                      >
+                        {it.qty}
+                      </Text>,
+                      <Button
+                        key="inc"
+                        icon={<PlusOutlined />}
+                        onClick={() => inc(it.productId)}
+                        style={{ borderRadius: 10 }}
+                        disabled={it.qty >= it.stock}
+                      />,
+                      <Popconfirm
+                        key="rm"
+                        title="Quitar producto"
+                        okText="Quitar"
+                        cancelText="Cancelar"
+                        onConfirm={() => removeLine(it.productId)}
+                      >
+                        <Tooltip title="Quitar del carrito">
+                          <Button
+                            danger
+                            icon={<DeleteOutlined />}
+                            style={{ borderRadius: 10 }}
+                          />
+                        </Tooltip>
+                      </Popconfirm>,
+                    ]}
+                  >
+                    <List.Item.Meta
+                      title={<Text style={{ fontWeight: 900 }}>{it.name}</Text>}
+                      description={
+                        <Space size={10} wrap>
+                          <Text type="secondary" style={{ fontSize: 11 }}>
+                            {money(it.unitPrice)} · stock {it.stock}
+                          </Text>
+                          <Tag
+                            style={{
+                              borderRadius: 999,
+                              margin: 0,
+                              fontWeight: 900,
+                            }}
+                          >
+                            {money(it.qty * it.unitPrice)}
+                          </Tag>
+                        </Space>
+                      }
+                    />
+                  </List.Item>
+                )}
+              />
+
+              <Divider />
+
+              <Space direction="vertical" size={10} style={{ width: "100%" }}>
+                <div style={{ display: "flex", justifyContent: "space-between" }}>
+                  <Text>Total</Text>
+                  <Text style={{ fontWeight: 900, fontSize: 16 }}>
+                    {money(cartTotal)}
+                  </Text>
+                </div>
+
+                <Popconfirm
+                  title="Confirmar venta"
+                  description="Se registrará la venta y se actualizará el stock."
+                  okText="Confirmar"
+                  cancelText="Cancelar"
+                  onConfirm={checkout}
+                  disabled={!canPOS}
+                >
+                  <Button
+                    type="primary"
+                    block
+                    disabled={!canPOS}
+                    style={{
+                      borderRadius: 14,
+                      height: 44,
+                      fontWeight: 900,
+                      background: `linear-gradient(90deg, ${beachColors.oceanBlue}, ${beachColors.teal})`,
+                    }}
+                  >
+                    Confirmar venta
+                  </Button>
+                </Popconfirm>
+
+                {!canPOS && (
+                  <Text type="secondary" style={{ fontSize: 11 }}>
+                    Tu usuario no tiene acceso para confirmar ventas.
+                  </Text>
+                )}
+              </Space>
+            </>
+          )}
+        </Card>
+      </SlidePanel>
+
+      {/* PANEL: GESTIÓN (sin Drawer) */}
+      <SlidePanel open={adminOpen} maxHeight={1200}>
+        <Card
+          bordered={false}
+          style={{
+            borderRadius: 18,
+            marginTop: 12,
+            boxShadow: "0 14px 32px rgba(15,23,42,0.08)",
+            background: "#fff",
+          }}
+          bodyStyle={{ padding: isMobile ? 12 : 14 }}
+          title={
+            <Space>
+              <SettingOutlined />
+              <span>Gestión</span>
+            </Space>
+          }
+          extra={
+            <Space>
+              <Tooltip title="Actualizar">
+                <Button
+                  icon={<ReloadOutlined />}
+                  onClick={() => {
+                    loadTrash();
+                    loadHistory();
+                  }}
+                />
+              </Tooltip>
+              <Button icon={<CloseOutlined />} onClick={() => setAdminOpen(false)}>
+                Cerrar
+              </Button>
+            </Space>
+          }
+        >
+          <Tabs
+            items={[
+              {
+                key: "trash",
+                label: (
+                  <Space size={6}>
+                    <DeleteOutlined />
+                    <span>Papelera</span>
+                  </Space>
+                ),
+                children: (
+                  <Spin spinning={trashLoading}>
+                    <Divider orientation="left" style={{ marginTop: 0 }}>
+                      Categorías
+                    </Divider>
+
+                    {trashCategories.length === 0 ? (
+                      <Empty
+                        image={Empty.PRESENTED_IMAGE_SIMPLE}
+                        description="No hay categorías en papelera"
+                      />
+                    ) : (
+                      <List
+                        dataSource={trashCategories}
+                        renderItem={(c) => (
+                          <List.Item
+                            actions={[
+                              <Popconfirm
+                                key="restore"
+                                title="Restaurar categoría"
+                                okText="Restaurar"
+                                cancelText="Cancelar"
+                                onConfirm={() => restoreCategory(c)}
+                              >
+                                <Button icon={<UndoOutlined />}>Restaurar</Button>
+                              </Popconfirm>,
+                            ]}
+                          >
+                            <List.Item.Meta
+                              title={<Text style={{ fontWeight: 900 }}>{c.name}</Text>}
+                              description={<Text type="secondary">Sección: {c.section}</Text>}
+                            />
+                          </List.Item>
+                        )}
+                      />
+                    )}
+
+                    <Divider orientation="left">
+                      Productos ({prettySite(site)} · {section})
+                    </Divider>
+
+                    {!site ? (
+                      <Empty
+                        image={Empty.PRESENTED_IMAGE_SIMPLE}
+                        description="Selecciona una sede para ver productos en papelera."
+                      />
+                    ) : trashProducts.length === 0 ? (
+                      <Empty
+                        image={Empty.PRESENTED_IMAGE_SIMPLE}
+                        description="No hay productos en papelera"
+                      />
+                    ) : (
+                      <List
+                        dataSource={trashProducts}
+                        renderItem={(p) => (
+                          <List.Item
+                            actions={[
+                              <Popconfirm
+                                key="restore"
+                                title="Restaurar producto"
+                                okText="Restaurar"
+                                cancelText="Cancelar"
+                                onConfirm={() => restoreProduct(p)}
+                              >
+                                <Button icon={<UndoOutlined />}>Restaurar</Button>
+                              </Popconfirm>,
+                            ]}
+                          >
+                            <List.Item.Meta
+                              title={<Text style={{ fontWeight: 900 }}>{p.name}</Text>}
+                              description={
+                                <Text type="secondary">
+                                  {money(p.unitPrice)} · stock {p.stock}
+                                </Text>
+                              }
+                            />
+                          </List.Item>
+                        )}
+                      />
+                    )}
+                  </Spin>
+                ),
+              },
+              {
+                key: "history",
+                label: (
+                  <Space size={6}>
+                    <HistoryOutlined />
+                    <span>Historial</span>
+                  </Space>
+                ),
+                children: (
+                  <Spin spinning={historyLoading}>
+                    {!site ? (
+                      <Empty
+                        image={Empty.PRESENTED_IMAGE_SIMPLE}
+                        description="Selecciona una sede para ver el historial."
+                      />
+                    ) : (
+                      <>
+                        <Divider orientation="left" style={{ marginTop: 0 }}>
+                          Movimientos de stock
+                        </Divider>
+
+                        {stockLogs.length === 0 ? (
+                          <Empty
+                            image={Empty.PRESENTED_IMAGE_SIMPLE}
+                            description="Sin movimientos"
+                          />
+                        ) : (
+                          <List
+                            size="small"
+                            dataSource={stockLogs}
+                            renderItem={(m) => (
+                              <List.Item>
+                                <Space direction="vertical" size={2} style={{ width: "100%" }}>
+                                  <Space
+                                    style={{
+                                      justifyContent: "space-between",
+                                      width: "100%",
+                                    }}
+                                  >
+                                    <Text style={{ fontWeight: 900 }}>
+                                      {m.type} · {m.delta > 0 ? `+${m.delta}` : m.delta}
+                                    </Text>
+                                    <Tag style={{ borderRadius: 999 }}>
+                                      {new Date(m.createdAt || Date.now()).toLocaleString("es-MX")}
+                                    </Tag>
+                                  </Space>
+                                  <Text type="secondary" style={{ fontSize: 12 }}>
+                                    Stock {m.before} → {m.after} · {m.reason || "—"}
+                                  </Text>
+                                </Space>
+                              </List.Item>
+                            )}
+                          />
+                        )}
+
+                        <Divider orientation="left">
+                          Ventas recientes <FileTextOutlined />
+                        </Divider>
+
+                        {salesLogs.length === 0 ? (
+                          <Empty
+                            image={Empty.PRESENTED_IMAGE_SIMPLE}
+                            description="Sin ventas"
+                          />
+                        ) : (
+                          <List
+                            dataSource={salesLogs}
+                            renderItem={(s) => (
+                              <List.Item>
+                                <Space direction="vertical" size={2} style={{ width: "100%" }}>
+                                  <Space
+                                    style={{
+                                      justifyContent: "space-between",
+                                      width: "100%",
+                                    }}
+                                  >
+                                    <Text style={{ fontWeight: 900 }}>
+                                      {money(s.total)}
+                                    </Text>
+                                    <Tag style={{ borderRadius: 999 }}>
+                                      {new Date(s.createdAt || Date.now()).toLocaleString("es-MX")}
+                                    </Tag>
+                                  </Space>
+                                  <Text type="secondary" style={{ fontSize: 12 }}>
+                                    Productos: {Array.isArray(s.items) ? s.items.length : 0} ·
+                                    método: {s.paymentMethod || "—"} · sección: {s.section}
+                                  </Text>
+                                </Space>
+                              </List.Item>
+                            )}
+                          />
+                        )}
+                      </>
+                    )}
+                  </Spin>
+                ),
+              },
+            ]}
+          />
+        </Card>
+      </SlidePanel>
 
       {/* MAIN */}
       <Card
@@ -1026,9 +1532,7 @@ export default function MiniTiendaView({ isMobile, currentUser }) {
                     background: "rgba(148,163,184,0.15)",
                   }}
                 >
-                  {t.key === "normal"
-                    ? "snacks / bebidas"
-                    : "vinos / cervezas / licores"}
+                  {t.key === "normal" ? "snacks / bebidas" : "vinos / cervezas / licores"}
                 </Tag>
               </Space>
             ),
@@ -1050,16 +1554,14 @@ export default function MiniTiendaView({ isMobile, currentUser }) {
               </strong>
             </Text>
 
-            <Space size={8}>
-              {catsLoading && (
-                <Space size={6}>
-                  <Spin size="small" />
-                  <Text style={{ fontSize: 11, color: neutrals.textMuted }}>
-                    Cargando categorías…
-                  </Text>
-                </Space>
-              )}
-            </Space>
+            {catsLoading && (
+              <Space size={6}>
+                <Spin size="small" />
+                <Text style={{ fontSize: 11, color: neutrals.textMuted }}>
+                  Cargando categorías…
+                </Text>
+              </Space>
+            )}
           </Space>
 
           <div style={{ marginTop: 10 }}>
@@ -1068,8 +1570,8 @@ export default function MiniTiendaView({ isMobile, currentUser }) {
                 image={Empty.PRESENTED_IMAGE_SIMPLE}
                 description={
                   <span style={{ color: neutrals.textMuted }}>
-                    No hay categorías.{" "}
-                    {canManage ? "Crea una desde Admin." : ""}
+                    No hay categorías por ahora.{" "}
+                    {canManage ? "Puedes crear una desde Gestión." : ""}
                   </span>
                 }
               />
@@ -1083,7 +1585,7 @@ export default function MiniTiendaView({ isMobile, currentUser }) {
           </div>
         </div>
 
-        {/* Grid mosaicos */}
+        {/* Grid */}
         <div key={gridKey} className="mtFadeUp">
           {loading ? (
             <Row gutter={[12, 12]}>
@@ -1104,7 +1606,7 @@ export default function MiniTiendaView({ isMobile, currentUser }) {
             </Row>
           ) : products.length === 0 ? (
             <Empty
-              description="No hay productos (o tu búsqueda no encontró nada)."
+              description="No encontramos productos con esos filtros."
               style={{ marginTop: 18 }}
             />
           ) : (
@@ -1128,8 +1630,8 @@ export default function MiniTiendaView({ isMobile, currentUser }) {
                     icon: <DeleteOutlined />,
                     label: (
                       <Popconfirm
-                        title="Enviar producto a papelera"
-                        description="Soft delete. Puedes restaurarlo en Admin → Papelera."
+                        title="Enviar a papelera"
+                        description="Podrás restaurarlo desde Gestión."
                         okText="Enviar"
                         cancelText="Cancelar"
                         onConfirm={() => deleteProduct(p)}
@@ -1173,12 +1675,7 @@ export default function MiniTiendaView({ isMobile, currentUser }) {
                       }}
                     >
                       <Flex vertical gap={10} style={{ height: "100%" }}>
-                        {/* Header: nombre (2 líneas max) + precio + ⋯ */}
-                        <Flex
-                          align="flex-start"
-                          justify="space-between"
-                          gap={10}
-                        >
+                        <Flex align="flex-start" justify="space-between" gap={10}>
                           <Text
                             style={{
                               fontWeight: 900,
@@ -1186,7 +1683,7 @@ export default function MiniTiendaView({ isMobile, currentUser }) {
                               fontSize: 13,
                               lineHeight: 1.15,
                               flex: 1,
-                              minWidth: 0, // importante para ellipsis
+                              minWidth: 0,
                             }}
                             ellipsis={{ rows: 2, tooltip: p.name }}
                           >
@@ -1209,10 +1706,7 @@ export default function MiniTiendaView({ isMobile, currentUser }) {
                             </Tag>
 
                             {canManage && (
-                              <Dropdown
-                                trigger={["click"]}
-                                menu={{ items: menuItems }}
-                              >
+                              <Dropdown trigger={["click"]} menu={{ items: menuItems }}>
                                 <Button
                                   size="small"
                                   type="text"
@@ -1228,73 +1722,36 @@ export default function MiniTiendaView({ isMobile, currentUser }) {
                                     justifyContent: "center",
                                     color: neutrals.textMuted,
                                   }}
-                                  onMouseEnter={(e) => {
-                                    e.currentTarget.style.background =
-                                      "rgba(15,23,42,0.06)";
-                                    e.currentTarget.style.color =
-                                      neutrals.textMain;
-                                  }}
-                                  onMouseLeave={(e) => {
-                                    e.currentTarget.style.background =
-                                      "transparent";
-                                    e.currentTarget.style.color =
-                                      neutrals.textMuted;
-                                  }}
                                 />
                               </Dropdown>
                             )}
                           </Space>
                         </Flex>
 
-                        {/* Body: stock + status (misma altura siempre) */}
                         <Flex align="center" justify="space-between">
-                          <Text
-                            style={{ fontSize: 11, color: neutrals.textMuted }}
-                          >
-                            Stock:{" "}
-                            <b style={{ color: neutrals.textMain }}>
-                              {p.stock}
-                            </b>
+                          <Text style={{ fontSize: 11, color: neutrals.textMuted }}>
+                            Stock: <b style={{ color: neutrals.textMain }}>{p.stock}</b>
                           </Text>
 
                           {out ? (
-                            <Tag
-                              color="red"
-                              style={{
-                                borderRadius: 999,
-                                margin: 0,
-                                fontSize: 10,
-                              }}
-                            >
-                              Sin stock
+                            <Tag color="red" style={{ borderRadius: 999, margin: 0, fontSize: 10 }}>
+                              Agotado
                             </Tag>
                           ) : low ? (
                             <Tag
                               icon={<WarningOutlined />}
                               color="gold"
-                              style={{
-                                borderRadius: 999,
-                                margin: 0,
-                                fontSize: 10,
-                              }}
+                              style={{ borderRadius: 999, margin: 0, fontSize: 10 }}
                             >
                               Bajo
                             </Tag>
                           ) : (
-                            <Tag
-                              color="green"
-                              style={{
-                                borderRadius: 999,
-                                margin: 0,
-                                fontSize: 10,
-                              }}
-                            >
+                            <Tag color="green" style={{ borderRadius: 999, margin: 0, fontSize: 10 }}>
                               OK
                             </Tag>
                           )}
                         </Flex>
 
-                        {/* Spacer: empuja el botón hasta abajo SIEMPRE */}
                         <div style={{ flex: 1 }} />
 
                         <Button
@@ -1329,363 +1786,6 @@ export default function MiniTiendaView({ isMobile, currentUser }) {
         </div>
       </Card>
 
-      {/* Carrito */}
-      <Drawer
-        title={
-          <Space>
-            <ShoppingCartOutlined />
-            <span>Carrito · {prettySite(site)}</span>
-          </Space>
-        }
-        open={cartOpen}
-        onClose={() => setCartOpen(false)}
-        width={isMobile ? "92%" : 420}
-      >
-        {cart.length === 0 ? (
-          <Empty description="Carrito vacío" />
-        ) : (
-          <>
-            <List
-              dataSource={cart}
-              renderItem={(it) => (
-                <List.Item
-                  style={{ padding: "10px 0" }}
-                  actions={[
-                    <Button
-                      key="dec"
-                      icon={<MinusOutlined />}
-                      onClick={() => dec(it.productId)}
-                      style={{ borderRadius: 10 }}
-                    />,
-                    <Text
-                      key="qty"
-                      style={{
-                        minWidth: 18,
-                        textAlign: "center",
-                        fontWeight: 900,
-                      }}
-                    >
-                      {it.qty}
-                    </Text>,
-                    <Button
-                      key="inc"
-                      icon={<PlusOutlined />}
-                      onClick={() => inc(it.productId)}
-                      style={{ borderRadius: 10 }}
-                      disabled={it.qty >= it.stock}
-                    />,
-                    <Popconfirm
-                      key="rm"
-                      title="Eliminar del carrito"
-                      okText="Eliminar"
-                      cancelText="Cancelar"
-                      onConfirm={() => removeLine(it.productId)}
-                    >
-                      <Tooltip title="Eliminar del carrito">
-                        <Button
-                          danger
-                          icon={<DeleteOutlined />}
-                          style={{ borderRadius: 10 }}
-                        />
-                      </Tooltip>
-                    </Popconfirm>,
-                  ]}
-                >
-                  <List.Item.Meta
-                    title={<Text style={{ fontWeight: 900 }}>{it.name}</Text>}
-                    description={
-                      <Space size={10}>
-                        <Text type="secondary" style={{ fontSize: 11 }}>
-                          {money(it.unitPrice)} · stock {it.stock}
-                        </Text>
-                        <Tag
-                          style={{
-                            borderRadius: 999,
-                            margin: 0,
-                            fontWeight: 900,
-                          }}
-                        >
-                          {money(it.qty * it.unitPrice)}
-                        </Tag>
-                      </Space>
-                    }
-                  />
-                </List.Item>
-              )}
-            />
-
-            <Divider />
-
-            <Space direction="vertical" size={10} style={{ width: "100%" }}>
-              <div style={{ display: "flex", justifyContent: "space-between" }}>
-                <Text>Total</Text>
-                <Text style={{ fontWeight: 900, fontSize: 16 }}>
-                  {money(cartTotal)}
-                </Text>
-              </div>
-
-              <Popconfirm
-                title="Confirmar venta"
-                description="Se descontará stock y se registrará la venta."
-                okText="Confirmar"
-                cancelText="Cancelar"
-                onConfirm={checkout}
-                disabled={!canPOS}
-              >
-                <Button
-                  type="primary"
-                  block
-                  disabled={!canPOS}
-                  style={{
-                    borderRadius: 14,
-                    height: 44,
-                    fontWeight: 900,
-                    background: `linear-gradient(90deg, ${beachColors.oceanBlue}, ${beachColors.teal})`,
-                  }}
-                >
-                  Confirmar venta
-                </Button>
-              </Popconfirm>
-
-              {!canPOS && (
-                <Text type="secondary" style={{ fontSize: 11 }}>
-                  Tu usuario no tiene permiso <b>pos_shop</b>.
-                </Text>
-              )}
-            </Space>
-          </>
-        )}
-      </Drawer>
-
-      {/* Admin Drawer: Papelera + Logs */}
-      <Drawer
-        title={
-          <Space>
-            <SettingOutlined />
-            <span>Admin · Papelera y Logs</span>
-          </Space>
-        }
-        open={adminOpen}
-        onClose={() => setAdminOpen(false)}
-        width={isMobile ? "96%" : 720}
-        extra={
-          <Space>
-            <Tooltip title="Recargar">
-              <Button
-                icon={<ReloadOutlined />}
-                onClick={() => {
-                  loadTrash();
-                  loadLogs();
-                }}
-              />
-            </Tooltip>
-          </Space>
-        }
-      >
-        <Tabs
-          items={[
-            {
-              key: "trash",
-              label: (
-                <Space size={6}>
-                  <DeleteOutlined />
-                  <span>Papelera</span>
-                </Space>
-              ),
-              children: (
-                <Spin spinning={trashLoading}>
-                  <Divider orientation="left" style={{ marginTop: 0 }}>
-                    Categorías
-                  </Divider>
-
-                  {trashCategories.length === 0 ? (
-                    <Empty
-                      image={Empty.PRESENTED_IMAGE_SIMPLE}
-                      description="Sin categorías en papelera"
-                    />
-                  ) : (
-                    <List
-                      dataSource={trashCategories}
-                      renderItem={(c) => (
-                        <List.Item
-                          actions={[
-                            <Popconfirm
-                              key="restore"
-                              title="Restaurar categoría"
-                              okText="Restaurar"
-                              cancelText="Cancelar"
-                              onConfirm={() => restoreCategory(c)}
-                            >
-                              <Button icon={<UndoOutlined />}>Restaurar</Button>
-                            </Popconfirm>,
-                          ]}
-                        >
-                          <List.Item.Meta
-                            title={
-                              <Text style={{ fontWeight: 900 }}>{c.name}</Text>
-                            }
-                            description={
-                              <Text type="secondary">Sección: {c.section}</Text>
-                            }
-                          />
-                        </List.Item>
-                      )}
-                    />
-                  )}
-
-                  <Divider orientation="left">
-                    Productos (site: <b>{prettySite(site)}</b>, sección:{" "}
-                    <b>{section}</b>)
-                  </Divider>
-
-                  {trashProducts.length === 0 ? (
-                    <Empty
-                      image={Empty.PRESENTED_IMAGE_SIMPLE}
-                      description="Sin productos en papelera"
-                    />
-                  ) : (
-                    <List
-                      dataSource={trashProducts}
-                      renderItem={(p) => (
-                        <List.Item
-                          actions={[
-                            <Popconfirm
-                              key="restore"
-                              title="Restaurar producto"
-                              okText="Restaurar"
-                              cancelText="Cancelar"
-                              onConfirm={() => restoreProduct(p)}
-                            >
-                              <Button icon={<UndoOutlined />}>Restaurar</Button>
-                            </Popconfirm>,
-                          ]}
-                        >
-                          <List.Item.Meta
-                            title={
-                              <Text style={{ fontWeight: 900 }}>{p.name}</Text>
-                            }
-                            description={
-                              <Text type="secondary">
-                                {money(p.unitPrice)} · stock {p.stock} · cat{" "}
-                                {String(p.categoryId).slice(-6)}
-                              </Text>
-                            }
-                          />
-                        </List.Item>
-                      )}
-                    />
-                  )}
-                </Spin>
-              ),
-            },
-            {
-              key: "logs",
-              label: (
-                <Space size={6}>
-                  <FileTextOutlined />
-                  <span>Logs</span>
-                </Space>
-              ),
-              children: (
-                <Spin spinning={logsLoading}>
-                  <Divider orientation="left" style={{ marginTop: 0 }}>
-                    Movimientos de stock
-                  </Divider>
-
-                  {stockLogs.length === 0 ? (
-                    <Empty
-                      image={Empty.PRESENTED_IMAGE_SIMPLE}
-                      description="Sin movimientos"
-                    />
-                  ) : (
-                    <List
-                      size="small"
-                      dataSource={stockLogs}
-                      renderItem={(m) => (
-                        <List.Item>
-                          <Space
-                            direction="vertical"
-                            size={2}
-                            style={{ width: "100%" }}
-                          >
-                            <Space
-                              style={{
-                                justifyContent: "space-between",
-                                width: "100%",
-                              }}
-                            >
-                              <Text style={{ fontWeight: 900 }}>
-                                {m.type} ·{" "}
-                                {m.delta > 0 ? `+${m.delta}` : m.delta}
-                              </Text>
-                              <Tag style={{ borderRadius: 999 }}>
-                                {new Date(
-                                  m.createdAt || Date.now()
-                                ).toLocaleString("es-MX")}
-                              </Tag>
-                            </Space>
-                            <Text type="secondary" style={{ fontSize: 12 }}>
-                              productId: {String(m.productId)} · stock{" "}
-                              {m.before} → {m.after} · {m.reason || "—"}
-                            </Text>
-                          </Space>
-                        </List.Item>
-                      )}
-                    />
-                  )}
-
-                  <Divider orientation="left">
-                    Ventas recientes <HistoryOutlined />
-                  </Divider>
-
-                  {salesLogs.length === 0 ? (
-                    <Empty
-                      image={Empty.PRESENTED_IMAGE_SIMPLE}
-                      description="Sin ventas"
-                    />
-                  ) : (
-                    <List
-                      dataSource={salesLogs}
-                      renderItem={(s) => (
-                        <List.Item>
-                          <Space
-                            direction="vertical"
-                            size={2}
-                            style={{ width: "100%" }}
-                          >
-                            <Space
-                              style={{
-                                justifyContent: "space-between",
-                                width: "100%",
-                              }}
-                            >
-                              <Text style={{ fontWeight: 900 }}>
-                                {money(s.total)}
-                              </Text>
-                              <Tag style={{ borderRadius: 999 }}>
-                                {new Date(
-                                  s.createdAt || Date.now()
-                                ).toLocaleString("es-MX")}
-                              </Tag>
-                            </Space>
-                            <Text type="secondary" style={{ fontSize: 12 }}>
-                              items:{" "}
-                              {Array.isArray(s.items) ? s.items.length : 0} ·
-                              método: {s.paymentMethod || "—"} · sección:{" "}
-                              {s.section}
-                            </Text>
-                          </Space>
-                        </List.Item>
-                      )}
-                    />
-                  )}
-                </Spin>
-              ),
-            },
-          ]}
-        />
-      </Drawer>
-
       {/* Modal: Crear/Editar categoría */}
       <Modal
         title={editingCategory ? "Editar categoría" : "Nueva categoría"}
@@ -1703,7 +1803,7 @@ export default function MiniTiendaView({ isMobile, currentUser }) {
           <Form.Item
             label="Sección"
             name="section"
-            rules={[{ required: true, message: "Selecciona sección" }]}
+            rules={[{ required: true, message: "Selecciona una sección" }]}
           >
             <Select
               options={[
@@ -1725,7 +1825,7 @@ export default function MiniTiendaView({ isMobile, currentUser }) {
           </Form.Item>
 
           <Text type="secondary" style={{ fontSize: 12 }}>
-            Tip: el menú ⋯ dentro de cada categoría te deja editar/eliminar.
+            Tip: el botón ⋯ en la etiqueta te deja editar o enviar a papelera.
           </Text>
         </Form>
       </Modal>
@@ -1791,10 +1891,7 @@ export default function MiniTiendaView({ isMobile, currentUser }) {
                 rules={[{ required: true, message: "Categoría requerida" }]}
               >
                 <Select
-                  options={categories.map((c) => ({
-                    label: c.name,
-                    value: c._id,
-                  }))}
+                  options={categories.map((c) => ({ label: c.name, value: c._id }))}
                   showSearch
                   optionFilterProp="label"
                 />
@@ -1842,7 +1939,7 @@ export default function MiniTiendaView({ isMobile, currentUser }) {
           </Row>
 
           <Text type="secondary" style={{ fontSize: 12 }}>
-            Si el backend responde 403, revisa permisos: <b>manage_shop</b>.
+            Si algo falla, usa “Ver detalles” en el mensaje de error para compartirlo con soporte.
           </Text>
         </Form>
       </Modal>

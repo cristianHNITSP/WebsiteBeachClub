@@ -1,0 +1,30 @@
+const mongoose = require('mongoose');
+const Sede = require('../models/Sede');
+
+(async () => {
+  await mongoose.connect(process.env.MONGO_URI);
+
+  const sedes = [
+    {
+      key: 'casa-frida',
+      name: 'Casa Frida',
+      description: 'Casa boutique frente al mar',
+    },
+    {
+      key: 'cabanas-frida',
+      name: 'Cabañas Frida',
+      description: 'Complejo de cabañas boutique',
+    },
+  ];
+
+  for (const s of sedes) {
+    await Sede.updateOne(
+      { key: s.key },
+      { $setOnInsert: s },
+      { upsert: true }
+    );
+  }
+
+  console.log('Sedes inicializadas');
+  process.exit(0);
+})();

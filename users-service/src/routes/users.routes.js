@@ -1,47 +1,32 @@
-// routes/users.routes.js (o donde lo tengas)
 const express = require('express');
 const bcrypt = require('bcrypt');
 const { body, param, validationResult } = require('express-validator');
 
 const User = require('../models/User');
+const Sede = require('../models/Sede');
+
 const authMiddleware = require('../middlewares/auth.middleware');
 const { requirePermissions } = require('../middlewares/require.Permissions');
 
 const router = express.Router();
 
-/**
- * GET /api/users
- *
- * Solo quien tenga manage_users puede ver la lista.
- *
- * Paginación por índice (máx. 5 por página en backend):
- *   - ?offset=0&limit=5   // aunque envíen más, el backend limitará a 5
- *
- * Filtros opcionales (se ejecutan SIEMPRE en backend):
- *   - ?role=administrador | staff
- *   - ?state=active | inactive
- *   - ?sede=casa-frida | cabanas-frida   👈 (nuevo filtro opcional)
- *   - ?q=texto   (busca por nombre, email o rol)
- *
- * Respuesta:
- * {
- *   total: number,
- *   offset: number,
- *   limit: number,
- *   count: number,
- *   hasMore: boolean,
- *   items: [ ...usuarios... ]
- * }
- */
-const escapeRegExp = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+/* =========================================================
+   HELPERS
+   ========================================================= */
 
+const escapeRegExp = (str) =>
+  str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/* =========================================================
+   GET /api/users
+   ========================================================= */
 router.get(
-  "/",
+  '/',
   authMiddleware,
-  requirePermissions(["manage_users"]),
+  requirePermissions(['manage_users']),
   async (req, res) => {
     try {
-      let { offset, limit, role, state, q, sede } = req.query;
+      let { offset, limit, role, state, q, sedeId } = req.query;
 
       const skip = Math.max(parseInt(offset, 10) || 0, 0);
       const pageSizeRaw = parseInt(limit, 10);
@@ -49,32 +34,33 @@ router.get(
 
       const filter = {};
 
-      if (role && ["administrador", "staff"].includes(role)) {
+      if (role && ['administrador', 'staff'].includes(role)) {
         filter.role = role;
       }
 
-      if (state === "active") filter.isActive = true;
-      else if (state === "inactive") filter.isActive = false;
+      if (state === 'active') filter.isActive = true;
+      else if (state === 'inactive') filter.isActive = false;
 
-      // 👇 filtro por sede opcional
-      if (sede && ["casa-frida", "cabanas-frida"].includes(sede)) {
-        filter.sede = sede;
+      // 👇 FILTRO REAL POR SEDE (ObjectId)
+      if (sedeId) {
+        filter.sede = sedeId;
       }
 
-      if (q && typeof q === "string" && q.trim() !== "") {
+      if (q && typeof q === 'string' && q.trim() !== '') {
         const safe = escapeRegExp(q.trim());
-        const regex = new RegExp(safe, "i");
+        const regex = new RegExp(safe, 'i');
         filter.$or = [{ name: regex }, { email: regex }, { role: regex }];
       }
 
       const [total, users] = await Promise.all([
         User.countDocuments(filter),
         User.find(filter)
+          .populate('sede', 'key name')
           .sort({ createdAt: -1 })
           .skip(skip)
           .limit(pageSize)
-          .select("-password -tokens")
-          .lean(), // ✅ más ligero
+          .select('-password -tokens')
+          .lean(),
       ]);
 
       const count = users.length;
@@ -89,82 +75,59 @@ router.get(
         items: users,
       });
     } catch (err) {
-      console.error("Error al obtener usuarios:", err);
+      console.error('Error al obtener usuarios:', err);
       return res.status(500).json({
-        error: "INTERNAL_ERROR",
-        message: "Error interno del servidor al obtener usuarios",
+        error: 'INTERNAL_ERROR',
+        message: 'Error interno del servidor al obtener usuarios',
       });
     }
   }
 );
 
-/**
- * POST /api/users
- *
- * Crear nuevo usuario (solo para quienes tienen manage_users).
- * - name (obligatorio)
- * - email (obligatorio, único)  👈 desde FE siempre será *@beachclub.com
- * - role ('administrador' | 'staff', por defecto 'staff')
- * - password (obligatorio, se guarda encriptada)
- * - sede ('casa-frida' | 'cabanas-frida') 👈 obligatorio
- */
+/* =========================================================
+   POST /api/users
+   ========================================================= */
 router.post(
   '/',
   authMiddleware,
   requirePermissions(['manage_users']),
   [
-    body('name')
-      .exists()
-      .withMessage('El nombre es obligatorio')
-      .bail()
-      .isString()
-      .trim()
-      .notEmpty()
-      .withMessage('El nombre no puede estar vacío'),
-    body('email')
-      .exists()
-      .withMessage('El correo es obligatorio')
-      .bail()
-      .isEmail()
-      .withMessage('Correo no válido'),
+    body('name').isString().trim().notEmpty(),
+    body('email').isEmail(),
+    body('password').isString().isLength({ min: 8 }),
     body('role')
       .optional()
-      .isIn(['administrador', 'staff'])
-      .withMessage('Rol no válido. Usa "administrador" o "staff".'),
-    body('password')
-      .exists()
-      .withMessage('La contraseña es obligatoria')
-      .bail()
-      .isString()
-      .isLength({ min: 8 })
-      .withMessage('La contraseña debe tener al menos 8 caracteres'),
-    body('sede')
-      .exists()
-      .withMessage('La sede es obligatoria')
-      .bail()
-      .isIn(['casa-frida', 'cabanas-frida'])
-      .withMessage('Sede no válida. Usa "casa-frida" o "cabanas-frida".'),
+      .isIn(['administrador', 'staff']),
+    body('sedeId')
+      .isMongoId()
+      .withMessage('Sede inválida'),
   ],
   async (req, res) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
       return res.status(400).json({
         error: 'VALIDATION_ERROR',
-        message: 'Datos inválidos',
         details: errors.array(),
       });
     }
 
     try {
-      const { name, email, role = 'staff', password, sede } = req.body;
+      const { name, email, password, role = 'staff', sedeId } = req.body;
       const normalizedEmail = email.toLowerCase().trim();
 
-      // Verificar si ya existe el correo
       const existing = await User.findOne({ email: normalizedEmail });
       if (existing) {
         return res.status(409).json({
           error: 'EMAIL_IN_USE',
           message: 'Ya existe un usuario con ese correo.',
+        });
+      }
+
+      const sede = await Sede.findById(sedeId);
+      if (!sede || !sede.isActive) {
+        return res.status(400).json({
+          error: 'INVALID_SEDE',
+          message: 'La sede no existe o está inactiva.',
         });
       }
 
@@ -174,14 +137,15 @@ router.post(
         name,
         email: normalizedEmail,
         password: hashedPassword,
-        role: role || 'staff',
+        role,
+        sede: sede._id,
         isActive: true,
-        sede, // 👈 guardar sede
       });
 
-      const userObj = user.toObject();
-      delete userObj.password;
-      delete userObj.tokens;
+      const userObj = await User.findById(user._id)
+        .populate('sede', 'key name')
+        .select('-password -tokens')
+        .lean();
 
       return res.status(201).json({
         message: 'Usuario creado correctamente',
@@ -189,186 +153,110 @@ router.post(
       });
     } catch (err) {
       console.error('Error al crear usuario:', err);
-
-      if (err.code === 11000 && err.keyPattern?.email) {
-        return res.status(409).json({
-          error: 'EMAIL_IN_USE',
-          message: 'Ya existe un usuario con ese correo.',
-        });
-      }
-
       return res.status(500).json({
         error: 'INTERNAL_ERROR',
-        message: 'Error interno del servidor al crear el usuario',
+        message: 'Error interno del servidor',
       });
     }
   }
 );
 
-
-/**
- * PUT /api/users/me
- * Actualizar el propio perfil del usuario autenticado.
- *
- * - name (obligatorio si viene, y no puede estar vacío)
- *
- * No permite cambiar: email, role, isActive, tokens, sede, etc.
- */
+/* =========================================================
+   PUT /api/users/me
+   ========================================================= */
 router.put('/me', authMiddleware, async (req, res) => {
   try {
-    console.log('[/api/users/me] body recibido:', req.body);
-
-    const userId = req.user?.id || req.user?._id;
+    const userId = req.user?.id;
     if (!userId) {
-      return res.status(401).json({
-        error: 'UNAUTHENTICATED',
-        message: 'Usuario no autenticado',
-      });
+      return res.status(401).json({ error: 'UNAUTHENTICATED' });
     }
 
-    // Solo vamos a permitir cambiar el nombre
-    const rawName = req.body?.name;
+    const { name } = req.body;
 
-    if (typeof rawName !== 'string') {
+    if (typeof name !== 'string' || !name.trim()) {
       return res.status(400).json({
         error: 'VALIDATION_ERROR',
-        message: 'El nombre debe ser una cadena de texto.',
-        details: [
-          {
-            param: 'name',
-            msg: 'El nombre debe ser una cadena de texto.',
-            value: rawName,
-          },
-        ],
+        message: 'Nombre inválido',
       });
     }
 
-    const name = rawName.trim();
-
-    if (!name) {
-      return res.status(400).json({
-        error: 'VALIDATION_ERROR',
-        message: 'El nombre no puede estar vacío.',
-        details: [
-          {
-            param: 'name',
-            msg: 'El nombre no puede estar vacío.',
-            value: rawName,
-          },
-        ],
-      });
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ error: 'USER_NOT_FOUND' });
     }
 
-    const currentUser = await User.findById(userId);
-    if (!currentUser) {
-      return res.status(404).json({
-        error: 'USER_NOT_FOUND',
-        message: 'Usuario no encontrado',
-      });
+    if (user.name.trim() === name.trim()) {
+      return res.status(400).json({ error: 'NO_CHANGES' });
     }
 
-    // Si no cambia nada, devolvemos 400 con NO_CHANGES
-    if ((currentUser.name || '').trim() === name) {
-      return res.status(400).json({
-        error: 'NO_CHANGES',
-        message: 'No se enviaron cambios válidos para actualizar.',
-      });
-    }
+    user.name = name.trim();
+    await user.save();
 
-    currentUser.name = name;
-
-    const updatedUser = await currentUser
-      .save()
-      .then((u) => u.toObject());
-
-    delete updatedUser.password;
-    delete updatedUser.tokens;
-
-    console.log('[/api/users/me] usuario actualizado:', updatedUser);
+    const updated = await User.findById(userId)
+      .populate('sede', 'key name')
+      .select('-password -tokens')
+      .lean();
 
     return res.json({
       message: 'Perfil actualizado correctamente',
-      user: updatedUser,
+      user: updated,
     });
   } catch (err) {
-    console.error('Error al actualizar perfil propio:', err);
-    return res.status(500).json({
-      error: 'INTERNAL_ERROR',
-      message: 'Error interno del servidor al actualizar el perfil',
-    });
+    console.error('Error al actualizar perfil:', err);
+    return res.status(500).json({ error: 'INTERNAL_ERROR' });
   }
 });
 
-/**
- * PUT /api/users/:id
- * Editar información general del usuario:
- * - name
- * - email
- * - role ('administrador' | 'staff')
- * - isActive (boolean)
- * - sede ('casa-frida' | 'cabanas-frida') 👈 nuevo
- */
+/* =========================================================
+   PUT /api/users/:id
+   ========================================================= */
 router.put(
   '/:id',
   authMiddleware,
   requirePermissions(['manage_users']),
   [
-    param('id').isMongoId().withMessage('ID de usuario no válido'),
-    body('name')
-      .optional()
-      .isString()
-      .trim()
-      .notEmpty()
-      .withMessage('El nombre no puede estar vacío'),
-    body('email')
-      .optional()
-      .isEmail()
-      .withMessage('Correo no válido'),
-    body('role')
-      .optional()
-      .isIn(['administrador', 'staff'])
-      .withMessage('Rol no válido. Usa "administrador" o "staff".'),
-    body('isActive')
-      .optional()
-      .isBoolean()
-      .withMessage('isActive debe ser booleano'),
-    body('sede')
-      .optional()
-      .isIn(['casa-frida', 'cabanas-frida'])
-      .withMessage('Sede no válida. Usa "casa-frida" o "cabanas-frida".'),
+    param('id').isMongoId(),
+    body('name').optional().isString().trim().notEmpty(),
+    body('email').optional().isEmail(),
+    body('role').optional().isIn(['administrador', 'staff']),
+    body('isActive').optional().isBoolean(),
+    body('sedeId').optional().isMongoId(),
   ],
   async (req, res) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      return res.status(400).json({
-        error: 'VALIDATION_ERROR',
-        message: 'Datos inválidos',
-        details: errors.array(),
-      });
+      return res.status(400).json({ error: 'VALIDATION_ERROR', details: errors.array() });
     }
 
     const { id } = req.params;
-    const { name, email, role, isActive, sede } = req.body;
+    const { name, email, role, isActive, sedeId } = req.body;
 
     const updates = {};
-    if (name !== undefined) updates.name = name;
+
+    if (name !== undefined) updates.name = name.trim();
     if (email !== undefined) updates.email = email.toLowerCase().trim();
     if (role !== undefined) updates.role = role;
     if (isActive !== undefined) updates.isActive = isActive;
-    if (sede !== undefined) updates.sede = sede;
+
+    if (sedeId) {
+      const sede = await Sede.findById(sedeId);
+      if (!sede) {
+        return res.status(400).json({ error: 'INVALID_SEDE' });
+      }
+      updates.sede = sede._id;
+    }
 
     try {
       const user = await User.findByIdAndUpdate(
         id,
         { $set: updates },
         { new: true, runValidators: true }
-      ).select('-password -tokens');
+      )
+        .populate('sede', 'key name')
+        .select('-password -tokens');
 
       if (!user) {
-        return res.status(404).json({
-          error: 'USER_NOT_FOUND',
-          message: 'Usuario no encontrado',
-        });
+        return res.status(404).json({ error: 'USER_NOT_FOUND' });
       }
 
       return res.json({
@@ -377,77 +265,43 @@ router.put(
       });
     } catch (err) {
       console.error('Error al actualizar usuario:', err);
-
-      if (err.code === 11000 && err.keyPattern?.email) {
-        return res.status(409).json({
-          error: 'EMAIL_IN_USE',
-          message: 'Ya existe un usuario con ese correo.',
-        });
-      }
-
-      return res.status(500).json({
-        error: 'INTERNAL_ERROR',
-        message: 'Error interno del servidor al actualizar el usuario',
-      });
+      return res.status(500).json({ error: 'INTERNAL_ERROR' });
     }
   }
 );
 
-/**
- * PATCH /api/users/:id/status
- * Cambiar rápido el estado isActive (activar/desactivar).
- * Body: { isActive: true/false }
- */
-
+/* =========================================================
+   PATCH /api/users/:id/status
+   ========================================================= */
 router.patch(
   '/:id/status',
   authMiddleware,
   requirePermissions(['manage_users']),
   [
-    param('id').isMongoId().withMessage('ID de usuario no válido'),
-    body('isActive')
-      .exists()
-      .withMessage('isActive es requerido')
-      .isBoolean()
-      .withMessage('isActive debe ser booleano'),
+    param('id').isMongoId(),
+    body('isActive').isBoolean(),
   ],
   async (req, res) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({
-        error: 'VALIDATION_ERROR',
-        message: 'Datos inválidos',
-        details: errors.array(),
-      });
-    }
-
-    const { id } = req.params;
-    const { isActive } = req.body;
-
     try {
       const user = await User.findByIdAndUpdate(
-        id,
-        { $set: { isActive } },
-        { new: true, runValidators: true }
-      ).select('-password -tokens');
+        req.params.id,
+        { $set: { isActive: req.body.isActive } },
+        { new: true }
+      )
+        .populate('sede', 'key name')
+        .select('-password -tokens');
 
       if (!user) {
-        return res.status(404).json({
-          error: 'USER_NOT_FOUND',
-          message: 'Usuario no encontrado',
-        });
+        return res.status(404).json({ error: 'USER_NOT_FOUND' });
       }
 
       return res.json({
-        message: `Usuario ${isActive ? 'activado' : 'desactivado'} correctamente`,
+        message: `Usuario ${req.body.isActive ? 'activado' : 'desactivado'} correctamente`,
         user,
       });
     } catch (err) {
-      console.error('Error al actualizar estado de usuario:', err);
-      return res.status(500).json({
-        error: 'INTERNAL_ERROR',
-        message: 'Error interno del servidor al actualizar el estado',
-      });
+      console.error('Error al cambiar estado:', err);
+      return res.status(500).json({ error: 'INTERNAL_ERROR' });
     }
   }
 );

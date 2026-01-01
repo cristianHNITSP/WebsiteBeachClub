@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import {
   Modal,
   Button,
@@ -23,54 +23,126 @@ import {
 
 const { Text } = Typography;
 
-const SEDE_LABELS = {
-  "casa-frida": "Casa Frida",
-  "cabanas-frida": "Cabañas Frida",
-};
-
 const ROLE_LABELS = {
   administrador: "Administrador",
   staff: "Staff",
+};
+
+const isObjectId = (v) => typeof v === "string" && /^[a-f\d]{24}$/i.test(v);
+
+// Humaniza "cabanas-frida" -> "Cabanas Frida" (fallback legacy)
+const humanizeKey = (k) => {
+  const s = String(k || "")
+    .trim()
+    .replace(/[-_]+/g, " ")
+    .replace(/\s+/g, " ");
+  if (!s) return "";
+  return s.replace(/\b\w/g, (m) => m.toUpperCase());
+};
+
+// ✅ Nunca expone key. Solo intenta mostrar name.
+const resolveSedeLabel = (sede) => {
+  if (!sede) return "No asignada";
+
+  // populado: { _id, key, name }
+  if (typeof sede === "object") {
+    const name = String(sede.name || "").trim();
+    if (name) return name;
+    return "Sede asignada";
+  }
+
+  // string: puede ser objectId o legacy key
+  if (typeof sede === "string") {
+    if (isObjectId(sede)) return "Sede asignada";
+    const friendly = humanizeKey(sede);
+    return friendly || "Sede asignada";
+  }
+
+  return "No asignada";
 };
 
 const ConfigModal = ({ open, onClose, currentUser, onUserUpdated }) => {
   const [profileForm] = Form.useForm();
   const [passwordForm] = Form.useForm();
 
+  // ✅ usuario “vivo” para renderizar dentro del modal
+  const [liveUser, setLiveUser] = useState(currentUser || null);
+
   const [profileInitialValues, setProfileInitialValues] = useState({});
   const [savingProfile, setSavingProfile] = useState(false);
   const [changingPassword, setChangingPassword] = useState(false);
 
   // 🔶 Accesibilidad
-  const [accessPrefs, setAccessPrefs] = useState(() =>
-    loadAccessibilityPrefs()
-  );
+  const [accessPrefs, setAccessPrefs] = useState(() => loadAccessibilityPrefs());
   const [savingAccess, setSavingAccess] = useState(false);
 
-  // ========= CARGAR DATOS AL ABRIR =========
+  const roleLabel = useMemo(() => {
+    return ROLE_LABELS[liveUser?.role] || liveUser?.role || "Sin rol";
+  }, [liveUser?.role]);
+
+  const sedeLabel = useMemo(() => {
+    return resolveSedeLabel(liveUser?.sede);
+  }, [liveUser?.sede]);
+
+  const fillProfileFormFromUser = useCallback(
+    (u) => {
+      if (!u) return;
+      const email = String(u.email || "");
+      const [localPart] = email.split("@");
+
+      const resolvedName = u.name || u.displayName || localPart || "";
+      const initial = { name: resolvedName };
+
+      setProfileInitialValues(initial);
+
+      // no pisar si ya está escribiendo
+      const touched = profileForm.isFieldsTouched(["name"], true);
+      if (!touched) profileForm.setFieldsValue(initial);
+    },
+    [profileForm]
+  );
+
+  // ========= AL ABRIR: setea con currentUser y luego sincroniza con /api/auth/me =========
   useEffect(() => {
-    if (!open || !currentUser) return;
+    if (!open) return;
 
-    const email = String(currentUser.email || "");
-    const [localPart] = email.split("@");
+    // 1) base inmediato con el prop
+    setLiveUser(currentUser || null);
+    fillProfileFormFromUser(currentUser || null);
 
-    const resolvedName =
-      currentUser.name || currentUser.displayName || localPart || "";
+    passwordForm.resetFields();
+    setAccessPrefs(loadAccessibilityPrefs());
 
-    const initial = {
-      name: resolvedName,
+    // 2) sync: trae user fresh (sede poblada con name actualizado)
+    let mounted = true;
+
+    const syncMe = async () => {
+      try {
+        const { data } = await axios.get("/api/auth/me", {
+          withCredentials: true,
+        });
+
+        if (!mounted) return;
+
+        setLiveUser(data);
+        fillProfileFormFromUser(data);
+
+        // 🔥 importantísimo: sube el user al state global del panel
+        onUserUpdated?.(data);
+      } catch (err) {
+        // si falla, nos quedamos con el currentUser actual sin romper el modal
+        console.warn("[ConfigModal] No se pudo sincronizar /api/auth/me:", err?.message);
+      }
     };
 
-    setProfileInitialValues(initial);
+    syncMe();
 
-    profileForm.setFieldsValue(initial);
-    passwordForm.resetFields();
+    return () => {
+      mounted = false;
+    };
+  }, [open, currentUser, fillProfileFormFromUser, passwordForm, onUserUpdated]);
 
-    // refrescar accesibilidad por si cambió desde otro lado
-    setAccessPrefs(loadAccessibilityPrefs());
-  }, [open, currentUser, profileForm, passwordForm]);
-
-  if (!currentUser) {
+  if (!liveUser) {
     return (
       <Modal
         open={open}
@@ -86,8 +158,7 @@ const ConfigModal = ({ open, onClose, currentUser, onUserUpdated }) => {
           message="No se pudo cargar la información de tu usuario."
           description={
             <Text style={{ fontSize: 11 }}>
-              Vuelve a iniciar sesión o recarga la página si el problema
-              persiste.
+              Vuelve a iniciar sesión o recarga la página si el problema persiste.
             </Text>
           }
         />
@@ -95,26 +166,19 @@ const ConfigModal = ({ open, onClose, currentUser, onUserUpdated }) => {
     );
   }
 
-  const roleLabel =
-    ROLE_LABELS[currentUser.role] || currentUser.role || "Sin rol";
-  const sedeLabel = currentUser.sede
-    ? SEDE_LABELS[currentUser.sede] || currentUser.sede
-    : "No asignada";
-
-  // ========= GUARDAR PERFIL (solo nombre / sede) =========
+  // ========= GUARDAR PERFIL (solo nombre) =========
   const handleSaveProfile = async () => {
     try {
       const values = await profileForm.validateFields();
-      console.log("[ConfigModal] values del form perfil:", values);
 
       const currentNameRaw =
-        currentUser.name ||
-        currentUser.displayName ||
-        currentUser.email?.split("@")[0] ||
+        liveUser.name ||
+        liveUser.displayName ||
+        liveUser.email?.split("@")[0] ||
         "";
 
-      const currentName = currentNameRaw.trim();
-      const formName = (values.name || "").trim();
+      const currentName = String(currentNameRaw).trim();
+      const formName = String(values.name || "").trim();
 
       if (!formName) {
         message.error("Ingresa tu nombre completo (no puede estar vacío).");
@@ -122,17 +186,7 @@ const ConfigModal = ({ open, onClose, currentUser, onUserUpdated }) => {
       }
 
       const payload = {};
-
-      if (formName !== currentName) {
-        payload.name = formName;
-      }
-
-      console.log("[ConfigModal] currentName:", currentName);
-      console.log("[ConfigModal] formName:", formName);
-      console.log(
-        "[ConfigModal] payload que se enviará a /api/users/me:",
-        payload
-      );
+      if (formName !== currentName) payload.name = formName;
 
       if (Object.keys(payload).length === 0) {
         message.info("No hay cambios para guardar.");
@@ -140,40 +194,26 @@ const ConfigModal = ({ open, onClose, currentUser, onUserUpdated }) => {
       }
 
       setSavingProfile(true);
-      message.loading({
-        content: "Enviando cambios de perfil...",
-        key: "saveProfile",
-      });
+      message.loading({ content: "Enviando cambios de perfil...", key: "saveProfile" });
 
-      const res = await axios.put("/api/users/me", payload, {
-        withCredentials: true,
-      });
-
+      const res = await axios.put("/api/users/me", payload, { withCredentials: true });
       const updatedUser = res.data?.user || res.data;
-      console.log("[ConfigModal] respuesta de /api/users/me:", updatedUser);
 
       message.success({
         content: "Tu perfil se actualizó correctamente.",
         key: "saveProfile",
       });
 
-      if (onUserUpdated) onUserUpdated(updatedUser);
+      // actualiza modal + state global
+      setLiveUser((prev) => ({ ...(prev || {}), ...(updatedUser || {}) }));
+      onUserUpdated?.(updatedUser);
 
       onClose();
     } catch (err) {
       console.error("Error al actualizar perfil:", err);
       message.destroy("saveProfile");
-
-      if (err?.response?.data?.details) {
-        console.error(
-          "[ConfigModal] detalles VALIDATION_ERROR:",
-          err.response.data.details
-        );
-      }
-
       message.error(
-        err?.response?.data?.message ||
-          "No se pudieron aplicar los cambios a tu perfil."
+        err?.response?.data?.message || "No se pudieron aplicar los cambios a tu perfil."
       );
     } finally {
       setSavingProfile(false);
@@ -191,10 +231,7 @@ const ConfigModal = ({ open, onClose, currentUser, onUserUpdated }) => {
       }
 
       setChangingPassword(true);
-      message.loading({
-        content: "Actualizando contraseña...",
-        key: "changePassword",
-      });
+      message.loading({ content: "Actualizando contraseña...", key: "changePassword" });
 
       await axios.post(
         "/api/users/me/password",
@@ -214,9 +251,7 @@ const ConfigModal = ({ open, onClose, currentUser, onUserUpdated }) => {
     } catch (err) {
       console.error("Error al cambiar contraseña:", err);
       message.destroy("changePassword");
-      message.error(
-        err?.response?.data?.message || "No se pudo cambiar la contraseña."
-      );
+      message.error(err?.response?.data?.message || "No se pudo cambiar la contraseña.");
     } finally {
       setChangingPassword(false);
     }
@@ -236,9 +271,7 @@ const ConfigModal = ({ open, onClose, currentUser, onUserUpdated }) => {
       });
     } catch (e) {
       console.error("[ConfigModal] error guardando accesibilidad:", e);
-      message.error(
-        "No se pudieron guardar las preferencias de accesibilidad."
-      );
+      message.error("No se pudieron guardar las preferencias de accesibilidad.");
     } finally {
       setSavingAccess(false);
     }
@@ -263,15 +296,13 @@ const ConfigModal = ({ open, onClose, currentUser, onUserUpdated }) => {
             <Form.Item
               label="Nombre completo"
               name="name"
-              rules={[
-                { required: true, message: "Ingresa tu nombre completo" },
-              ]}
+              rules={[{ required: true, message: "Ingresa tu nombre completo" }]}
             >
               <Input placeholder="Ej: Juan Pérez" />
             </Form.Item>
 
             <Form.Item label="Correo corporativo">
-              <Input disabled value={currentUser.email || ""} />
+              <Input disabled value={liveUser.email || ""} />
             </Form.Item>
 
             <Form.Item label="Rol en el sistema">
@@ -282,14 +313,7 @@ const ConfigModal = ({ open, onClose, currentUser, onUserUpdated }) => {
               <Input disabled value={sedeLabel} />
             </Form.Item>
 
-            <Space
-              style={{
-                display: "flex",
-                justifyContent: "flex-end",
-                marginTop: 4,
-              }}
-              wrap
-            >
+            <Space style={{ display: "flex", justifyContent: "flex-end", marginTop: 4 }} wrap>
               <Button onClick={onClose}>Cancelar</Button>
 
               <Popconfirm
@@ -326,27 +350,16 @@ const ConfigModal = ({ open, onClose, currentUser, onUserUpdated }) => {
             message={<Text style={{ fontSize: 11 }}>Cambio de contraseña</Text>}
             description={
               <Text style={{ fontSize: 11 }}>
-                Esta acción es sensible. No compartas tu nueva contraseña con
-                nadie.
+                Esta acción es sensible. No compartas tu nueva contraseña con nadie.
               </Text>
             }
           />
 
-          <Form
-            form={passwordForm}
-            layout="vertical"
-            preserve={false}
-            style={{ marginTop: 4 }}
-          >
+          <Form form={passwordForm} layout="vertical" preserve={false} style={{ marginTop: 4 }}>
             <Form.Item
               label="Contraseña actual"
               name="currentPassword"
-              rules={[
-                {
-                  required: true,
-                  message: "Ingresa tu contraseña actual",
-                },
-              ]}
+              rules={[{ required: true, message: "Ingresa tu contraseña actual" }]}
             >
               <Input.Password placeholder="Contraseña actual" />
             </Form.Item>
@@ -355,15 +368,8 @@ const ConfigModal = ({ open, onClose, currentUser, onUserUpdated }) => {
               label="Nueva contraseña"
               name="newPassword"
               rules={[
-                {
-                  required: true,
-                  message: "Ingresa la nueva contraseña",
-                },
-                {
-                  min: 8,
-                  message:
-                    "La nueva contraseña debe tener al menos 8 caracteres",
-                },
+                { required: true, message: "Ingresa la nueva contraseña" },
+                { min: 8, message: "La nueva contraseña debe tener al menos 8 caracteres" },
               ]}
             >
               <Input.Password placeholder="Mínimo 8 caracteres" />
@@ -372,12 +378,7 @@ const ConfigModal = ({ open, onClose, currentUser, onUserUpdated }) => {
             <Form.Item
               label="Confirmar nueva contraseña"
               name="confirmPassword"
-              rules={[
-                {
-                  required: true,
-                  message: "Confirma la nueva contraseña",
-                },
-              ]}
+              rules={[{ required: true, message: "Confirma la nueva contraseña" }]}
             >
               <Input.Password placeholder="Repite la nueva contraseña" />
             </Form.Item>
@@ -417,67 +418,35 @@ const ConfigModal = ({ open, onClose, currentUser, onUserUpdated }) => {
             message={<Text style={{ fontSize: 11 }}>Ajustes visuales</Text>}
             description={
               <Text style={{ fontSize: 11 }}>
-                Estas opciones estan en fase de prueba. Puedes cambiar la
-                apariencia y comportamiento de la interfaz para adaptarla a tus
-                necesidades.
+                Estas opciones están en fase de prueba.
               </Text>
             }
           />
 
-          <Space
-            direction="vertical"
-            size={12}
-            style={{ width: "100%", marginTop: 4 }}
-          >
-            {/* Reducir animaciones */}
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                gap: 12,
-              }}
-            >
+          <Space direction="vertical" size={12} style={{ width: "100%", marginTop: 4 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
               <div style={{ maxWidth: 420 }}>
-                <Text strong style={{ fontSize: 12 }}>
-                  Reducir animaciones y efectos
-                </Text>
+                <Text strong style={{ fontSize: 12 }}>Reducir animaciones y efectos</Text>
                 <br />
                 <Text type="secondary" style={{ fontSize: 11 }}>
-                  Desactiva la mayoría de transiciones y animaciones para una
-                  experiencia más tranquila o en dispositivos lentos.
+                  Desactiva transiciones y animaciones.
                 </Text>
               </div>
-
               <Switch
                 checked={accessPrefs.reducedMotion}
                 loading={savingAccess}
-                onChange={(checked) =>
-                  handleUpdateAccessPrefs({ reducedMotion: checked })
-                }
+                onChange={(checked) => handleUpdateAccessPrefs({ reducedMotion: checked })}
               />
             </div>
 
-            {/* Tema claro / oscuro */}
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                gap: 12,
-              }}
-            >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
               <div style={{ maxWidth: 420 }}>
-                <Text strong style={{ fontSize: 12 }}>
-                  Tema de la aplicación
-                </Text>
+                <Text strong style={{ fontSize: 12 }}>Tema de la aplicación</Text>
                 <br />
                 <Text type="secondary" style={{ fontSize: 11 }}>
-                  Cambia entre modo claro y oscuro. Afecta a todos los
-                  componentes de Ant Design y la mayor parte de la interfaz.
+                  Claro u oscuro.
                 </Text>
               </div>
-
               <Segmented
                 size="small"
                 options={[
@@ -489,26 +458,14 @@ const ConfigModal = ({ open, onClose, currentUser, onUserUpdated }) => {
               />
             </div>
 
-            {/* Contraste */}
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                gap: 12,
-              }}
-            >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
               <div style={{ maxWidth: 420 }}>
-                <Text strong style={{ fontSize: 12 }}>
-                  Contraste
-                </Text>
+                <Text strong style={{ fontSize: 12 }}>Contraste</Text>
                 <br />
                 <Text type="secondary" style={{ fontSize: 11 }}>
-                  Usa un contraste más fuerte para mejorar la legibilidad de
-                  textos y controles.
+                  Normal o alto contraste.
                 </Text>
               </div>
-
               <Segmented
                 size="small"
                 options={[
@@ -516,32 +473,18 @@ const ConfigModal = ({ open, onClose, currentUser, onUserUpdated }) => {
                   { label: "Alto contraste", value: true },
                 ]}
                 value={accessPrefs.highContrast}
-                onChange={(val) =>
-                  handleUpdateAccessPrefs({ highContrast: !!val })
-                }
+                onChange={(val) => handleUpdateAccessPrefs({ highContrast: !!val })}
               />
             </div>
 
-            {/* Tamaño de fuente base */}
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                gap: 12,
-              }}
-            >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
               <div style={{ maxWidth: 420 }}>
-                <Text strong style={{ fontSize: 12 }}>
-                  Tamaño de texto
-                </Text>
+                <Text strong style={{ fontSize: 12 }}>Tamaño de texto</Text>
                 <br />
                 <Text type="secondary" style={{ fontSize: 11 }}>
-                  Aumenta ligeramente el tamaño base de la tipografía en todo el
-                  sistema.
+                  Normal o grande.
                 </Text>
               </div>
-
               <Segmented
                 size="small"
                 options={[
@@ -549,9 +492,7 @@ const ConfigModal = ({ open, onClose, currentUser, onUserUpdated }) => {
                   { label: "Grande", value: true },
                 ]}
                 value={accessPrefs.largeFonts}
-                onChange={(val) =>
-                  handleUpdateAccessPrefs({ largeFonts: !!val })
-                }
+                onChange={(val) => handleUpdateAccessPrefs({ largeFonts: !!val })}
               />
             </div>
           </Space>
@@ -573,9 +514,7 @@ const ConfigModal = ({ open, onClose, currentUser, onUserUpdated }) => {
         message="Configuración personal"
         description={
           <Text style={{ fontSize: 12 }}>
-            Usa las pestañas para editar tus datos de perfil, actualizar tu
-            contraseña o ajustar accesibilidad visual. La sede y el rol son
-            informativos y solo pueden ser cambiados por un administrador.
+            La sede y el rol son informativos y solo pueden ser cambiados por un administrador.
           </Text>
         }
         type="info"
@@ -585,13 +524,13 @@ const ConfigModal = ({ open, onClose, currentUser, onUserUpdated }) => {
 
       <Tabs defaultActiveKey="profile" size="small" items={tabItems} animated />
 
-      {/* Etiquetas informativas abajo */}
       <Divider style={{ margin: "12px 0 6px" }} />
       <Space size={6} wrap>
         <Tag color="default" style={{ fontSize: 10 }}>
-          Sesión: {currentUser.email || "—"}
+          Sesión: {liveUser.email || "—"}
         </Tag>
-        {currentUser.sede && (
+
+        {!!liveUser.sede && (
           <Tag color="processing" style={{ fontSize: 10 }}>
             Sede actual: {sedeLabel}
           </Tag>

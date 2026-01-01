@@ -1,20 +1,7 @@
-// src/components/usuarios/UsuariosCreatePanel.jsx
-import {
-  Row,
-  Col,
-  Alert,
-  Space,
-  Form,
-  Input,
-  Select,
-  Button,
-  Tag,
-  Typography,
-} from "antd";
+import { Row, Col, Alert, Space, Form, Input, Select, Button, Tag, Typography } from "antd";
 import { beachColors } from "../../theme/beachTheme";
 
 const { Text } = Typography;
-const { Option } = Select;
 
 const EMAIL_DOMAIN = "beachclub.com";
 
@@ -25,6 +12,9 @@ const UsuariosCreatePanel = ({
   lastTempPassword,
   generarPasswordSegura,
   crearUsuario,
+
+  sedeOptions = [],
+  sedesLoading = false,
 }) => {
   return (
     <div
@@ -36,53 +26,21 @@ const UsuariosCreatePanel = ({
         borderRadius: 12,
         border: createPanelOpen ? "1px solid #e5e7eb" : "1px solid transparent",
         background: "linear-gradient(to right, #eff6ff, #ecfdf5)",
-        boxShadow: createPanelOpen
-          ? "0 10px 25px rgba(15,23,42,0.12)"
-          : "none",
+        boxShadow: createPanelOpen ? "0 10px 25px rgba(15,23,42,0.12)" : "none",
         transform: createPanelOpen ? "translateY(0)" : "translateY(-8px)",
         transition: "all 0.25s ease",
       }}
     >
       {createPanelOpen && (
         <div style={{ padding: 12 }}>
-          <Space
-            size={6}
-            style={{
-              marginBottom: 8,
-              flexWrap: "wrap",
-            }}
-          >
-            <Tag
-              style={{
-                borderRadius: 999,
-                fontSize: 10,
-                background: "#ffffff",
-                border: "none",
-                color: "#111827",
-              }}
-            >
+          <Space size={6} style={{ marginBottom: 8, flexWrap: "wrap" }}>
+            <Tag style={{ borderRadius: 999, fontSize: 10, background: "#fff", border: "none" }}>
               1. Datos básicos
             </Tag>
-            <Tag
-              style={{
-                borderRadius: 999,
-                fontSize: 10,
-                background: "#ffffff",
-                border: "none",
-                color: "#111827",
-              }}
-            >
+            <Tag style={{ borderRadius: 999, fontSize: 10, background: "#fff", border: "none" }}>
               2. Sede y acceso
             </Tag>
-            <Tag
-              style={{
-                borderRadius: 999,
-                fontSize: 10,
-                background: "#ffffff",
-                border: "none",
-                color: "#111827",
-              }}
-            >
+            <Tag style={{ borderRadius: 999, fontSize: 10, background: "#fff", border: "none" }}>
               3. Definir contraseña
             </Tag>
           </Space>
@@ -93,12 +51,7 @@ const UsuariosCreatePanel = ({
                 <Form.Item
                   label="Nombre de la persona"
                   name="name"
-                  rules={[
-                    {
-                      required: true,
-                      message: "Ingresa el nombre completo del usuario",
-                    },
-                  ]}
+                  rules={[{ required: true, message: "Ingresa el nombre completo del usuario" }]}
                 >
                   <Input placeholder="Ej: Laura Sánchez" />
                 </Form.Item>
@@ -107,35 +60,25 @@ const UsuariosCreatePanel = ({
                   label="Usuario corporativo"
                   name="emailUser"
                   tooltip={`El correo que se creará será usuario@${EMAIL_DOMAIN}`}
-                  rules={[
-                    {
-                      required: true,
-                      message: "Ingresa el usuario corporativo",
-                    },
-                  ]}
+                  rules={[{ required: true, message: "Ingresa el usuario corporativo" }]}
                 >
-                  <Input
-                    placeholder="ej: laura.sanchez"
-                    addonAfter={`@${EMAIL_DOMAIN}`}
-                  />
+                  <Input placeholder="ej: laura.sanchez" addonAfter={`@${EMAIL_DOMAIN}`} />
                 </Form.Item>
 
                 <Row gutter={8}>
                   <Col xs={24} md={12}>
                     <Form.Item
                       label="Sede"
-                      name="sede"
-                      rules={[
-                        {
-                          required: true,
-                          message: "Selecciona la sede",
-                        },
-                      ]}
+                      name="sedeId"
+                      rules={[{ required: true, message: "Selecciona la sede" }]}
                     >
-                      <Select placeholder="Selecciona la sede">
-                        <Option value="casa-frida">Casa Frida</Option>
-                        <Option value="cabanas-frida">Cabañas Frida</Option>
-                      </Select>
+                      <Select
+                        placeholder="Selecciona la sede"
+                        loading={sedesLoading}
+                        options={sedeOptions}
+                        showSearch
+                        optionFilterProp="label"
+                      />
                     </Form.Item>
                   </Col>
 
@@ -143,19 +86,15 @@ const UsuariosCreatePanel = ({
                     <Form.Item
                       label="Tipo de acceso"
                       name="role"
-                      rules={[
-                        {
-                          required: true,
-                          message: "Selecciona el tipo de acceso",
-                        },
-                      ]}
+                      rules={[{ required: true, message: "Selecciona el tipo de acceso" }]}
                     >
-                      <Select placeholder="Selecciona una opción">
-                        <Option value="administrador">
-                          Administrador (control total)
-                        </Option>
-                        <Option value="staff">Staff (uso operativo)</Option>
-                      </Select>
+                      <Select
+                        placeholder="Selecciona una opción"
+                        options={[
+                          { value: "administrador", label: "Administrador (control total)" },
+                          { value: "staff", label: "Staff (uso operativo)" },
+                        ]}
+                      />
                     </Form.Item>
                   </Col>
                 </Row>
@@ -165,28 +104,12 @@ const UsuariosCreatePanel = ({
                   name="password"
                   tooltip="Puedes escribir una contraseña manualmente o generar una segura desde aquí."
                   rules={[
-                    {
-                      required: true,
-                      message: "Define una contraseña para esta persona",
-                    },
-                    {
-                      min: 8,
-                      message:
-                        "La contraseña debe tener al menos 8 caracteres",
-                    },
+                    { required: true, message: "Define una contraseña para esta persona" },
+                    { min: 8, message: "La contraseña debe tener al menos 8 caracteres" },
                   ]}
                 >
-                  <div
-                    style={{
-                      display: "flex",
-                      gap: 8,
-                      alignItems: "center",
-                    }}
-                  >
-                    <Input.Password
-                      placeholder="Ej: Usa una contraseña fuerte"
-                      style={{ flex: 1 }}
-                    />
+                  <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                    <Input.Password placeholder="Usa una contraseña fuerte" style={{ flex: 1 }} />
                     <Button size="small" onClick={generarPasswordSegura}>
                       Generar
                     </Button>
@@ -203,10 +126,7 @@ const UsuariosCreatePanel = ({
                 message={<Text style={{ fontSize: 11 }}>Alta rápida de acceso</Text>}
                 description={
                   <Text style={{ fontSize: 11 }}>
-                    Este formulario crea directamente un usuario activo en el
-                    sistema, asociado a una sede específica. Copia la
-                    contraseña que definas y compártela solo con la persona
-                    correspondiente.
+                    Copia la contraseña y compártela solo con la persona correspondiente.
                   </Text>
                 }
               />
@@ -216,20 +136,11 @@ const UsuariosCreatePanel = ({
                   type="success"
                   showIcon
                   style={{ marginTop: 4 }}
-                  message={
-                    <Text style={{ fontSize: 11 }}>Contraseña preparada</Text>
-                  }
+                  message={<Text style={{ fontSize: 11 }}>Contraseña preparada</Text>}
                   description={
                     <div style={{ marginTop: 4 }}>
-                      <Text
-                        style={{
-                          fontSize: 11,
-                          display: "block",
-                          marginBottom: 4,
-                        }}
-                      >
-                        Esta es la contraseña que se usará al crear el usuario.
-                        Puedes ajustarla antes de confirmar:
+                      <Text style={{ fontSize: 11, display: "block", marginBottom: 4 }}>
+                        Esta es la contraseña que se usará:
                       </Text>
                       <div
                         style={{
@@ -250,13 +161,7 @@ const UsuariosCreatePanel = ({
                 />
               )}
 
-              <div
-                style={{
-                  marginTop: 8,
-                  display: "flex",
-                  justifyContent: "flex-end",
-                }}
-              >
+              <div style={{ marginTop: 8, display: "flex", justifyContent: "flex-end" }}>
                 <Button
                   type="primary"
                   size="small"

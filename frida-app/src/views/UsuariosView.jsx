@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import axios from "@api/axios";
 import {
   Card,
@@ -13,7 +13,7 @@ import {
   Divider,
   Spin,
 } from "antd";
-import { TeamOutlined, PlusOutlined } from "@ant-design/icons";
+import { TeamOutlined, PlusOutlined, EnvironmentOutlined } from "@ant-design/icons";
 import { beachColors, neutrals } from "../theme/beachTheme";
 
 import UsuariosCreatePanel from "../components/usuarios/UsuariosCreatePanel";
@@ -22,6 +22,7 @@ import UsuariosFiltersBar from "../components/usuarios/UsuariosFiltersBar";
 import UsuariosActiveList from "../components/usuarios/UsuariosActiveList";
 import UsuariosInactiveList from "../components/usuarios/UsuariosInactiveList";
 import UsuarioEditModal from "../components/usuarios/UsuarioEditModal";
+import SedesManagerPanel from "../components/usuarios/SedesManagerPanel";
 
 const { Text } = Typography;
 
@@ -30,12 +31,9 @@ const ROLE_LABELS = {
   staff: "Staff",
 };
 
-const SEDE_LABELS = {
-  "casa-frida": "Casa Frida",
-  "cabanas-frida": "Cabañas Frida",
-};
-
 const EMAIL_DOMAIN = "beachclub.com";
+
+const isObjectId = (v) => typeof v === "string" && /^[a-f\d]{24}$/i.test(v);
 
 /* =========================================================
    HELPERS
@@ -47,15 +45,11 @@ const formatLastLogin = (iso) => {
   if (Number.isNaN(d.getTime())) return "Sin acceso registrado";
 
   const now = new Date();
-
   const isSameDay = (a, b) => a.toDateString() === b.toDateString();
   const yesterday = new Date();
   yesterday.setDate(now.getDate() - 1);
 
-  const time = d.toLocaleTimeString("es-MX", {
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  const time = d.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" });
 
   if (isSameDay(d, now)) return `Hoy · ${time}`;
   if (isSameDay(d, yesterday)) return `Ayer · ${time}`;
@@ -68,33 +62,6 @@ const formatLastLogin = (iso) => {
   return `${datePart} · ${time}`;
 };
 
-const mapUserFromApi = (apiUser, currentUser) => {
-  const role = apiUser.role || "staff";
-  const sede = apiUser.sede || "casa-frida";
-
-  const mapped = {
-    id: apiUser._id,
-    name: apiUser.name,
-    email: apiUser.email,
-    role,
-    roleLabel: ROLE_LABELS[role] || role,
-    isActive: apiUser.isActive,
-    lastAccess: formatLastLogin(apiUser.lastLogin),
-    createdAt: apiUser.createdAt,
-    updatedAt: apiUser.updatedAt,
-    isSelf:
-      !!currentUser &&
-      (currentUser.id === apiUser._id ||
-        currentUser.email === apiUser.email),
-    channels: [],
-    sede,
-    sedeLabel: SEDE_LABELS[sede] || "Casa Frida",
-  };
-
-  console.log("[mapUserFromApi] apiUser -> mapped", apiUser, mapped);
-  return mapped;
-};
-
 /* =========================================================
    COMPONENTE PRINCIPAL
    ========================================================= */
@@ -104,21 +71,29 @@ const UsuariosView = ({ isMobile, currentUser }) => {
 
   const [users, setUsers] = useState([]);
 
+  // SEDES (catálogo)
+  const [sedes, setSedes] = useState([]);
+  const [sedesLoading, setSedesLoading] = useState(false);
+  const [sedesPanelOpen, setSedesPanelOpen] = useState(false);
+
+  // filtros
   const [userRoleFilter, setUserRoleFilter] = useState("all");
+  const [userSedeFilter, setUserSedeFilter] = useState("all"); // _id
   const [userSearch, setUserSearch] = useState("");
 
+  // Edit modal
   const [modalVisible, setModalVisible] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
-  const [editInitialValues, setEditInitialValues] = useState(null); // 👈 para el modal
-  const [form] = Form.useForm(); // form del modal de edición
+  const [editInitialValues, setEditInitialValues] = useState(null);
+  const [form] = Form.useForm();
 
-  // Panel de creación
+  // Create panel
   const [createPanelOpen, setCreatePanelOpen] = useState(false);
   const [createForm] = Form.useForm();
   const [creatingUser, setCreatingUser] = useState(false);
   const [lastTempPassword, setLastTempPassword] = useState(null);
 
-  // Carga inicial / paginación
+  // Load/pagination
   const [loadingUsers, setLoadingUsers] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [togglingId, setTogglingId] = useState(null);
@@ -131,25 +106,166 @@ const UsuariosView = ({ isMobile, currentUser }) => {
 
   const [savingUser, setSavingUser] = useState(false);
 
-  // Debounce del buscador
+  // Debounce search
   const [debouncedSearch, setDebouncedSearch] = useState("");
   useEffect(() => {
-    const handler = setTimeout(() => {
-      setDebouncedSearch(userSearch.trim());
-    }, 400);
+    const handler = setTimeout(() => setDebouncedSearch(userSearch.trim()), 400);
     return () => clearTimeout(handler);
   }, [userSearch]);
 
-  /* =======================
-     OPTIMIZACIÓN REQUESTS
-     ======================= */
+  // Request optimization
   const abortRef = useRef(null);
   const reqSeqRef = useRef(0);
   const skipFirstFiltersEffectRef = useRef(true);
   const lastResetKeyRef = useRef("");
 
-  /* ========== CARGAR LISTA DESDE API  ========== */
+  /* =========================================================
+     SEDES: cargar catálogo del backend
+     GET /api/sedes
+     ========================================================= */
+  const fetchSedes = useCallback(async () => {
+    try {
+      setSedesLoading(true);
+      const res = await axios.get("/api/sedes", { withCredentials: true });
+      const data = res.data;
+      const items = Array.isArray(data) ? data : data?.items || [];
+      setSedes(items);
+    } catch (err) {
+      console.error("Error al obtener sedes:", err);
+      messageApi.error(
+        err.response?.data?.message || "No se pudieron cargar las sedes. Revisa /api/sedes."
+      );
+      setSedes([]);
+    } finally {
+      setSedesLoading(false);
+    }
+  }, [messageApi]);
 
+  useEffect(() => {
+    fetchSedes();
+  }, [fetchSedes]);
+
+  const sedeById = useMemo(() => {
+    const m = {};
+    for (const s of sedes) if (s?._id) m[String(s._id)] = s;
+    return m;
+  }, [sedes]);
+
+  const sedeByKey = useMemo(() => {
+    const m = {};
+    for (const s of sedes) if (s?.key) m[String(s.key)] = s;
+    return m;
+  }, [sedes]);
+
+  const defaultSedeId = useMemo(() => {
+    const firstActive = sedes.find((s) => s?.isActive);
+    return (
+      (firstActive?._id && String(firstActive._id)) ||
+      (sedes[0]?._id && String(sedes[0]._id)) ||
+      null
+    );
+  }, [sedes]);
+
+  const sedeOptionsForForms = useMemo(() => {
+    return sedes.map((s) => ({
+      value: String(s._id),
+      label: s.isActive ? s.name : `${s.name} (inactiva)`,
+      disabled: !s.isActive,
+    }));
+  }, [sedes]);
+
+  const sedeOptionsForFilter = useMemo(() => {
+    return sedes.map((s) => ({
+      value: String(s._id),
+      label: s.name,
+      disabled: false,
+    }));
+  }, [sedes]);
+
+  const resolveSede = useCallback(
+    (raw) => {
+      // raw puede ser:
+      // - ObjectId string "65f..."
+      // - populated object { _id, key, name }
+      // - legacy key string "casa-frida"
+      let sedeId = null;
+      let sedeKey = null;
+      let sedeName = null;
+
+      if (raw && typeof raw === "object") {
+        if (raw._id) sedeId = String(raw._id);
+        if (raw.key) sedeKey = String(raw.key);
+        if (raw.name) sedeName = String(raw.name);
+      } else if (typeof raw === "string") {
+        if (isObjectId(raw)) {
+          sedeId = raw;
+        } else {
+          sedeKey = raw;
+          const found = sedeByKey[raw];
+          if (found?._id) {
+            sedeId = String(found._id);
+            sedeName = found.name;
+          }
+        }
+      }
+
+      if (!sedeId && defaultSedeId) sedeId = defaultSedeId;
+
+      const label =
+        sedeName ||
+        (sedeId && sedeById[sedeId]?.name) ||
+        (sedeKey && sedeByKey[sedeKey]?.name) ||
+        "Sin sede";
+
+      return { sedeId, sedeKey, sedeLabel: String(label) };
+    },
+    [defaultSedeId, sedeById, sedeByKey]
+  );
+
+  /* =========================================================
+     mapUserFromApi (safe con populated)
+     ========================================================= */
+  const mapUserFromApi = useCallback(
+    (apiUser) => {
+      const role = apiUser.role || "staff";
+      const sedeResolved = resolveSede(apiUser.sede);
+
+      return {
+        id: String(apiUser._id),
+        name: apiUser.name,
+        email: apiUser.email,
+        role,
+        roleLabel: ROLE_LABELS[role] || role,
+        isActive: !!apiUser.isActive,
+        lastAccess: formatLastLogin(apiUser.lastLogin),
+        createdAt: apiUser.createdAt,
+        updatedAt: apiUser.updatedAt,
+        isSelf:
+          !!currentUser &&
+          (String(currentUser.id) === String(apiUser._id) || currentUser.email === apiUser.email),
+
+        // ✅ usamos sedeId (alineado a backend)
+        sedeId: sedeResolved.sedeId,
+        sedeKey: sedeResolved.sedeKey,
+        sedeLabel: sedeResolved.sedeLabel,
+      };
+    },
+    [currentUser, resolveSede]
+  );
+
+  // si cambian sedes (CRUD), refresca labels
+  useEffect(() => {
+    setUsers((prev) =>
+      prev.map((u) => {
+        const { sedeLabel } = resolveSede(u.sedeId || u.sedeKey);
+        return { ...u, sedeLabel };
+      })
+    );
+  }, [resolveSede]);
+
+  /* =========================================================
+     FETCH USERS
+     ========================================================= */
   const fetchUsers = useCallback(
     async ({ reset = false } = {}) => {
       if (abortRef.current) abortRef.current.abort();
@@ -172,6 +288,7 @@ const UsuariosView = ({ isMobile, currentUser }) => {
       }
 
       setErrorMsg("");
+
       try {
         const currentOffset = reset ? 0 : offset;
 
@@ -180,15 +297,12 @@ const UsuariosView = ({ isMobile, currentUser }) => {
           limit,
         };
 
-        if (userRoleFilter !== "all") {
-          params.role = userRoleFilter;
-        }
+        if (userRoleFilter !== "all") params.role = userRoleFilter;
 
-        if (debouncedSearch) {
-          params.q = debouncedSearch;
-        }
+        // ✅ filtro sedeId (backend)
+        if (userSedeFilter !== "all") params.sedeId = userSedeFilter;
 
-        console.log("[fetchUsers] params enviados", params);
+        if (debouncedSearch) params.q = debouncedSearch;
 
         const res = await axios.get("/api/users", {
           withCredentials: true,
@@ -200,19 +314,13 @@ const UsuariosView = ({ isMobile, currentUser }) => {
 
         const api = res.data;
         const apiUsers = Array.isArray(api) ? api : api.items || [];
-        console.log("[fetchUsers] respuesta raw", api);
 
-        const mapped = apiUsers.map((u) => mapUserFromApi(u, currentUser));
-
-        console.log("[fetchUsers] usuarios mapeados", mapped);
+        const mapped = apiUsers.map((u) => mapUserFromApi(u));
 
         setUsers((prev) =>
           reset
             ? mapped
-            : [
-                ...prev,
-                ...mapped.filter((nu) => !prev.some((p) => p.id === nu.id)),
-              ]
+            : [...prev, ...mapped.filter((nu) => !prev.some((p) => p.id === nu.id))]
         );
 
         const nextOffset = currentOffset + apiUsers.length;
@@ -225,16 +333,14 @@ const UsuariosView = ({ isMobile, currentUser }) => {
         }
 
         if (reset) {
-          const resetKey = `${userRoleFilter}::${debouncedSearch}`;
+          const resetKey = `${userRoleFilter}::${userSedeFilter}::${debouncedSearch}`;
           if (lastResetKeyRef.current !== resetKey) {
             lastResetKeyRef.current = resetKey;
             messageApi.success("Usuarios cargados correctamente.");
           }
         }
       } catch (err) {
-        if (err?.code === "ERR_CANCELED" || err?.name === "CanceledError") {
-          return;
-        }
+        if (err?.code === "ERR_CANCELED" || err?.name === "CanceledError") return;
 
         console.error("Error al obtener usuarios:", err);
         const msg =
@@ -247,7 +353,16 @@ const UsuariosView = ({ isMobile, currentUser }) => {
         setLoadingMore(false);
       }
     },
-    [hasMore, offset, limit, userRoleFilter, debouncedSearch, currentUser, messageApi]
+    [
+      hasMore,
+      offset,
+      limit,
+      userRoleFilter,
+      userSedeFilter,
+      debouncedSearch,
+      mapUserFromApi,
+      messageApi,
+    ]
   );
 
   useEffect(() => {
@@ -262,47 +377,37 @@ const UsuariosView = ({ isMobile, currentUser }) => {
     }
     fetchUsers({ reset: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userRoleFilter, debouncedSearch]);
-
-  useEffect(() => {
-    console.log("[UsuariosView] users en estado", users);
-  }, [users]);
+  }, [userRoleFilter, userSedeFilter, debouncedSearch]);
 
   /* ========== DERIVADOS ========== */
+  const filteredActiveUsers = users.filter((u) => u.isActive);
+  const filteredInactiveUsers = users.filter((u) => !u.isActive);
 
-  const baseFiltered = users;
-
-  const filteredActiveUsers = baseFiltered.filter((u) => u.isActive);
-  const filteredInactiveUsers = baseFiltered.filter((u) => !u.isActive);
-
-  const activos = users.filter((u) => u.isActive).length;
-  const inactivos = users.filter((u) => !u.isActive).length;
+  const activos = filteredActiveUsers.length;
+  const inactivos = filteredInactiveUsers.length;
   const total = users.length;
   const adminsCount = users.filter((u) => u.role === "administrador").length;
   const staffCount = users.filter((u) => u.role === "staff").length;
 
   const loadingActiveList = loadingUsers && users.length === 0;
 
-  /* ========== CREAR NUEVO USUARIO ========== */
-
+  /* ========== CREATE USER ========== */
   const toggleCreatePanel = () => {
     setCreatePanelOpen((prev) => !prev);
+
     if (!createPanelOpen) {
       setLastTempPassword(null);
       createForm.resetFields();
       createForm.setFieldsValue({
         role: "staff",
-        sede: "casa-frida",
+        sedeId: defaultSedeId || undefined, // ✅ sedeId
       });
-      messageApi.info(
-        "Completa los datos para dar de alta a un nuevo usuario."
-      );
+      messageApi.info("Completa los datos para dar de alta a un nuevo usuario.");
     }
   };
 
   const generarPasswordSegura = () => {
-    const chars =
-      "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789!@$%&*?";
+    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789!@$%&*?";
     let pwd = "";
     for (let i = 0; i < 12; i += 1) {
       const idx = Math.floor(Math.random() * chars.length);
@@ -316,7 +421,7 @@ const UsuariosView = ({ isMobile, currentUser }) => {
   const crearUsuario = async () => {
     try {
       const values = await createForm.validateFields();
-      const { name, emailUser, role, password, sede } = values;
+      const { name, emailUser, role, password, sedeId } = values;
 
       const username = String(emailUser || "")
         .toLowerCase()
@@ -332,25 +437,17 @@ const UsuariosView = ({ isMobile, currentUser }) => {
       const email = `${username}@${EMAIL_DOMAIN}`;
 
       setCreatingUser(true);
-      messageApi.loading({
-        content: "Creando usuario...",
-        key: "creatingUser",
-      });
+      messageApi.loading({ content: "Creando usuario...", key: "creatingUser" });
 
+      // ✅ backend espera sedeId
       const res = await axios.post(
         "/api/users",
-        {
-          name,
-          email,
-          role,
-          password,
-          sede,
-        },
+        { name, email, role, password, sedeId },
         { withCredentials: true }
       );
 
       const apiUser = res.data?.user || res.data;
-      const mapped = mapUserFromApi(apiUser, currentUser);
+      const mapped = mapUserFromApi(apiUser);
 
       setUsers((prev) => [mapped, ...prev]);
 
@@ -358,21 +455,18 @@ const UsuariosView = ({ isMobile, currentUser }) => {
       createForm.resetFields();
       setLastTempPassword(null);
 
-      messageApi.success({
-        content: "Usuario creado correctamente.",
-        key: "creatingUser",
-      });
+      messageApi.success({ content: "Usuario creado correctamente.", key: "creatingUser" });
 
       Modal.success({
         title: "Usuario creado correctamente",
+        centered: true,
+        okText: "Entendido",
         content: (
           <div style={{ marginTop: 8 }}>
             <p>
               Se creó el usuario <strong>{name}</strong> ({email}).
             </p>
-            <p style={{ marginTop: 6 }}>
-              Comparte estas credenciales iniciales con la persona:
-            </p>
+            <p style={{ marginTop: 6 }}>Comparte estas credenciales iniciales con la persona:</p>
             <div
               style={{
                 marginTop: 6,
@@ -395,32 +489,19 @@ const UsuariosView = ({ isMobile, currentUser }) => {
                 {password}
               </div>
             </div>
-            <p
-              style={{
-                marginTop: 8,
-                fontSize: 11,
-                color: "#6b7280",
-              }}
-            >
+            <p style={{ marginTop: 8, fontSize: 11, color: "#6b7280" }}>
               Recomienda cambiar la contraseña en su primer inicio de sesión.
             </p>
           </div>
         ),
-        okText: "Entendido",
-        centered: true,
       });
     } catch (err) {
       console.error("Error al crear usuario:", err);
       messageApi.destroy("creatingUser");
-      if (
-        err?.response?.data?.error === "EMAIL_IN_USE" &&
-        err?.response?.data?.message
-      ) {
+      if (err?.response?.data?.error === "EMAIL_IN_USE" && err?.response?.data?.message) {
         messageApi.error(err.response.data.message);
       } else if (err?.response?.data?.message) {
         messageApi.error(err.response.data.message);
-      } else if (err?.name === "Error") {
-        // cancelado
       } else {
         messageApi.error("No se pudo crear el usuario.");
       }
@@ -429,23 +510,12 @@ const UsuariosView = ({ isMobile, currentUser }) => {
     }
   };
 
-  /* ========== MODAL EDITAR ========== */
-
+  /* ========== EDIT MODAL ========== */
   const abrirModalEditar = (user) => {
-    console.log("[abrirModalEditar] argumento recibido:", user);
-
-    if (!user || typeof user !== "object" || !user.id) {
-      console.warn(
-        "[abrirModalEditar] se llamó sin un usuario válido. " +
-          "Revisa que en UsuariosActiveList hagas onClick={() => abrirModalEditar(user)}"
-      );
-      return;
-    }
+    if (!user || !user.id) return;
 
     if (user.isSelf) {
-      messageApi.info(
-        "No puedes editar tu propio usuario desde este panel."
-      );
+      messageApi.info("No puedes editar tu propio usuario desde este panel.");
       return;
     }
 
@@ -457,20 +527,15 @@ const UsuariosView = ({ isMobile, currentUser }) => {
       name: user.name || "",
       emailUser: userPart || "",
       role: user.role || "staff",
-      sede: user.sede || "casa-frida",
+      sedeId: user.sedeId || defaultSedeId || undefined, // ✅ sedeId
     };
 
-    console.log("[abrirModalEditar] initial values calculados:", initial);
-
     setEditInitialValues(initial);
-
-    // Limpiamos el form y abrimos el modal.
     form.resetFields();
     setModalVisible(true);
   };
 
   const cerrarModal = () => {
-    console.log("[cerrarModal] cerrando modal de edición");
     setModalVisible(false);
     setEditingUser(null);
     setEditInitialValues(null);
@@ -478,15 +543,10 @@ const UsuariosView = ({ isMobile, currentUser }) => {
   };
 
   const guardarUsuario = async () => {
-    if (!editingUser) {
-      console.warn("[guardarUsuario] No hay editingUser, abortando");
-      return;
-    }
+    if (!editingUser) return;
 
     const values = await form.validateFields();
-    console.log("[guardarUsuario] valores del form validados:", values);
-
-    const { name, emailUser, role, sede } = values;
+    const { name, emailUser, role, sedeId } = values;
 
     const username = String(emailUser || "")
       .toLowerCase()
@@ -501,67 +561,42 @@ const UsuariosView = ({ isMobile, currentUser }) => {
 
     const email = `${username}@${EMAIL_DOMAIN}`;
 
-    const payload = {
-      name,
-      email,
-      role,
-      sede,
-    };
-
-    console.log("[guardarUsuario] payload que se enviará al backend:", payload);
+    // ✅ backend espera sedeId
+    const payload = { name, email, role, sedeId };
 
     setSavingUser(true);
-    messageApi.loading({
-      content: "Guardando cambios...",
-      key: "savingUser",
-    });
+    messageApi.loading({ content: "Guardando cambios...", key: "savingUser" });
+
     try {
-      const res = await axios.put(
-        `/api/users/${editingUser.id}`,
-        payload,
-        { withCredentials: true }
-      );
+      const res = await axios.put(`/api/users/${editingUser.id}`, payload, {
+        withCredentials: true,
+      });
 
       const updatedApiUser = res.data?.user || res.data;
-      console.log("[guardarUsuario] respuesta backend:", updatedApiUser);
+      const updated = mapUserFromApi(updatedApiUser);
 
-      const updated = mapUserFromApi(updatedApiUser, currentUser);
+      setUsers((prev) => prev.map((u) => (u.id === updated.id ? updated : u)));
 
-      setUsers((prev) =>
-        prev.map((u) => (u.id === updated.id ? updated : u))
-      );
-
-      messageApi.success({
-        content: "Usuario actualizado correctamente.",
-        key: "savingUser",
-      });
+      messageApi.success({ content: "Usuario actualizado correctamente.", key: "savingUser" });
       cerrarModal();
     } catch (err) {
       console.error("Error al actualizar usuario:", err);
       messageApi.destroy("savingUser");
-      if (
-        err.response?.data?.error === "EMAIL_IN_USE" &&
-        err.response?.data?.message
-      ) {
+      if (err.response?.data?.error === "EMAIL_IN_USE" && err.response?.data?.message) {
         messageApi.error(err.response.data.message);
       } else {
-        messageApi.error(
-          err.response?.data?.message || "No se pudo guardar el usuario."
-        );
+        messageApi.error(err.response?.data?.message || "No se pudo guardar el usuario.");
       }
     } finally {
       setSavingUser(false);
     }
   };
 
-  /* ========== ACTIVAR / DESACTIVAR ========== */
-
+  /* ========== TOGGLE ACTIVE ========== */
   const hacerToggleEstado = async (user, nextIsActive) => {
     setTogglingId(user.id);
     messageApi.loading({
-      content: nextIsActive
-        ? "Restaurando usuario..."
-        : "Enviando usuario a la papelera...",
+      content: nextIsActive ? "Restaurando usuario..." : "Enviando usuario a la papelera...",
       key: `toggle-${user.id}`,
     });
 
@@ -573,11 +608,9 @@ const UsuariosView = ({ isMobile, currentUser }) => {
       );
 
       const updatedApiUser = res.data?.user || res.data;
-      const updated = mapUserFromApi(updatedApiUser, currentUser);
+      const updated = mapUserFromApi(updatedApiUser);
 
-      setUsers((prev) =>
-        prev.map((u) => (u.id === updated.id ? updated : u))
-      );
+      setUsers((prev) => prev.map((u) => (u.id === updated.id ? updated : u)));
 
       messageApi.success({
         content: nextIsActive
@@ -587,10 +620,7 @@ const UsuariosView = ({ isMobile, currentUser }) => {
       });
     } catch (err) {
       console.error("Error al cambiar estado de usuario:", err);
-      messageApi.error(
-        err.response?.data?.message ||
-          "No se pudo actualizar el estado del usuario."
-      );
+      messageApi.error(err.response?.data?.message || "No se pudo actualizar el estado del usuario.");
     } finally {
       setTogglingId(null);
       setFadingId(null);
@@ -599,9 +629,7 @@ const UsuariosView = ({ isMobile, currentUser }) => {
 
   const cambiarEstado = (user) => {
     if (user.isSelf) {
-      messageApi.info(
-        "No puedes cambiar el estado de tu propio usuario desde aquí."
-      );
+      messageApi.info("No puedes cambiar el estado de tu propio usuario desde aquí.");
       return;
     }
 
@@ -609,22 +637,19 @@ const UsuariosView = ({ isMobile, currentUser }) => {
 
     if (!nextIsActive) {
       setFadingId(user.id);
-      setTimeout(() => {
-        hacerToggleEstado(user, nextIsActive);
-      }, 220);
+      setTimeout(() => hacerToggleEstado(user, nextIsActive), 220);
     } else {
       hacerToggleEstado(user, nextIsActive);
     }
   };
 
   /* ========== RENDER ========== */
-
   return (
     <>
       {contextHolder}
 
       <Card
-        bordered={false}
+        variant="borderless"
         style={{
           marginTop: 4,
           borderRadius: 16,
@@ -633,84 +658,86 @@ const UsuariosView = ({ isMobile, currentUser }) => {
         }}
         title={
           <Space size={8} wrap>
-            <TeamOutlined
-              style={{ color: beachColors.teal, fontSize: 16 }}
-            />
-            <Text
-              style={{
-                fontWeight: 600,
-                color: neutrals.textMain,
-                fontSize: 15,
-              }}
-            >
+            <TeamOutlined style={{ color: beachColors.teal, fontSize: 16 }} />
+            <Text style={{ fontWeight: 600, color: neutrals.textMain, fontSize: 15 }}>
               Usuarios y permisos
             </Text>
+
             <Tag
               color={beachColors.teal}
-              style={{
-                borderRadius: 999,
-                fontSize: 10,
-                color: "#064e3b",
-              }}
+              style={{ borderRadius: 999, fontSize: 10, color: "#064e3b" }}
             >
               {activos} activos
             </Tag>
+
             {inactivos > 0 && (
               <Tag
                 color="#e5e7eb"
-                style={{
-                  borderRadius: 999,
-                  fontSize: 10,
-                  color: "#111827",
-                }}
+                style={{ borderRadius: 999, fontSize: 10, color: "#111827" }}
               >
                 {inactivos} en papelera
               </Tag>
             )}
+
+            <Tag
+              color="#eef2ff"
+              style={{ borderRadius: 999, fontSize: 10, color: "#4338ca" }}
+            >
+              {sedesLoading ? "Sedes..." : `${sedes.length} sedes`}
+            </Tag>
           </Space>
         }
         extra={
-          <Button
-            type={createPanelOpen ? "default" : "primary"}
-            size="small"
-            icon={<PlusOutlined />}
-            onClick={toggleCreatePanel}
-            style={{
-              borderRadius: 999,
-              paddingInline: 14,
-              fontSize: 11,
-              background: createPanelOpen ? "#ffffff" : beachColors.teal,
-              borderColor: beachColors.teal,
-              color: createPanelOpen ? beachColors.teal : "#ffffff",
-            }}
-          >
-            {createPanelOpen ? "Cerrar alta rápida" : "Nuevo usuario"}
-          </Button>
+          <Space size={8} wrap>
+            <Button
+              size="small"
+              onClick={() => {
+                setSedesPanelOpen((v) => !v);
+                fetchSedes();
+              }}
+              icon={<EnvironmentOutlined />}
+              style={{
+                borderRadius: 999,
+                paddingInline: 12,
+                fontSize: 11,
+                background: "#ffffff",
+                borderColor: "#c7d2fe",
+                color: "#4338ca",
+              }}
+            >
+              {sedesPanelOpen ? "Cerrar sedes" : "Sedes"}
+            </Button>
+
+            <Button
+              type={createPanelOpen ? "default" : "primary"}
+              size="small"
+              icon={<PlusOutlined />}
+              onClick={toggleCreatePanel}
+              style={{
+                borderRadius: 999,
+                paddingInline: 14,
+                fontSize: 11,
+                background: createPanelOpen ? "#ffffff" : beachColors.teal,
+                borderColor: beachColors.teal,
+                color: createPanelOpen ? beachColors.teal : "#ffffff",
+              }}
+            >
+              {createPanelOpen ? "Cerrar alta rápida" : "Nuevo usuario"}
+            </Button>
+          </Space>
         }
       >
         {errorMsg && (
-          <Alert
-            type="error"
-            showIcon
-            style={{ marginBottom: 12 }}
-            message={errorMsg}
-          />
+          <Alert type="error" showIcon style={{ marginBottom: 12 }} message={errorMsg} />
         )}
 
         {loadingUsers && users.length === 0 && (
-          <div
-            style={{
-              width: "100%",
-              display: "flex",
-              justifyContent: "center",
-              marginBottom: 10,
-            }}
-          >
-            <Spin size="small" tip="Cargando usuarios..." />
+          <div style={{ width: "100%", display: "flex", gap: 8, justifyContent: "center" }}>
+            <Spin size="small" />
+            <Text style={{ fontSize: 12, color: neutrals.textMuted }}>Cargando usuarios...</Text>
           </div>
         )}
 
-        {/* Panel de creación */}
         <UsuariosCreatePanel
           createPanelOpen={createPanelOpen}
           createForm={createForm}
@@ -718,28 +745,34 @@ const UsuariosView = ({ isMobile, currentUser }) => {
           lastTempPassword={lastTempPassword}
           generarPasswordSegura={generarPasswordSegura}
           crearUsuario={crearUsuario}
+          sedeOptions={sedeOptionsForForms}
+          sedesLoading={sedesLoading}
         />
 
-        {/* Resumen superior */}
-        <UsuariosSummaryBar
-          total={total}
-          adminsCount={adminsCount}
-          staffCount={staffCount}
-          isMobile={isMobile}
+        <SedesManagerPanel
+          open={sedesPanelOpen}
+          sedes={sedes}
+          loading={sedesLoading}
+          reload={fetchSedes}
+          onSedesChanged={() => fetchSedes()}
         />
 
-        {/* Filtros */}
+        <UsuariosSummaryBar total={total} adminsCount={adminsCount} staffCount={staffCount} isMobile={isMobile} />
+
         <UsuariosFiltersBar
           isMobile={isMobile}
           userSearch={userSearch}
           setUserSearch={setUserSearch}
           userRoleFilter={userRoleFilter}
           setUserRoleFilter={setUserRoleFilter}
+          userSedeFilter={userSedeFilter}
+          setUserSedeFilter={setUserSedeFilter}
+          sedeOptions={sedeOptionsForFilter}
+          sedesLoading={sedesLoading}
         />
 
         <Divider style={{ margin: "8px 0 12px" }} />
 
-        {/* LISTA: ACTIVOS */}
         <Text
           style={{
             fontSize: 11,
@@ -763,17 +796,12 @@ const UsuariosView = ({ isMobile, currentUser }) => {
 
         {hasMore && (
           <div style={{ textAlign: "center", marginTop: 10 }}>
-            <Button
-              size="small"
-              onClick={() => fetchUsers({ reset: false })}
-              loading={loadingMore}
-            >
+            <Button size="small" onClick={() => fetchUsers({ reset: false })} loading={loadingMore}>
               Cargar más usuarios
             </Button>
           </div>
         )}
 
-        {/* PAPELERA */}
         <UsuariosInactiveList
           filteredInactiveUsers={filteredInactiveUsers}
           isMobile={isMobile}
@@ -782,7 +810,6 @@ const UsuariosView = ({ isMobile, currentUser }) => {
         />
       </Card>
 
-      {/* MODAL EDITAR */}
       <UsuarioEditModal
         modalVisible={modalVisible}
         guardarUsuario={guardarUsuario}
@@ -791,6 +818,8 @@ const UsuariosView = ({ isMobile, currentUser }) => {
         form={form}
         initialValues={editInitialValues}
         editingUserId={editingUser?.id || null}
+        sedeOptions={sedeOptionsForForms}
+        sedesLoading={sedesLoading}
       />
     </>
   );

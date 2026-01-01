@@ -1,7 +1,5 @@
-import { useEffect } from "react";
 import { Modal, Form, Input, Select } from "antd";
 
-const { Option } = Select;
 const EMAIL_DOMAIN = "beachclub.com";
 
 const UsuarioEditModal = ({
@@ -12,15 +10,10 @@ const UsuarioEditModal = ({
   form,
   initialValues,
   editingUserId,
-}) => {
-  useEffect(() => {
-    console.log("[UsuarioEditModal] props:", {
-      modalVisible,
-      initialValues,
-      editingUserId,
-    });
-  }, [modalVisible, initialValues, editingUserId]);
 
+  sedeOptions = [],
+  sedesLoading = false,
+}) => {
   return (
     <Modal
       open={modalVisible}
@@ -34,7 +27,7 @@ const UsuarioEditModal = ({
       destroyOnHidden
     >
       <Form
-        key={editingUserId || "no-user"} // 🔑 fuerza remount cuando cambia el usuario
+        key={editingUserId || "no-user"}
         form={form}
         layout="vertical"
         preserve={false}
@@ -52,25 +45,23 @@ const UsuarioEditModal = ({
           label="Usuario corporativo"
           name="emailUser"
           tooltip={`El correo final será usuario@${EMAIL_DOMAIN}`}
-          rules={[
-            { required: true, message: "Ingresa el usuario corporativo" },
-          ]}
+          rules={[{ required: true, message: "Ingresa el usuario corporativo" }]}
         >
-          <Input
-            placeholder="ej: laura.sanchez"
-            addonAfter={`@${EMAIL_DOMAIN}`}
-          />
+          <Input placeholder="ej: laura.sanchez" addonAfter={`@${EMAIL_DOMAIN}`} />
         </Form.Item>
 
         <Form.Item
           label="Sede"
-          name="sede"
+          name="sedeId"
           rules={[{ required: true, message: "Selecciona la sede" }]}
         >
-          <Select placeholder="Selecciona la sede">
-            <Option value="casa-frida">Casa Frida</Option>
-            <Option value="cabanas-frida">Cabañas Frida</Option>
-          </Select>
+          <Select
+            placeholder="Selecciona la sede"
+            loading={sedesLoading}
+            options={sedeOptions}
+            showSearch
+            optionFilterProp="label"
+          />
         </Form.Item>
 
         <Form.Item
@@ -78,10 +69,13 @@ const UsuarioEditModal = ({
           name="role"
           rules={[{ required: true, message: "Selecciona el tipo de acceso" }]}
         >
-          <Select placeholder="Selecciona una opción">
-            <Option value="administrador">Administrador</Option>
-            <Option value="staff">Staff</Option>
-          </Select>
+          <Select
+            placeholder="Selecciona una opción"
+            options={[
+              { value: "administrador", label: "Administrador" },
+              { value: "staff", label: "Staff" },
+            ]}
+          />
         </Form.Item>
       </Form>
     </Modal>

@@ -6,6 +6,7 @@ const { connectDB } = require('./config/db');
 
 const authRoutes = require('./routes/auth.routes');
 const usersRoutes = require('./routes/users.routes');
+const sedesRoutes = require('./routes/sedes.routes');
 
 const app = express();
 
@@ -26,6 +27,7 @@ app.options('*', cors(corsOptions));
 
 app.use('/api/auth', authRoutes);
 app.use('/api/users', usersRoutes);
+app.use('/api/sedes', sedesRoutes);
 
 app.get('/', (req, res) => {
   res.send('🚀 users-service (auth + usuarios) OK');
