@@ -27,7 +27,6 @@ const TOKENS = {
   h: 58,
   padX: 18,
   padXMobile: 12,
-
   mark: 28,
 
   // espacio reservado al centro para el NotchBar (responsivo)
@@ -61,9 +60,10 @@ const Navbar = ({
     ? TOKENS.notchSM
     : TOKENS.notchXS;
 
+  // Gradiente más sobrio (menos “glass”)
   const headerBg = isLight
     ? token.colorBgContainer
-    : `linear-gradient(180deg, ${beachColors.deepBlue} 0%, rgba(14,165,233,.92) 100%)`;
+    : `linear-gradient(180deg, ${beachColors.deepBlue} 0%, ${beachColors.oceanBlue} 100%)`;
 
   const headerStyle = {
     height: TOKENS.h,
@@ -72,30 +72,76 @@ const Navbar = ({
     top: 0,
     zIndex: 50,
     background: headerBg,
-    borderBottom: isLight ? `1px solid ${token.colorBorderSecondary}` : "none",
-    boxShadow: isLight ? "none" : "0 18px 50px rgba(15, 23, 42, .10)",
+    borderBottom: isLight
+      ? `1px solid ${token.colorBorderSecondary}`
+      : "1px solid rgba(255,255,255,.10)",
+    boxShadow: isLight ? "none" : "0 10px 30px rgba(15, 23, 42, .16)",
     overflow: "hidden",
   };
 
   const logoTextColor = isLight ? neutrals.textMain : "#fff";
-  const subTextColor = isLight ? "rgba(15,23,42,.55)" : "rgba(255,255,255,.78)";
+  const subTextColor = isLight
+    ? "rgba(15,23,42,.55)"
+    : "rgba(255,255,255,.80)";
+
+  // Botones más AntD “producto” (menos efecto iOS)
+  const primaryBtnStyle = {
+    fontWeight: 950,
+    background: beachColors.coral,
+    borderColor: beachColors.coral,
+    boxShadow: "0 10px 22px rgba(251,113,133,.22)",
+  };
+
+  const secondaryBtnStyle = {
+    fontWeight: 900,
+    background: isLight ? token.colorBgElevated : "rgba(255,255,255,.10)",
+    borderColor: isLight ? token.colorBorderSecondary : "rgba(255,255,255,.22)",
+    color: isLight ? "rgba(15,23,42,.78)" : "rgba(255,255,255,.92)",
+  };
+
+  const brandWrapStyle = {
+    borderRadius: 14,
+    padding: "6px 10px",
+    background: isLight ? "transparent" : "rgba(255,255,255,.08)",
+    border: isLight ? "1px solid transparent" : "1px solid rgba(255,255,255,.14)",
+  };
 
   return (
     <Header style={headerStyle}>
-      {/* glow “gratis” (sin CSS externo) */}
+      {/* Material muy sutil: highlight arriba + leve sombra abajo (no iOS) */}
       {!isLight && (
-        <div
-          style={{
-            position: "absolute",
-            inset: -120,
-            background:
-              "radial-gradient(circle at 25% 25%, rgba(255,255,255,.16), rgba(255,255,255,0) 55%)",
-            pointerEvents: "none",
-          }}
-        />
+        <>
+          <div
+            style={{
+              position: "absolute",
+              left: 0,
+              right: 0,
+              top: 0,
+              height: 1,
+              background: "rgba(255,255,255,.14)",
+              pointerEvents: "none",
+            }}
+          />
+          <div
+            style={{
+              position: "absolute",
+              left: 0,
+              right: 0,
+              bottom: -18,
+              height: 30,
+              background:
+                "linear-gradient(180deg, rgba(15,23,42,0), rgba(15,23,42,.14))",
+              pointerEvents: "none",
+            }}
+          />
+        </>
       )}
 
-      <Row align="middle" wrap={false} style={{ height: "100%", position: "relative" }}>
+      <Row
+        align="middle"
+        wrap={false}
+        style={{ height: "100%", position: "relative" }}
+      >
         {/* LEFT */}
         <Col flex="1 1 0" style={{ minWidth: 0 }}>
           <Button
@@ -104,53 +150,94 @@ const Navbar = ({
             style={{
               padding: 0,
               height: "auto",
-              color: logoTextColor,
-              borderRadius: 999,
+              borderRadius: 14,
               maxWidth: "100%",
             }}
           >
-            <Space size={10} align="center" style={{ minWidth: 0 }}>
-              <Avatar
-                size={TOKENS.mark}
-                style={{
-                  background: `linear-gradient(135deg, ${beachColors.turquoise}, ${beachColors.oceanBlue})`,
-                  boxShadow: "0 14px 28px rgba(14,165,233,.30)",
-                }}
-              />
+            <div style={brandWrapStyle}>
+              <Space size={10} align="center" style={{ minWidth: 0 }}>
+                <Avatar
+                  size={TOKENS.mark}
+                  style={{
+                    background: `linear-gradient(135deg, ${beachColors.turquoise}, ${beachColors.oceanBlue})`,
+                    boxShadow: "0 10px 18px rgba(14,165,233,.20)",
+                    border: isLight
+                      ? `1px solid ${token.colorBorderSecondary}`
+                      : "1px solid rgba(255,255,255,.22)",
+                  }}
+                />
 
-              <Space direction="vertical" size={0} style={{ minWidth: 0 }}>
-                {!isMobile && (
-                  <Text
-                    style={{ fontWeight: 900, fontSize: 14, lineHeight: 1.1, color: logoTextColor }}
-                    ellipsis={{ tooltip: false }}
-                  >
-                    Hoteles Frida
-                  </Text>
-                )}
-
-                <Space size={6} align="center">
-                  {screens.md && (
-                    <EnvironmentOutlined style={{ fontSize: 12, color: subTextColor }} />
-                  )}
-                  {screens.md && (
-                    <Text style={{ fontWeight: 800, fontSize: 11, color: subTextColor }}>
-                      Chelem · Chuburná
+                <Space direction="vertical" size={0} style={{ minWidth: 0 }}>
+                  {!isMobile && (
+                    <Text
+                      style={{
+                        fontWeight: 950,
+                        fontSize: 14,
+                        lineHeight: 1.05,
+                        color: logoTextColor,
+                        letterSpacing: 0.2,
+                      }}
+                      ellipsis={{ tooltip: false }}
+                    >
+                      Hoteles Frida
                     </Text>
                   )}
-                </Space>
-              </Space>
 
-              {screens.xl && (
-                <Tag color={isLight ? "blue" : "geekblue"} style={{ borderRadius: 999, fontWeight: 900 }}>
-                  Reservas directas
-                </Tag>
-              )}
-            </Space>
+                  <Space size={6} align="center">
+                    {screens.md && (
+                      <EnvironmentOutlined
+                        style={{ fontSize: 12, color: subTextColor }}
+                      />
+                    )}
+                    {screens.md && (
+                      <Text
+                        style={{
+                          fontWeight: 800,
+                          fontSize: 11,
+                          color: subTextColor,
+                        }}
+                      >
+                        Chelem · Chuburná
+                      </Text>
+                    )}
+                  </Space>
+                </Space>
+
+                {screens.xl && (
+                  <Tag
+                    style={{
+                      borderRadius: 999,
+                      fontWeight: 900,
+                      paddingInline: 10,
+                      height: 26,
+                      display: "inline-flex",
+                      alignItems: "center",
+                      marginInlineStart: 6,
+                      background: isLight
+                        ? "rgba(14,165,233,.10)"
+                        : "rgba(255,255,255,.10)",
+                      border: isLight
+                        ? "1px solid rgba(14,165,233,.18)"
+                        : "1px solid rgba(255,255,255,.16)",
+                      color: isLight
+                        ? "rgba(14,165,233,.95)"
+                        : "rgba(255,255,255,.90)",
+                    }}
+                  >
+                    Reservas directas
+                  </Tag>
+                )}
+              </Space>
+            </div>
           </Button>
         </Col>
 
         {/* CENTER GAP (para el NotchBar) */}
-        <Col flex={`${notchW}px`} style={{ height: "100%", pointerEvents: "none" }} aria-hidden />
+        <Col
+          flex={`${notchW}px`}
+          style={{ height: "100%", pointerEvents: "none" }}
+          aria-hidden
+        />
 
         {/* RIGHT */}
         <Col flex="1 1 0" style={{ minWidth: 0, textAlign: "right" }}>
@@ -161,14 +248,7 @@ const Navbar = ({
                 shape="round"
                 icon={<SearchOutlined />}
                 onClick={onGoSearch}
-                style={{
-                  fontWeight: 900,
-                  background: isLight ? beachColors.oceanBlue : beachColors.coral,
-                  borderColor: isLight ? beachColors.oceanBlue : beachColors.coral,
-                  boxShadow: isLight
-                    ? "0 16px 34px rgba(14,165,233,.22)"
-                    : "0 16px 34px rgba(251,113,133,.22)",
-                }}
+                style={primaryBtnStyle}
               >
                 {screens.md ? "Reservar" : null}
               </Button>
@@ -179,12 +259,7 @@ const Navbar = ({
                 shape="round"
                 icon={<UserOutlined />}
                 onClick={onGoAccount}
-                style={{
-                  fontWeight: 900,
-                  background: isLight ? "rgba(243,246,251,.85)" : "rgba(255,255,255,.12)",
-                  borderColor: isLight ? token.colorBorderSecondary : "rgba(255,255,255,.25)",
-                  color: isLight ? "rgba(15,23,42,.76)" : "rgba(255,255,255,.92)",
-                }}
+                style={secondaryBtnStyle}
               >
                 {screens.md ? "Mis reservas" : null}
               </Button>

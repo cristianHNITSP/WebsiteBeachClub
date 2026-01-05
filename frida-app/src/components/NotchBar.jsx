@@ -1,6 +1,6 @@
 // src/components/NotchBar.jsx
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Button, Flex, Space, Tooltip, Grid } from "antd";
+import { Button, Flex, Space, Tooltip, Grid, theme } from "antd";
 import {
   SearchOutlined,
   HomeOutlined,
@@ -18,20 +18,24 @@ const items = [
 ];
 
 const TOKENS = {
-  hostH: 68,
+  // Si tu Navbar mide ~58, esto hace que “encaje” mejor visualmente
+  hostH: 60,
 
-  // “notch” (zona accesible cuando está cerrado)
-  notchW: 148,
-  notchWMobile: 128,
-  zoneH: 28,
+  // notch accesible cuando está cerrado (sube un poco y se siente “ranura”)
+  notchW: 176,
+  notchWMobile: 148,
+  zoneH: 44,
 
   // bar real
   barH: 58,
-  barHMobile: 54,
-  revealY: 10,
-  maxW: 620,
+  barHMobile: 56,
+
+  // cuánto baja cuando se revela (más “natural” que 10)
+  revealY: 8,
+
+  maxW: 640,
   sidePad: 24,
-  sidePadMobile: 16,
+  sidePadMobile: 14,
   barPadX: 10,
 
   pillR: 999,
@@ -46,9 +50,10 @@ const TOKENS = {
 };
 
 const NotchBar = ({ view, setView }) => {
+  const { token } = theme.useToken();
   const screens = Grid.useBreakpoint();
-  const isMobile = !screens.md; // md+ = desktop
-  const showLabel = !isMobile; // mobile: solo iconos
+  const isMobile = !screens.md;
+  const showLabel = !isMobile;
 
   const [open, setOpen] = useState(false);
   const [hoverKey, setHoverKey] = useState(null);
@@ -58,43 +63,66 @@ const NotchBar = ({ view, setView }) => {
   const barRef = useRef(null);
 
   const C = useMemo(() => {
-    const bg = neutrals?.bg;
     const ocean = beachColors?.oceanBlue;
     const turq = beachColors?.turquoise;
     const deep = beachColors?.deepBlue;
     const coral = beachColors?.coral;
 
+    const isDarkish = true; // tu UI usa mucho gradient arriba, esto queda bien
+
     return {
-      bg,
       ocean,
       turq,
       deep,
       coral,
 
-      handleBg: "rgba(255, 255, 255, .78)",
-      handleBorder: "rgba(148, 163, 184, .45)",
-      handleShadow: "0 10px 26px rgba(15, 23, 42, .10)",
+      // “Dock/ranura” del notch (lo que lo hace verse integrado)
+      slotBg: isDarkish
+        ? "linear-gradient(180deg, rgba(255,255,255,.14) 0%, rgba(255,255,255,.06) 100%)"
+        : token.colorBgContainer,
+      slotBorder: isDarkish ? "rgba(255,255,255,.20)" : token.colorBorderSecondary,
+      slotInset: isDarkish
+        ? "inset 0 1px 0 rgba(255,255,255,.22), inset 0 -10px 20px rgba(0,0,0,.08)"
+        : "inset 0 1px 0 rgba(255,255,255,.65)",
 
-      barBg:
-        "linear-gradient(180deg, rgba(255,255,255,.86) 0%, rgba(255,255,255,.74) 100%)",
-      barBorder: "rgba(148, 163, 184, .52)",
-      barShadow: "0 22px 50px rgba(15, 23, 42, .14)",
+      handleBg: isDarkish
+        ? "linear-gradient(180deg, rgba(255,255,255,.20) 0%, rgba(255,255,255,.10) 100%)"
+        : "rgba(255,255,255,.90)",
+      handleBorder: isDarkish ? "rgba(255,255,255,.24)" : token.colorBorderSecondary,
+      handleShadow: isDarkish
+        ? "0 16px 38px rgba(15, 23, 42, .22)"
+        : "0 14px 34px rgba(15,23,42,.12)",
 
-      pillText: "rgba(15, 23, 42, .72)",
-      pillBorder: "rgba(226, 232, 240, .95)",
-      pillBg: "rgba(255, 255, 255, .72)",
+      barBg: isDarkish
+        ? "linear-gradient(180deg, rgba(255,255,255,.22) 0%, rgba(255,255,255,.12) 100%)"
+        : "linear-gradient(180deg, rgba(255,255,255,.96) 0%, rgba(255,255,255,.86) 100%)",
+      barBorder: isDarkish ? "rgba(255,255,255,.22)" : token.colorBorderSecondary,
+      barShadow: isDarkish
+        ? "0 26px 70px rgba(15, 23, 42, .26)"
+        : "0 22px 55px rgba(15, 23, 42, .14)",
+      barInset:
+        "inset 0 1px 0 rgba(255,255,255,.24), inset 0 -18px 30px rgba(0,0,0,.06)",
 
-      pillHoverBorder: "rgba(14, 165, 233, .55)",
-      pillHoverBg: "rgba(255, 255, 255, .92)",
-      pillHoverShadow: "0 16px 30px rgba(15, 23, 42, .10)",
+      pillText: isDarkish ? "rgba(255,255,255,.88)" : "rgba(15, 23, 42, .72)",
+      pillBorder: isDarkish ? "rgba(255,255,255,.18)" : "rgba(226, 232, 240, .95)",
+      pillBg: isDarkish ? "rgba(255,255,255,.10)" : "rgba(255, 255, 255, .72)",
 
-      pillActiveBg:
-        "linear-gradient(135deg, rgba(14,165,233,.18) 0%, rgba(45,212,191,.14) 60%, rgba(255,255,255,.55) 100%)",
-      pillActiveBorder: "rgba(14, 165, 233, .62)",
-      pillActiveShadow: "0 18px 38px rgba(14, 165, 233, .14)",
-      pillActiveText: deep,
+      pillHoverBorder: isDarkish ? "rgba(45,212,191,.40)" : "rgba(14, 165, 233, .55)",
+      pillHoverBg: isDarkish ? "rgba(255,255,255,.16)" : "rgba(255, 255, 255, .92)",
+      pillHoverShadow: isDarkish
+        ? "0 18px 40px rgba(15, 23, 42, .18)"
+        : "0 16px 30px rgba(15, 23, 42, .10)",
+
+      pillActiveBg: isDarkish
+        ? "linear-gradient(135deg, rgba(45,212,191,.18) 0%, rgba(14,165,233,.18) 55%, rgba(255,255,255,.12) 100%)"
+        : "linear-gradient(135deg, rgba(14,165,233,.18) 0%, rgba(45,212,191,.14) 60%, rgba(255,255,255,.55) 100%)",
+      pillActiveBorder: isDarkish ? "rgba(45,212,191,.48)" : "rgba(14, 165, 233, .62)",
+      pillActiveShadow: isDarkish
+        ? "0 20px 46px rgba(45,212,191,.16)"
+        : "0 18px 38px rgba(14, 165, 233, .14)",
+      pillActiveText: isDarkish ? "rgba(255,255,255,.96)" : deep,
     };
-  }, []);
+  }, [token]);
 
   const S = useMemo(() => {
     const ease = "cubic-bezier(.2,.8,.2,1)";
@@ -113,25 +141,36 @@ const NotchBar = ({ view, setView }) => {
         pointerEvents: "none",
       },
 
-      // Esta es LA ÚNICA zona accesible cuando está cerrado
       notchZone: {
         pointerEvents: "auto",
         position: "absolute",
         left: "50%",
         transform: "translateX(-50%)",
-        top: 0,
+        top: 6,
         width: notchW,
         height: TOKENS.zoneH,
         cursor: "pointer",
         display: "flex",
-        alignItems: "flex-start",
+        alignItems: "center",
         justifyContent: "center",
       },
 
+      // ranura visual para que parezca “parte del navbar”
+      slot: {
+        position: "absolute",
+        inset: 0,
+        borderRadius: TOKENS.pillR,
+        background: C.slotBg,
+        border: `1px solid ${C.slotBorder}`,
+        boxShadow: C.slotInset,
+        backdropFilter: "blur(10px)",
+        WebkitBackdropFilter: "blur(10px)",
+      },
+
       handle: (isOpen) => ({
-        marginTop: 0,
-        width: "100%",
-        height: 22,
+        position: "relative",
+        width: "calc(100% - 8px)",
+        height: isMobile ? 34 : 36,
         borderRadius: TOKENS.pillR,
         background: C.handleBg,
         border: `1px solid ${C.handleBorder}`,
@@ -139,21 +178,33 @@ const NotchBar = ({ view, setView }) => {
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        opacity: isOpen ? 0.2 : 1,
-        transition: `opacity .18s ${ease}`,
-        backdropFilter: "blur(10px)",
-        WebkitBackdropFilter: "blur(10px)",
+        opacity: isOpen ? 0.35 : 1,
+        transform: isOpen ? "scale(.98)" : "scale(1)",
+        transition: `opacity .18s ${ease}, transform .18s ${ease}`,
+        backdropFilter: "blur(12px)",
+        WebkitBackdropFilter: "blur(12px)",
       }),
+
+      // highlight superior (quita “plano” instant)
+      handleHighlight: {
+        position: "absolute",
+        left: 10,
+        right: 10,
+        top: 6,
+        height: 1,
+        borderRadius: 999,
+        background: "rgba(255,255,255,.30)",
+        pointerEvents: "none",
+      },
 
       handleLine: {
         width: TOKENS.handleLineW,
         height: TOKENS.handleLineH,
         borderRadius: TOKENS.pillR,
         background: `linear-gradient(90deg, ${C.coral}, ${C.ocean})`,
-        boxShadow: "0 10px 18px rgba(14,165,233,.18)",
+        boxShadow: "0 12px 22px rgba(14,165,233,.22)",
       },
 
-      // IMPORTANTE: cuando NO está abierto => pointerEvents NONE (no “toma” clicks fuera)
       barShell: (isOpen) => ({
         pointerEvents: isOpen ? "auto" : "none",
         position: "absolute",
@@ -173,13 +224,11 @@ const NotchBar = ({ view, setView }) => {
         borderRadius: TOKENS.pillR,
         background: C.barBg,
         border: `1px solid ${C.barBorder}`,
-        boxShadow: C.barShadow,
-        backdropFilter: "blur(14px)",
-        WebkitBackdropFilter: "blur(14px)",
-        transform: isOpen
-          ? `translateY(${TOKENS.revealY}px)`
-          : `translateY(-${barH}px)`,
-        transition: `transform .18s ${ease}`,
+        boxShadow: `${C.barShadow}, ${C.barInset}`,
+        backdropFilter: "blur(16px)",
+        WebkitBackdropFilter: "blur(16px)",
+        transform: isOpen ? `translateY(${TOKENS.revealY}px)` : `translateY(-${barH + 10}px)`,
+        transition: `transform .20s ${ease}`,
         willChange: "transform",
         display: "flex",
         alignItems: "center",
@@ -192,18 +241,18 @@ const NotchBar = ({ view, setView }) => {
         borderRadius: TOKENS.pillR,
         pointerEvents: "none",
         background:
-          "radial-gradient(circle at 18% 30%, rgba(14,165,233,.12), rgba(255,255,255,0) 55%)",
+          "radial-gradient(circle at 18% 30%, rgba(45,212,191,.14), rgba(255,255,255,0) 52%), radial-gradient(circle at 82% 40%, rgba(14,165,233,.12), rgba(255,255,255,0) 55%)",
       },
 
       barTopLine: {
         position: "absolute",
-        left: 14,
-        right: 14,
-        top: 7,
+        left: 16,
+        right: 16,
+        top: 8,
         height: 1,
         borderRadius: TOKENS.pillR,
         pointerEvents: "none",
-        background: "rgba(255,255,255,.55)",
+        background: "rgba(255,255,255,.22)",
       },
 
       box: { width: "100%" },
@@ -215,11 +264,14 @@ const NotchBar = ({ view, setView }) => {
         border: `1px solid ${C.pillBorder}`,
         background: C.pillBg,
         color: C.pillText,
-        fontWeight: 800,
+        fontWeight: 900,
+        letterSpacing: 0.1,
         transition:
           "transform .12s ease, box-shadow .12s ease, border-color .12s ease, background .12s ease, color .12s ease",
         display: "inline-flex",
         alignItems: "center",
+        backdropFilter: "blur(10px)",
+        WebkitBackdropFilter: "blur(10px)",
       },
 
       pillHover: {
@@ -229,10 +281,11 @@ const NotchBar = ({ view, setView }) => {
         background: C.pillHoverBg,
       },
 
+      // AQUÍ ESTABA LO “PLANO”: ahora sí aplica fondo activo
       pillActive: {
+        background: C.pillActiveBg,
         borderColor: C.pillActiveBorder,
         boxShadow: C.pillActiveShadow,
-        background: C.pillActiveBg,
         color: C.pillActiveText,
       },
 
@@ -243,7 +296,6 @@ const NotchBar = ({ view, setView }) => {
       label: {
         lineHeight: 1,
         fontSize: 13,
-        letterSpacing: 0.1,
       },
 
       iconWrap: {
@@ -254,7 +306,6 @@ const NotchBar = ({ view, setView }) => {
     };
   }, [C, isMobile]);
 
-  // Mobile: cerrar al tocar fuera
   useEffect(() => {
     if (!open || !isMobile) return;
 
@@ -266,7 +317,8 @@ const NotchBar = ({ view, setView }) => {
     };
 
     window.addEventListener("pointerdown", onDown, { capture: true });
-    return () => window.removeEventListener("pointerdown", onDown, { capture: true });
+    return () =>
+      window.removeEventListener("pointerdown", onDown, { capture: true });
   }, [open, isMobile]);
 
   const openDesktop = () => {
@@ -288,7 +340,6 @@ const NotchBar = ({ view, setView }) => {
 
   return (
     <div style={S.host} aria-label="Top reveal navigation">
-      {/*SOLO notch clickable cuando está cerrado */}
       <div
         ref={handleRef}
         style={S.notchZone}
@@ -298,12 +349,13 @@ const NotchBar = ({ view, setView }) => {
         tabIndex={0}
         aria-expanded={open}
       >
+        <div style={S.slot} aria-hidden />
         <div style={S.handle(open)}>
+          <div style={S.handleHighlight} aria-hidden />
           <div style={S.handleLine} />
         </div>
       </div>
 
-      {/*Bar solo “existe” para eventos cuando open = true */}
       <div
         ref={barRef}
         style={S.barShell(open)}

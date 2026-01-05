@@ -1,10 +1,8 @@
-import { Button, Flex, Typography, Tooltip } from "antd";
+// src/components/Footer.jsx
+import { Button, Flex, Typography, Tooltip, Grid, theme, Tag } from "antd";
 import {
   HeartFilled,
-  FileTextOutlined,
   LockOutlined,
-  PhoneOutlined,
-  InfoCircleOutlined,
   SafetyCertificateOutlined,
   ThunderboltOutlined,
   CompassOutlined,
@@ -12,22 +10,18 @@ import {
   ArrowUpOutlined,
   FacebookOutlined,
   BookOutlined,
-  GlobalOutlined,
 } from "@ant-design/icons";
 
 const { Text } = Typography;
 import { beachColors } from "../theme/beachTheme";
 
-// URL interna (respeta Vite base y tu basename)
 const BASE_URL = (import.meta?.env?.BASE_URL || "/").replace(/\/$/, "");
 const PANEL_LOGIN_HREF = `${BASE_URL}/panel.web/login.panel.web`;
 
-//  WhatsApp desde env (acepta +, espacios, etc. y lo convierte a solo dígitos)
 const RAW_WA = String(import.meta.env?.VITE_WHATSAPP_NUMBER || "").trim();
-const WA_NUMBER = RAW_WA.replace(/[^\d]/g, ""); // "+57 316..." -> "57316..."
+const WA_NUMBER = RAW_WA.replace(/[^\d]/g, "");
 
 const footerLinks = [
-  // Casa Frida
   {
     nombre: "Casa Frida (Facebook)",
     path: "https://www.facebook.com/casafridachelem/",
@@ -40,7 +34,6 @@ const footerLinks = [
     icon: <BookOutlined />,
     external: true,
   },
-
   {
     nombre: "Cabañas Frida (Facebook)",
     path: "https://www.facebook.com/cabanasfridachelem/",
@@ -53,41 +46,52 @@ const footerLinks = [
     icon: <BookOutlined />,
     external: true,
   },
-
-  // Panel interno
   {
     nombre: "Acceso a staff",
     path: PANEL_LOGIN_HREF,
     icon: <LockOutlined />,
     external: false,
   },
-
-  // (si luego reactivas legales)
-  // { nombre: "Términos", path: "#", icon: <FileTextOutlined />, external: false },
-  // { nombre: "Privacidad", path: "#", icon: <LockOutlined />, external: false },
-  // { nombre: "Contacto", path: "#", icon: <PhoneOutlined />, external: false },
-  // { nombre: "Nosotros", path: "#", icon: <InfoCircleOutlined />, external: false },
 ];
 
 const Footer = () => {
   const waDisabled = !WA_NUMBER;
+  const screens = Grid.useBreakpoint();
+  const { token } = theme.useToken();
+
+  const padY = screens.md ? 30 : 24;
 
   return (
     <footer
       style={{
-        padding: "28px 14px 22px",
+        padding: `${padY}px 14px 22px`,
         background: `linear-gradient(135deg, ${beachColors.deepBlue}, ${beachColors.oceanBlue})`,
         color: "white",
         position: "relative",
         overflow: "hidden",
+        borderTop: "1px solid rgba(255,255,255,0.10)",
       }}
     >
+      {/* capas de luz para quitar lo plano */}
       <div
         style={{
           position: "absolute",
           inset: 0,
           background:
-            "radial-gradient(900px 220px at 20% 0%, rgba(255,255,255,0.18), transparent 60%), radial-gradient(700px 240px at 85% 10%, rgba(45,212,191,0.14), transparent 55%)",
+            "radial-gradient(1000px 260px at 18% 0%, rgba(255,255,255,0.20), transparent 62%), radial-gradient(780px 300px at 86% 10%, rgba(45,212,191,0.14), transparent 58%), radial-gradient(700px 280px at 88% 65%, rgba(251,113,133,0.10), transparent 60%)",
+          pointerEvents: "none",
+        }}
+      />
+
+      {/* highlight superior finito */}
+      <div
+        style={{
+          position: "absolute",
+          left: 0,
+          right: 0,
+          top: 0,
+          height: 1,
+          background: "rgba(255,255,255,.14)",
           pointerEvents: "none",
         }}
       />
@@ -107,60 +111,78 @@ const Footer = () => {
           wrap
           gap={16}
           style={{
-            padding: "14px 16px",
-            borderRadius: 18,
-            background: "rgba(255,255,255,0.08)",
-            border: "1px solid rgba(255,255,255,0.16)",
-            backdropFilter: "blur(10px)",
-            boxShadow: "0 18px 40px rgba(0,0,0,0.18)",
+            padding: screens.md ? "18px 18px" : "16px 14px",
+            borderRadius: 20,
+            background: "rgba(255,255,255,0.09)",
+            border: "1px solid rgba(255,255,255,0.18)",
+            boxShadow:
+              "0 22px 56px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.14)",
+            backdropFilter: "blur(12px)",
+            WebkitBackdropFilter: "blur(12px)",
           }}
         >
           {/* Marca */}
-          <Flex vertical gap={8} style={{ minWidth: 260, flex: "1 1 320px" }}>
+          <Flex vertical gap={10} style={{ minWidth: 260, flex: "1 1 330px" }}>
             <Flex align="center" gap={10}>
               <div
                 style={{
-                  width: 34,
-                  height: 34,
-                  borderRadius: 12,
-                  background: "rgba(255,255,255,0.12)",
-                  border: "1px solid rgba(255,255,255,0.18)",
+                  width: 36,
+                  height: 36,
+                  borderRadius: 14,
+                  background: `linear-gradient(135deg, rgba(45,212,191,0.22), rgba(14,165,233,0.20))`,
+                  border: "1px solid rgba(255,255,255,0.20)",
                   display: "grid",
                   placeItems: "center",
-                  boxShadow: "0 10px 20px rgba(0,0,0,0.18)",
+                  boxShadow: "0 12px 24px rgba(0,0,0,0.18)",
                 }}
                 aria-hidden
               >
-                <span style={{ fontWeight: 800, fontSize: 14 }}>HF</span>
+                <span style={{ fontWeight: 950, fontSize: 13, letterSpacing: 0.4 }}>
+                  HF
+                </span>
               </div>
 
               <div style={{ lineHeight: 1.1 }}>
-                <Text style={{ color: "#fff", fontWeight: 800, fontSize: 14 }}>
+                <Text style={{ color: "#fff", fontWeight: 900, fontSize: 14 }}>
                   Hoteles Frida
                 </Text>
                 <div>
-                  <Text
-                    style={{ color: "rgba(255,255,255,0.78)", fontSize: 11 }}
-                  >
+                  <Text style={{ color: "rgba(255,255,255,0.78)", fontSize: 11 }}>
                     Reservas directas · Atención personalizada
                   </Text>
                 </div>
               </div>
+
+              <Tag
+                style={{
+                  marginLeft: 8,
+                  borderRadius: 999,
+                  fontWeight: 900,
+                  paddingInline: 10,
+                  height: 26,
+                  display: screens.md ? "inline-flex" : "none",
+                  alignItems: "center",
+                  color: "rgba(255,255,255,0.92)",
+                  background: "rgba(255,255,255,0.10)",
+                  border: "1px solid rgba(255,255,255,0.18)",
+                }}
+              >
+                Costa Yucatán
+              </Tag>
             </Flex>
 
-            <Text style={{ color: "rgba(255,255,255,0.80)", fontSize: 12 }}>
-              Encuentra tu estancia ideal en la costa. Precios claros, trato
-              cercano y confirmación rápida.
+            <Text style={{ color: "rgba(255,255,255,0.82)", fontSize: 12, lineHeight: 1.45 }}>
+              Encuentra tu estancia ideal en la costa. Precios claros, trato cercano y confirmación rápida.
             </Text>
 
             <Flex wrap gap={8}>
               <span
                 style={{
-                  padding: "4px 10px",
+                  padding: "5px 10px",
                   borderRadius: 999,
                   fontSize: 11,
                   background: "rgba(45,212,191,0.18)",
-                  border: "1px solid rgba(45,212,191,0.30)",
+                  border: "1px solid rgba(45,212,191,0.32)",
                   color: "#ecfeff",
                   display: "inline-flex",
                   alignItems: "center",
@@ -173,7 +195,7 @@ const Footer = () => {
 
               <span
                 style={{
-                  padding: "4px 10px",
+                  padding: "5px 10px",
                   borderRadius: 999,
                   fontSize: 11,
                   background: "rgba(255,255,255,0.10)",
@@ -190,11 +212,11 @@ const Footer = () => {
 
               <span
                 style={{
-                  padding: "4px 10px",
+                  padding: "5px 10px",
                   borderRadius: 999,
                   fontSize: 11,
-                  background: "rgba(251,146,60,0.16)",
-                  border: "1px solid rgba(251,146,60,0.28)",
+                  background: "rgba(245,158,11,0.16)",
+                  border: "1px solid rgba(245,158,11,0.28)",
                   color: "#fff7ed",
                   display: "inline-flex",
                   alignItems: "center",
@@ -208,56 +230,71 @@ const Footer = () => {
           </Flex>
 
           {/* Links */}
-          <Flex vertical gap={8} style={{ minWidth: 220, flex: "0 1 320px" }}>
-            <Text style={{ color: "#fff", fontWeight: 700, fontSize: 12 }}>
+          <Flex vertical gap={10} style={{ minWidth: 220, flex: "0 1 320px" }}>
+            <Text style={{ color: "#fff", fontWeight: 900, fontSize: 12 }}>
               Enlaces
             </Text>
 
             <Flex vertical gap={6}>
               {footerLinks.map((link, i) => (
-                <a
+                <Button
                   key={i}
+                  type="text"
                   href={link.path}
                   target={link.external ? "_blank" : undefined}
                   rel={link.external ? "noopener noreferrer" : undefined}
                   style={{
-                    color: "rgba(255,255,255,0.80)",
-                    fontSize: 12,
-                    textDecoration: "none",
-                    padding: "6px 10px",
-                    borderRadius: 10,
+                    justifyContent: "flex-start",
+                    paddingInline: 10,
+                    height: 36,
+                    borderRadius: 12,
+                    color: "rgba(255,255,255,0.82)",
+                    background: "transparent",
                     border: "1px solid transparent",
                     transition: "all 160ms ease",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 8,
                   }}
+                  icon={
+                    <span
+                      style={{
+                        width: 26,
+                        height: 26,
+                        borderRadius: 10,
+                        display: "grid",
+                        placeItems: "center",
+                        background: "rgba(255,255,255,0.10)",
+                        border: "1px solid rgba(255,255,255,0.16)",
+                        boxShadow: "inset 0 1px 0 rgba(255,255,255,0.12)",
+                      }}
+                    >
+                      {link.icon}
+                    </span>
+                  }
                   onMouseEnter={(e) => {
-                    e.currentTarget.style.color = "#ffffff";
-                    e.currentTarget.style.background = "rgba(255,255,255,0.10)";
-                    e.currentTarget.style.borderColor =
-                      "rgba(255,255,255,0.18)";
+                    const el = e.currentTarget;
+                    el.style.background = "rgba(255,255,255,0.10)";
+                    el.style.borderColor = "rgba(255,255,255,0.18)";
+                    el.style.color = "#fff";
                   }}
                   onMouseLeave={(e) => {
-                    e.currentTarget.style.color = "rgba(255,255,255,0.80)";
-                    e.currentTarget.style.background = "transparent";
-                    e.currentTarget.style.borderColor = "transparent";
+                    const el = e.currentTarget;
+                    el.style.background = "transparent";
+                    el.style.borderColor = "transparent";
+                    el.style.color = "rgba(255,255,255,0.82)";
                   }}
                 >
-                  <span style={{ display: "inline-flex" }}>{link.icon}</span>
                   {link.nombre}
-                </a>
+                </Button>
               ))}
             </Flex>
           </Flex>
 
           {/* CTA */}
           <Flex vertical gap={10} style={{ minWidth: 220, flex: "0 1 260px" }}>
-            <Text style={{ color: "#fff", fontWeight: 700, fontSize: 12 }}>
+            <Text style={{ color: "#fff", fontWeight: 900, fontSize: 12 }}>
               ¿Necesitas ayuda?
             </Text>
 
-            <Text style={{ color: "rgba(255,255,255,0.78)", fontSize: 12 }}>
+            <Text style={{ color: "rgba(255,255,255,0.78)", fontSize: 12, lineHeight: 1.45 }}>
               Escríbenos y te asesoramos con disponibilidad y recomendaciones.
             </Text>
 
@@ -276,21 +313,19 @@ const Footer = () => {
                   disabled={waDisabled}
                   style={{
                     borderRadius: 999,
-                    height: 34,
+                    height: 36,
                     paddingInline: 14,
-                    fontWeight: 900,
+                    fontWeight: 950,
                     background: `linear-gradient(90deg, ${beachColors.turquoise}, ${beachColors.teal})`,
                     border: "none",
-                    boxShadow: "0 10px 22px rgba(45,212,191,0.28)",
+                    boxShadow: "0 12px 26px rgba(45,212,191,0.28)",
                     opacity: waDisabled ? 0.6 : 1,
                   }}
                   onClick={() => {
                     const texto =
                       "Hola, quiero ayuda para reservar en Hoteles Frida.";
                     window.open(
-                      `https://wa.me/${WA_NUMBER}?text=${encodeURIComponent(
-                        texto
-                      )}`,
+                      `https://wa.me/${WA_NUMBER}?text=${encodeURIComponent(texto)}`,
                       "_blank",
                       "noopener,noreferrer"
                     );
@@ -302,15 +337,18 @@ const Footer = () => {
 
               <Button
                 size="small"
-                ghost
                 icon={<ArrowUpOutlined />}
                 style={{
                   borderRadius: 999,
-                  height: 34,
+                  height: 36,
                   paddingInline: 14,
-                  fontWeight: 900,
+                  fontWeight: 950,
                   color: "#fff",
-                  borderColor: "rgba(255,255,255,0.35)",
+                  background: "rgba(255,255,255,0.10)",
+                  borderColor: "rgba(255,255,255,0.22)",
+                  boxShadow: "inset 0 1px 0 rgba(255,255,255,0.14)",
+                  backdropFilter: "blur(10px)",
+                  WebkitBackdropFilter: "blur(10px)",
                 }}
                 onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
               >
@@ -335,12 +373,11 @@ const Footer = () => {
           gap={10}
           style={{ paddingInline: 6 }}
         >
-          <Text style={{ color: "rgba(255,255,255,0.80)", fontSize: 12 }}>
-            © {new Date().getFullYear()} Hoteles Frida. Todos los derechos
-            reservados.
+          <Text style={{ color: "rgba(255,255,255,0.82)", fontSize: 12 }}>
+            © {new Date().getFullYear()} Hoteles Frida. Todos los derechos reservados.
           </Text>
 
-          <Text style={{ color: "rgba(255,255,255,0.70)", fontSize: 11 }}>
+          <Text style={{ color: "rgba(255,255,255,0.72)", fontSize: 11 }}>
             Hecho con <HeartFilled style={{ fontSize: 12 }} /> en Yucatán
           </Text>
         </Flex>

@@ -24,11 +24,9 @@ import {
 import {
   SearchOutlined,
   DownOutlined,
-  StarFilled,
   UserOutlined,
   CalendarOutlined,
   EnvironmentOutlined,
-  RightOutlined,
   FilterOutlined,
   ArrowRightOutlined,
   HeartOutlined,
@@ -41,6 +39,8 @@ const { Title, Text } = Typography;
 import Footer from "./components/Footer";
 import NotchBar from "./components/NotchBar";
 import Navbar from "./components/Navbar";
+
+import HomePage from "./pages/HomePage";
 
 /** Paleta solicitada (se queda igual) */
 import { beachColors, neutrals } from "./theme/beachTheme";
@@ -164,215 +164,6 @@ function StatusPill({ text, colorKey }) {
       style={{ background: map[colorKey] || colorKey }}
     >
       {text}
-    </div>
-  );
-}
-
-/** HOME */
-function HomeHero({ form, onChange, onSearch }) {
-  return (
-    <div className="hf-hero">
-      <div className="hf-heroBg" />
-      <div className="hf-heroOverlay" />
-      <div className="hf-heroGlow" />
-      <div className="hf-heroContent">
-        <Title level={2} className="hf-heroTitle">
-          Reserva tu estancia
-          <br />
-          en Hoteles Frida
-        </Title>
-        <div className="hf-heroSub">
-          Chelem y Chuburná · A unos clics de tu próxima escapada
-        </div>
-      </div>
-
-      <div className="hf-heroSearchWrap">
-        <div className="hf-heroSearchCard">
-          <div className="hf-searchRow">
-            <div className="hf-searchItem">
-              <Select
-                value={form.branch}
-                onChange={(v) => onChange({ branch: v })}
-                placeholder="Sucursal"
-                size="large"
-                suffixIcon={<DownOutlined />}
-                className="hf-select"
-                options={SUCURSALES.map((s) => ({
-                  label: `${s.name} · ${s.subtitle}`,
-                  value: s.key,
-                }))}
-              />
-            </div>
-
-            <div className="hf-searchItem">
-              <DatePicker.RangePicker
-                value={form.range}
-                onChange={(v) => onChange({ range: v })}
-                size="large"
-                className="hf-range"
-                placeholder={["Check-in", "Check-out"]}
-                suffixIcon={<CalendarOutlined />}
-              />
-            </div>
-
-            <Button
-              className="hf-searchGo"
-              type="primary"
-              size="large"
-              icon={<SearchOutlined />}
-              onClick={onSearch}
-            >
-              Buscar
-            </Button>
-          </div>
-
-          <div className="hf-searchHint">
-            <Text className="hf-searchHintText">
-              Tip: selecciona una sucursal y fechas para ver disponibilidad ✨
-            </Text>
-          </div>
-        </div>
-      </div>
-
-      <SoftWaveTop />
-    </div>
-  );
-}
-
-function DestinationCard({ d, onClick }) {
-  return (
-    <button
-      className="hf-destCard"
-      style={{ backgroundImage: `url('${d.img}')` }}
-      onClick={onClick}
-      type="button"
-    >
-      <div className="hf-destShade" />
-      <div className="hf-destBottom">
-        <div>
-          <div className="hf-destName">{d.name}</div>
-          <div className="hf-destSub">{d.subtitle}</div>
-        </div>
-        <div className="hf-destArrow">
-          <RightOutlined />
-        </div>
-      </div>
-    </button>
-  );
-}
-
-function FeaturedCard({ item, onReserve, isFav, onToggleFav }) {
-  const badgeBg =
-    item.badge.color === "coral"
-      ? beachColors.coral
-      : item.badge.color === "teal"
-      ? beachColors.teal
-      : beachColors.sunset;
-
-  return (
-    <div className="hf-featCard">
-      <div className="hf-featInner">
-        <div
-          className="hf-featThumb"
-          style={{ backgroundImage: `url('${item.img}')` }}
-        />
-        <div className="hf-featInfo">
-          <div className="hf-featTopLine">
-            <div className="hf-featTitle">{item.title}</div>
-            <div className="hf-featBadge" style={{ background: badgeBg }}>
-              {item.badge.text}
-            </div>
-          </div>
-          <div className="hf-featSub">
-            <span className="hf-featPlace">{item.place}</span>
-            <span className="hf-dot">•</span>
-            <span className="hf-featRating">
-              <StarFilled style={{ color: beachColors.sunset }} />
-              <span className="hf-featRatingNum">{item.rating}</span>
-            </span>
-            <span className="hf-featPrice">${item.price}/noche</span>
-          </div>
-        </div>
-      </div>
-
-      <div className="hf-featActions">
-        <Tooltip title={isFav ? "Quitar de favoritos" : "Guardar en favoritos"}>
-          <Button
-            className="hf-featGhost"
-            icon={isFav ? <HeartFilled /> : <HeartOutlined />}
-            onClick={() => onToggleFav(item.key)}
-          />
-        </Tooltip>
-
-        <Button
-          className="hf-featBtn"
-          type="primary"
-          onClick={() => onReserve(item)}
-        >
-          Ver y reservar
-        </Button>
-      </div>
-    </div>
-  );
-}
-
-function HomePage({
-  form,
-  setFormPatch,
-  onSearch,
-  onReserveFeatured,
-  onPickSucursal,
-  favorites,
-  onToggleFav,
-}) {
-  return (
-    <div className="hf-pageBody hf-viewEnter">
-      <HomeHero form={form} onChange={setFormPatch} onSearch={onSearch} />
-
-      <div className="hf-section hf-section--wide">
-        <Title level={4} className="hf-sectionTitle">
-          Sucursales
-        </Title>
-        <div className="hf-destsGrid">
-          {SUCURSALES.map((d) => (
-            <DestinationCard
-              key={d.key}
-              d={d}
-              onClick={() => onPickSucursal(d.key)}
-            />
-          ))}
-        </div>
-      </div>
-
-      <div className="hf-section hf-section--wide hf-section--tightTop">
-        <div className="hf-sectionRow">
-          <Title
-            level={4}
-            className="hf-sectionTitle"
-            style={{ marginBottom: 0 }}
-          >
-            Habitaciones destacadas
-          </Title>
-          <Segmented
-            className="hf-seg"
-            size="middle"
-            options={["Top", "Familia", "Mejor precio"]}
-            onChange={() => message.info("Filtro (demo UI)")}
-          />
-        </div>
-
-        <div className="hf-featureGrid">
-          {HABITACIONES_DESTACADAS.map((f) => (
-            <FeaturedCard
-              key={f.key}
-              item={f}
-              onReserve={onReserveFeatured}
-              isFav={favorites.has(f.key)}
-              onToggleFav={onToggleFav}
-            />
-          ))}
-        </div>
-      </div>
     </div>
   );
 }
