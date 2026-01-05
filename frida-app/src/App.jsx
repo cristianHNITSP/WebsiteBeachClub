@@ -1,1685 +1,1057 @@
-import { useMediaQuery } from "react-responsive";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { initSocket, disconnectSocket } from "@api/websockets";
-
+// src/App.jsx
+import { useMemo, useState } from "react";
+import "./app.css";
+import dayjs from "dayjs";
 import {
   ConfigProvider,
+  Layout,
   Button,
-  Card,
-  Flex,
-  Input,
-  Space,
-  Splitter,
   Typography,
-  Tree,
   Select,
-  message,
-  FloatButton,
   DatePicker,
-  Drawer,
-  Tag,
-  Empty,
-  Spin,
+  Input,
+  Slider,
+  Collapse,
+  Checkbox,
+  InputNumber,
+  Rate,
+  Tabs,
+  message,
   Tooltip,
-  AutoComplete, // 👈 NUEVO
+  Segmented,
+  Flex,
 } from "antd";
-
 import {
   SearchOutlined,
-  EnvironmentOutlined,
-  HomeOutlined,
-  GiftOutlined,
-  CompassOutlined,
-  FilterOutlined,
-  MenuOutlined,
-  CommentOutlined,
-  CustomerServiceOutlined,
-  ReloadOutlined,
+  DownOutlined,
+  StarFilled,
+  UserOutlined,
   CalendarOutlined,
-  CheckCircleOutlined,
-  FontSizeOutlined,
-  SafetyCertificateOutlined,
-  ThunderboltOutlined,
-  FileTextOutlined,
-  LockOutlined,
-  PhoneOutlined,
-  InfoCircleOutlined,
-  WhatsAppOutlined,
-  ArrowUpOutlined,
+  EnvironmentOutlined,
+  RightOutlined,
+  FilterOutlined,
+  ArrowRightOutlined,
+  HeartOutlined,
   HeartFilled,
 } from "@ant-design/icons";
 
-import dayjs from "dayjs";
-
-import RoomCards from "./components/website/RoomCards.jsx";
-import Recommendcards from "./components/website/RecommendCards.jsx";
-import BuscadorMovil from "./components/website/BuscadorMovil.jsx";
-// import ChatSoporte from "./components/website/ChatSoporte.jsx";
-import HeroCarousel from "./components/website/HeroCarousel.jsx";
-import { beachColors } from "./theme/beachTheme";
-
+const { Content } = Layout;
 const { Title, Text } = Typography;
-const { Option } = Select;
 
-const backgroundColor = "#f8fafc";
-const borderColor = "#e2e8f0";
+import Footer from "./components/Footer";
+import NotchBar from "./components/NotchBar";
+import Navbar from "./components/Navbar";
 
-/**base URL de Vite (en prod debería ser "/hotelesfrida.app/") */
-const BASE = import.meta.env.BASE_URL || "/";
-const withBase = (p) => `${BASE}${String(p || "").replace(/^\//, "")}`;
+/** Paleta solicitada (se queda igual) */
+import { beachColors, neutrals } from "./theme/beachTheme";
 
-let WS_URL = import.meta.env.VITE_RESERVAS_WS_URL;
+/** DATA (solo Hoteles Frida / sin tours / sin spa) */
+const SUCURSALES = [
+  {
+    key: "chelem",
+    name: "Cabañas Frida",
+    subtitle: "Carretera Chelem",
+    img: "https://images.unsplash.com/photo-1520250497591-112f2f40a3f4?auto=format&fit=crop&w=2200&q=70",
+  },
+  {
+    key: "chuburna",
+    name: "Casa Frida",
+    subtitle: "Carretera Chuburná",
+    img: "https://images.unsplash.com/photo-1505691938895-1758d7feb511?auto=format&fit=crop&w=2200&q=70",
+  },
+];
 
-// Si no está definida (vacío, null, undefined…)
-if (!WS_URL || WS_URL.trim() === "") {
-  if (location.hostname !== "localhost" && location.hostname !== "127.0.0.1") {
-    // Estamos en PRODUCCIÓN
-    WS_URL = `${location.origin}`;
-  } else {
-    // Estamos en DESARROLLO
-    WS_URL = "http://localhost:4002";
-  }
+const HABITACIONES_DESTACADAS = [
+  {
+    key: "hab-01",
+    title: "Suite Frente al Mar",
+    place: "Cabañas Frida · Chelem",
+    rating: 4.9,
+    price: 1850, // por noche
+    badge: { text: "Top", color: "coral" },
+    img: "https://images.unsplash.com/photo-1520250497591-112f2f40a3f4?auto=format&fit=crop&w=1600&q=70",
+    location: "chelem",
+    amenities: ["wifi", "ac", "parking"],
+  },
+  {
+    key: "hab-02",
+    title: "Habitación Familiar",
+    place: "Casa Frida · Chuburná",
+    rating: 4.7,
+    price: 1500,
+    badge: { text: "Popular", color: "teal" },
+    img: "https://images.unsplash.com/photo-1540518614846-7eded433c457?auto=format&fit=crop&w=1600&q=70",
+    location: "chuburna",
+    amenities: ["wifi", "kitchen", "ac"],
+  },
+  {
+    key: "hab-03",
+    title: "Estancia Minimal",
+    place: "Casa Frida · Chuburná",
+    rating: 4.6,
+    price: 1200,
+    badge: { text: "Mejor precio", color: "sunset" },
+    img: "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=1600&q=70",
+    location: "chuburna",
+    amenities: ["wifi", "parking"],
+  },
+];
+
+const SEARCH_ITEMS = [
+  {
+    key: "sr-01",
+    title: "Suite Frente al Mar",
+    desc: "Amplia, luminosa, ideal para descansar. Vista y brisa marina.",
+    rating: 5,
+    reviews: 214,
+    img: "https://images.unsplash.com/photo-1520250497591-112f2f40a3f4?auto=format&fit=crop&w=1800&q=70",
+    location: "chelem",
+    price: 1850,
+    amenities: ["wifi", "ac", "parking"],
+  },
+  {
+    key: "sr-02",
+    title: "Habitación Familiar",
+    desc: "Cómoda para 3–5 huéspedes. Perfecta para viajes en grupo.",
+    rating: 4.5,
+    reviews: 168,
+    img: "https://images.unsplash.com/photo-1540518614846-7eded433c457?auto=format&fit=crop&w=1800&q=70",
+    location: "chuburna",
+    price: 1500,
+    amenities: ["wifi", "kitchen", "ac"],
+  },
+  {
+    key: "sr-03",
+    title: "Estancia Minimal",
+    desc: "Simple, bonita y práctica. Excelente opción para escapadas cortas.",
+    rating: 4.5,
+    reviews: 141,
+    img: "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=1800&q=70",
+    location: "chuburna",
+    price: 1200,
+    amenities: ["wifi", "parking"],
+  },
+];
+
+function SoftWaveTop() {
+  return (
+    <svg
+      className="hf-heroWave"
+      viewBox="0 0 1440 180"
+      preserveAspectRatio="none"
+      aria-hidden="true"
+    >
+      <path
+        d="M0,95 C240,155 520,50 760,95 C1030,145 1220,130 1440,80 L1440,180 L0,180 Z"
+        fill="rgba(255,255,255,0.97)"
+      />
+    </svg>
+  );
 }
 
-/** ================= Filtros HARDCODEADOS ================= */
-const ROOM_TYPE_OPTIONS = [
-  "Cabaña",
-  "Doble",
-  "King",
-  "Loft",
-  "Suite",
-  "Suite Jardín",
-];
-
-const AMENITY_OPTIONS = [
-  "A/C",
-  "Balcón",
-  "Cocina",
-  "Cocina pequeña",
-  "Desayuno incluido",
-  "Dos Camas",
-  "Hamaca",
-  "Hamacas",
-  "TV",
-  "Terraza",
-  "Ventilador",
-  "Vista panorámica",
-  "WiFi",
-];
-
-const LOCATION_OPTIONS = ["Chelem", "Chuburná"];
-
-/** ================= helpers ================= */
-const toArrayCheckedKeys = (checkedKeys) => {
-  if (Array.isArray(checkedKeys)) return checkedKeys;
-  if (checkedKeys && Array.isArray(checkedKeys.checked))
-    return checkedKeys.checked;
-  return [];
-};
-
-const normalizeStr = (s) =>
-  String(s || "")
-    .trim()
-    .toLowerCase();
-
-const isYmd = (s) => /^\d{4}-\d{2}-\d{2}$/.test(String(s || ""));
-
-/**
- * Intenta inferir capacidad (número de huéspedes) de la habitación
- * Prioridad:
- *  - room.maxGuests (numérico, si existe)
- *  - room.size / room.capacity / room.capacityLabel con textos tipo "1 adulto", "2 adultos", "Familia"
- */
-const parseGuestCapacity = (room) => {
-  const rawMax = room?.maxGuests;
-  if (typeof rawMax === "number" && Number.isFinite(rawMax) && rawMax > 0) {
-    return rawMax;
-  }
-
-  const sizeRaw = room?.size || room?.capacity || room?.capacityLabel || "";
-
-  const s = normalizeStr(sizeRaw);
-  if (!s) return null;
-
-  // Cadenas tipo "Familia", "familiar", etc. => asumimos capacidad alta
-  if (s.includes("familia") || s.includes("familiar")) {
-    return 99; // “ilimitado” para efectos de filtro
-  }
-
-  // Buscar primer número en el texto ("1 adulto", "2 adultos", "3 pax", etc.)
-  const m = s.match(/(\d+)/);
-  if (!m) return null;
-  const n = Number(m[1]);
-  return Number.isFinite(n) && n > 0 ? n : null;
-};
-
-const roomMatchesFilters = (room, filters) => {
-  const q = normalizeStr(filters.q);
-  const roomTypes = Array.isArray(filters.roomTypes) ? filters.roomTypes : [];
-  const amenities = Array.isArray(filters.amenities) ? filters.amenities : [];
-  const locations = Array.isArray(filters.locations) ? filters.locations : [];
-  const guests = Number(filters.guests || "0") || 0;
-
-  // Texto libre (destino / ciudad / código / número / título)
-  if (q) {
-    const haystack = [
-      room?.codigo,
-      room?.title,
-      room?.roomType,
-      room?.location,
-      room?.hotelCode,
-      room?.roomNumber,
-    ]
-      .map((x) => normalizeStr(x))
-      .join(" | ");
-    if (!haystack.includes(q)) return false;
-  }
-
-  // Tipo de alojamiento
-  if (roomTypes.length) {
-    const rt = normalizeStr(room?.roomType);
-    const ok = roomTypes.some((t) => normalizeStr(t) === rt);
-    if (!ok) return false;
-  }
-
-  // Servicios (amenities)
-  if (amenities.length) {
-    const have = new Set((room?.amenities || []).map((a) => normalizeStr(a)));
-    const ok = amenities.every((a) => have.has(normalizeStr(a)));
-    if (!ok) return false;
-  }
-
-  // Ubicación
-  if (locations.length) {
-    const loc = normalizeStr(room?.location);
-    const ok = locations.some((x) => loc.includes(normalizeStr(x)));
-    if (!ok) return false;
-  }
-
-  // 🔹 Capacidad vs huéspedes solicitados
-  if (guests > 0) {
-    const cap = parseGuestCapacity(room);
-    if (cap !== null && cap < guests) {
-      return false;
-    }
-  }
-
-  // Fechas + solo disponibles
-  const hasDates = isYmd(filters.startDate) && isYmd(filters.endDate);
-  if (hasDates && filters.onlyAvailable === true) {
-    if (room?.available !== true) return false;
-  }
-
-  return true;
-};
-
-function App({ currentUser }) {
-  const [openBuscadorMovil, setOpenBuscadorMovil] = useState(false);
-  const [openFiltrosMovil, setOpenFiltrosMovil] = useState(false);
-  const [openChat, setOpenChat] = useState(false);
-
-  const isMobile = useMediaQuery({ maxWidth: 1024 });
-  const [messageApi, contextHolder] = message.useMessage();
-
-  /** ================= Accesibilidad: tamaño de fuente ================= */
-  const [fontScale, setFontScale] = useState(() => {
-    if (typeof window === "undefined") return "normal";
-    const stored = window.localStorage.getItem("frida_font_scale");
-    return stored === "large" ? "large" : "normal";
-  });
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    window.localStorage.setItem("frida_font_scale", fontScale);
-  }, [fontScale]);
-
-  const toggleFontScale = () => {
-    setFontScale((prev) => (prev === "normal" ? "large" : "normal"));
-    messageApi.open({
-      type: "info",
-      content:
-        fontScale === "normal"
-          ? "Tamaño de fuente aumentado"
-          : "Tamaño de fuente restablecido",
-      duration: 1.4,
-    });
+function StatusPill({ text, colorKey }) {
+  const map = {
+    turquoise: beachColors.turquoise,
+    oceanBlue: beachColors.oceanBlue,
+    coral: beachColors.coral,
+    teal: beachColors.teal,
+    sunset: beachColors.sunset,
+    deepBlue: beachColors.deepBlue,
   };
-
-  // Base de fuentes para el theme de AntD
-  const baseFontSize = fontScale === "large" ? 16 : 14;
-
-  /** ================= socket ================= */
-  const socketRef = useRef(null);
-
-  /** ================= data ================= */
-  const [habitaciones, setHabitaciones] = useState([]);
-  const [loadingHabitaciones, setLoadingHabitaciones] = useState(true);
-  const [error, setError] = useState(null);
-
-  /** ================= filtros (FUENTE de verdad) ================= */
-  const [filters, setFilters] = useState({
-    q: "",
-    roomTypes: [],
-    amenities: [],
-    locations: [],
-    startDate: null, // "YYYY-MM-DD"
-    endDate: null, // "YYYY-MM-DD"
-    guests: "0",
-    onlyAvailable: true,
-  });
-
-  const filtersRef = useRef(filters);
-  useEffect(() => {
-    filtersRef.current = filters;
-  }, [filters]);
-
-  /** ================= filtros pendientes (Tree) ================= */
-  const [checkedKeys, setCheckedKeys] = useState([]);
-
-  /** ================= header controls ================= */
-  const [searchText, setSearchText] = useState("");
-  const [dates, setDates] = useState(null); // null = sin rango
-  const [guests, setGuests] = useState("2");
-
-  /** ================= paginado local (5 en 5) ================= */
-  const [pagination, setPagination] = useState({
-    page: 1,
-    limit: 6,
-    total: 0,
-    totalPages: 0,
-    hasMore: false,
-  });
-
-  /** ================= selection ================= */
-  const [habitacionSeleccionada, setHabitacionSeleccionada] = useState(null);
-
-  /** ================= TREE HARDCODEADO ================= */
-  const treeData = useMemo(() => {
-    const roomTypeNodes =
-      ROOM_TYPE_OPTIONS.length > 0
-        ? ROOM_TYPE_OPTIONS.map((t) => ({ title: t, key: `t:${t}` }))
-        : [
-            {
-              title: <Text type="secondary">Sin datos</Text>,
-              key: "t:__empty",
-              disabled: true,
-            },
-          ];
-
-    const amenityNodes =
-      AMENITY_OPTIONS.length > 0
-        ? AMENITY_OPTIONS.map((a) => ({ title: a, key: `a:${a}` }))
-        : [
-            {
-              title: <Text type="secondary">Sin datos</Text>,
-              key: "a:__empty",
-              disabled: true,
-            },
-          ];
-
-    const locationNodes =
-      LOCATION_OPTIONS.length > 0
-        ? LOCATION_OPTIONS.map((l) => ({ title: l, key: `l:${l}` }))
-        : [
-            {
-              title: <Text type="secondary">Sin datos</Text>,
-              key: "l:__empty",
-              disabled: true,
-            },
-          ];
-
-    return [
-      {
-        title: (
-          <Flex align="center" gap={8}>
-            <HomeOutlined style={{ color: beachColors.turquoise }} />
-            <b>Tipo de alojamiento</b>
-          </Flex>
-        ),
-        key: "group:type",
-        children: roomTypeNodes,
-      },
-      {
-        title: (
-          <Flex align="center" gap={8}>
-            <GiftOutlined style={{ color: beachColors.coral }} />
-            <b>Servicios</b>
-          </Flex>
-        ),
-        key: "group:amenities",
-        children: amenityNodes,
-      },
-      {
-        title: (
-          <Flex align="center" gap={8}>
-            <CompassOutlined style={{ color: beachColors.sunset }} />
-            <b>Ubicación</b>
-          </Flex>
-        ),
-        key: "group:location",
-        children: locationNodes,
-      },
-    ];
-  }, []);
-
-  /** ================= emitir query por WS ================= */
-  const emitQuery = useCallback(
-    (opts = {}) => {
-      const f = opts.filters || filtersRef.current;
-      const hasDates = isYmd(f.startDate) && isYmd(f.endDate);
-
-      const payload = {
-        q: f.q || "",
-        roomType: (f.roomTypes || []).join(","),
-        amenities: (f.amenities || []).join(","),
-        locationTag: (f.locations || []).join(","),
-        startDate: hasDates ? f.startDate : null,
-        endDate: hasDates ? f.endDate : null,
-        guests: f.guests || "2",
-        onlyAvailable: hasDates ? !!f.onlyAvailable : false,
-      };
-
-      if (opts.showToast) {
-        messageApi.open({
-          type: "loading",
-          content: "Aplicando filtros…",
-          key: "roomsSync",
-          duration: 0,
-        });
-      }
-
-      setLoadingHabitaciones(true);
-      setError(null);
-
-      socketRef.current?.emit("habitaciones:query", payload);
-    },
-    [messageApi]
+  return (
+    <div
+      className="hf-statusPill"
+      style={{ background: map[colorKey] || colorKey }}
+    >
+      {text}
+    </div>
   );
+}
 
-  /** ================= conectar socket UNA sola vez ================= */
-  useEffect(() => {
-    const socket = initSocket(WS_URL);
-    socketRef.current = socket;
+/** HOME */
+function HomeHero({ form, onChange, onSearch }) {
+  return (
+    <div className="hf-hero">
+      <div className="hf-heroBg" />
+      <div className="hf-heroOverlay" />
+      <div className="hf-heroGlow" />
+      <div className="hf-heroContent">
+        <Title level={2} className="hf-heroTitle">
+          Reserva tu estancia
+          <br />
+          en Hoteles Frida
+        </Title>
+        <div className="hf-heroSub">
+          Chelem y Chuburná · A unos clics de tu próxima escapada
+        </div>
+      </div>
 
-    socket.on("connect", () => {
-      console.log("WS conectado:", socket.id);
-      emitQuery({ showToast: false });
-    });
+      <div className="hf-heroSearchWrap">
+        <div className="hf-heroSearchCard">
+          <div className="hf-searchRow">
+            <div className="hf-searchItem">
+              <Select
+                value={form.branch}
+                onChange={(v) => onChange({ branch: v })}
+                placeholder="Sucursal"
+                size="large"
+                suffixIcon={<DownOutlined />}
+                className="hf-select"
+                options={SUCURSALES.map((s) => ({
+                  label: `${s.name} · ${s.subtitle}`,
+                  value: s.key,
+                }))}
+              />
+            </div>
 
-    socket.on("disconnect", () => {
-      console.log("🔌 WS desconectado");
-    });
+            <div className="hf-searchItem">
+              <DatePicker.RangePicker
+                value={form.range}
+                onChange={(v) => onChange({ range: v })}
+                size="large"
+                className="hf-range"
+                placeholder={["Check-in", "Check-out"]}
+                suffixIcon={<CalendarOutlined />}
+              />
+            </div>
 
-    const handleResult = (data) => {
-      const items = Array.isArray(data)
-        ? data
-        : Array.isArray(data?.items)
-        ? data.items
-        : Array.isArray(data?.data)
-        ? data.data
-        : [];
+            <Button
+              className="hf-searchGo"
+              type="primary"
+              size="large"
+              icon={<SearchOutlined />}
+              onClick={onSearch}
+            >
+              Buscar
+            </Button>
+          </div>
 
-      setHabitaciones(items);
-      setLoadingHabitaciones(false);
+          <div className="hf-searchHint">
+            <Text className="hf-searchHintText">
+              Tip: selecciona una sucursal y fechas para ver disponibilidad ✨
+            </Text>
+          </div>
+        </div>
+      </div>
 
-      messageApi.open({
-        type: "success",
-        content: `Listo. ${items.length} habitaciones sincronizadas`,
-        key: "roomsSync",
-        duration: 2,
-      });
-    };
+      <SoftWaveTop />
+    </div>
+  );
+}
 
-    socket.on("habitaciones:init", handleResult);
-    socket.on("habitaciones:result", handleResult);
+function DestinationCard({ d, onClick }) {
+  return (
+    <button
+      className="hf-destCard"
+      style={{ backgroundImage: `url('${d.img}')` }}
+      onClick={onClick}
+      type="button"
+    >
+      <div className="hf-destShade" />
+      <div className="hf-destBottom">
+        <div>
+          <div className="hf-destName">{d.name}</div>
+          <div className="hf-destSub">{d.subtitle}</div>
+        </div>
+        <div className="hf-destArrow">
+          <RightOutlined />
+        </div>
+      </div>
+    </button>
+  );
+}
 
-    socket.on("habitaciones:created", (room) => {
-      if (!room || !room._id) return;
-      const f = filtersRef.current;
-      if (!roomMatchesFilters(room, f)) return;
-
-      setHabitaciones((prev) => {
-        const exists = prev.some((h) => h._id === room._id);
-        if (exists) return prev;
-        return [room, ...prev];
-      });
-    });
-
-    socket.on("habitaciones:updated", (room) => {
-      if (!room || !room._id) return;
-      const f = filtersRef.current;
-
-      setHabitaciones((prev) => {
-        const exists = prev.some((h) => h._id === room._id);
-
-        if (exists && !roomMatchesFilters(room, f)) {
-          return prev.filter((h) => h._id !== room._id);
-        }
-        if (!exists && roomMatchesFilters(room, f)) {
-          return [room, ...prev];
-        }
-        return prev.map((h) => (h._id === room._id ? { ...h, ...room } : h));
-      });
-    });
-
-    socket.on("habitaciones:deleted", (payload) => {
-      const deleteId = payload?._id || payload?.id;
-      if (!deleteId) return;
-      setHabitaciones((prev) => prev.filter((h) => h._id !== deleteId));
-    });
-
-    socket.on("habitaciones:error", (payload) => {
-      console.error("WS habitaciones:error", payload);
-      setError(payload || { message: "Ocurrió un error en tiempo real." });
-      setLoadingHabitaciones(false);
-      messageApi.open({
-        type: "error",
-        content: payload?.message || "Ocurrió un error en tiempo real.",
-        key: "roomsSync",
-        duration: 3,
-      });
-    });
-
-    return () => {
-      try {
-        disconnectSocket();
-      } finally {
-        socketRef.current = null;
-      }
-    };
-  }, [emitQuery, messageApi]);
-
-  /** ================= aplicar filtros desde Tree (solo cambia estado local) ================= */
-  const applyTreeCheckedKeys = (keys) => {
-    const arr = toArrayCheckedKeys(keys).filter(
-      (k) => !String(k).endsWith("__empty")
-    );
-    setCheckedKeys(arr);
-  };
-
-  /** ================= aplicar filtros AL HACER CLICK en "Aplicar" ================= */
-  const handleApplyTreeFilters = () => {
-    const arr = checkedKeys.filter((k) => !String(k).endsWith("__empty"));
-
-    const roomTypes = arr
-      .filter((k) => String(k).startsWith("t:"))
-      .map((k) => String(k).slice(2))
-      .filter(Boolean);
-
-    const amenities = arr
-      .filter((k) => String(k).startsWith("a:"))
-      .map((k) => String(k).slice(2))
-      .filter(Boolean);
-
-    const locations = arr
-      .filter((k) => String(k).startsWith("l:"))
-      .map((k) => String(k).slice(2))
-      .filter(Boolean);
-
-    setPagination((p) => ({ ...p, page: 1 }));
-
-    const nextFilters = {
-      ...filtersRef.current,
-      roomTypes,
-      amenities,
-      locations,
-    };
-
-    setFilters(nextFilters);
-    emitQuery({ showToast: true, filters: nextFilters });
-  };
-
-  /**limpiar DE VERDAD */
-  const clearFilters = () => {
-    setCheckedKeys([]);
-    setSearchText("");
-    setDates(null);
-    setGuests("2");
-
-    setPagination((p) => ({ ...p, page: 1 }));
-
-    const nextFilters = {
-      q: "",
-      roomTypes: [],
-      amenities: [],
-      locations: [],
-      startDate: null,
-      endDate: null,
-      guests: "2",
-      onlyAvailable: true,
-    };
-
-    setFilters(nextFilters);
-    emitQuery({ showToast: true, filters: nextFilters });
-
-    messageApi.success("Filtros limpiados.");
-  };
-
-  /** ================= buscar ================= */
-  const runSearch = (payload) => {
-    const q = String(payload?.q ?? "").trim();
-    const startDate = payload?.startDate || null;
-    const endDate = payload?.endDate || null;
-    const g = String(payload?.guests || "2");
-
-    setSearchText(q);
-    setGuests(g);
-
-    const hasRange = isYmd(startDate) && isYmd(endDate);
-    setDates(
-      hasRange
-        ? [dayjs(startDate, "YYYY-MM-DD"), dayjs(endDate, "YYYY-MM-DD")]
-        : null
-    );
-
-    setPagination((p) => ({ ...p, page: 1 }));
-
-    const nextFilters = {
-      ...filtersRef.current,
-      q,
-      startDate: isYmd(startDate) ? startDate : null,
-      endDate: isYmd(endDate) ? endDate : null,
-      guests: g,
-      onlyAvailable: true,
-    };
-
-    setFilters(nextFilters);
-    emitQuery({ showToast: true, filters: nextFilters });
-
-    messageApi.open({
-      type: "success",
-      icon: <CheckCircleOutlined />,
-      content: "Búsqueda aplicada ✅",
-      duration: 1.6,
-    });
-  };
-
-  const handleSearchClick = () => {
-    runSearch({
-      q: searchText,
-      startDate: dates?.[0]?.format("YYYY-MM-DD") || null,
-      endDate: dates?.[1]?.format("YYYY-MM-DD") || null,
-      guests,
-    });
-  };
-
-  /** ================= SUGERENCIAS DEL BUSCADOR ================= */
-  const suggestionPool = useMemo(() => {
-    const titles = (habitaciones || []).map((h) => h?.title).filter(Boolean);
-    const codes = (habitaciones || []).map((h) => h?.codigo).filter(Boolean);
-    const locationsDyn = (habitaciones || [])
-      .map((h) => h?.location)
-      .filter(Boolean);
-
-    const all = [
-      ...titles,
-      ...codes,
-      ...locationsDyn,
-      ...LOCATION_OPTIONS,
-      ...ROOM_TYPE_OPTIONS,
-    ]
-      .map((s) => String(s).trim())
-      .filter(Boolean);
-
-    return Array.from(new Set(all)); // únicos
-  }, [habitaciones]);
-
-  const suggestionOptions = useMemo(() => {
-    const q = normalizeStr(searchText);
-    const base = suggestionPool;
-
-    const filtered = q ? base.filter((s) => normalizeStr(s).includes(q)) : base;
-
-    return filtered.slice(0, 8).map((value) => ({
-      value,
-      label: value,
-    }));
-  }, [searchText, suggestionPool]);
-
-  const handleSuggestionSelect = (value) => {
-    setSearchText(value);
-    runSearch({
-      q: value,
-      startDate: dates?.[0]?.format("YYYY-MM-DD") || null,
-      endDate: dates?.[1]?.format("YYYY-MM-DD") || null,
-      guests,
-    });
-  };
-
-  /** ================= cards filtradas + paginado local (5 en 5) ================= */
-  const filteredCards = useMemo(() => {
-    const arr = Array.isArray(habitaciones) ? habitaciones : [];
-    return arr.filter((r) => roomMatchesFilters(r, filters));
-  }, [habitaciones, filters]);
-
-  useEffect(() => {
-    const total = filteredCards.length;
-    const limit = pagination.limit || 6;
-    const totalPages = Math.max(1, Math.ceil(total / limit));
-    setPagination((p) => ({
-      ...p,
-      page: Math.min(p.page, totalPages),
-      total,
-      totalPages,
-      hasMore: p.page < totalPages,
-    }));
-  }, [filteredCards, pagination.limit]);
-
-  const cardsToShow = useMemo(() => {
-    const { page, limit } = pagination;
-    const size = limit || 6;
-    const start = (page - 1) * size;
-    const end = start + size;
-    return filteredCards.slice(start, end);
-  }, [filteredCards, pagination]);
-
-  const handleChangePageHabitaciones = (page) => {
-    setPagination((p) => ({ ...p, page }));
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  };
-
-  /** ================= reserva/chat ================= */
-  const handleReservaExpress = async (room) => {
-    setHabitacionSeleccionada(room);
-    setOpenChat(true);
-    messageApi.info("Listo. Abriendo chat para solicitar tu reserva.");
-  };
-
-  const handleInfoWhatsapp = (room) => {
-    setHabitacionSeleccionada(room);
-
-    const numero = "9994485069";
-    const texto = `Hola, me interesa la habitación ${room.codigo || ""} - ${
-      room.title || ""
-    } en ${room.location || "su propiedad"}. ¿Podrían darme más información?`;
-
-    const url = `https://wa.me/${numero}?text=${encodeURIComponent(texto)}`;
-    window.open(url, "_blank", "noopener,noreferrer");
-  };
-
-  const handleChatClosedForReserva = async () => {
-    setHabitacionSeleccionada(null);
-    setOpenChat(false);
-  };
-
-  /** ================= styles ================= */
-  const headerStyle = {
-    padding: ".5rem",
-    background: `linear-gradient(120deg, ${beachColors.teal}, ${beachColors.oceanBlue})`,
-    boxShadow: "0 4px 18px rgba(15,23,42,0.26)",
-    position: "sticky",
-    top: 0,
-    zIndex: 100,
-    borderBottom: `2px solid ${beachColors.turquoise}`,
-  };
-
-  const panelStyles = {
-    left: { background: "#f1f5f9", borderRight: `1px solid ${borderColor}` },
-    center: { background: "#ffffff", padding: 16 },
-    right: {
-      background: "#f8fafc",
-      borderLeft: `1px solid ${borderColor}`,
-      padding: 12,
-    },
-  };
-
-  const hasDateFilter = isYmd(filters.startDate) && isYmd(filters.endDate);
-
-  // Footer links con iconos (solo AntD SVG)
-  const footerLinks = [
-    { nombre: "Términos", path: "#", icon: <FileTextOutlined /> },
-    { nombre: "Privacidad", path: "#", icon: <LockOutlined /> },
-    { nombre: "Contacto", path: "#", icon: <PhoneOutlined /> },
-    { nombre: "Nosotros", path: "#", icon: <InfoCircleOutlined /> },
-  ];
+function FeaturedCard({ item, onReserve, isFav, onToggleFav }) {
+  const badgeBg =
+    item.badge.color === "coral"
+      ? beachColors.coral
+      : item.badge.color === "teal"
+      ? beachColors.teal
+      : beachColors.sunset;
 
   return (
-    <ConfigProvider
-      theme={{
-        token: {
-          colorPrimary: beachColors.oceanBlue,
-          colorLink: beachColors.oceanBlue,
-          borderRadius: 10,
-          fontFamily:
-            '-apple-system, BlinkMacSystemFont, system-ui, "SF Pro Text", sans-serif',
-          fontSize: baseFontSize,
-          fontSizeLG: baseFontSize + 2,
-          fontSizeSM: baseFontSize - 2,
-        },
-      }}
-    >
+    <div className="hf-featCard">
+      <div className="hf-featInner">
+        <div
+          className="hf-featThumb"
+          style={{ backgroundImage: `url('${item.img}')` }}
+        />
+        <div className="hf-featInfo">
+          <div className="hf-featTopLine">
+            <div className="hf-featTitle">{item.title}</div>
+            <div className="hf-featBadge" style={{ background: badgeBg }}>
+              {item.badge.text}
+            </div>
+          </div>
+          <div className="hf-featSub">
+            <span className="hf-featPlace">{item.place}</span>
+            <span className="hf-dot">•</span>
+            <span className="hf-featRating">
+              <StarFilled style={{ color: beachColors.sunset }} />
+              <span className="hf-featRatingNum">{item.rating}</span>
+            </span>
+            <span className="hf-featPrice">${item.price}/noche</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="hf-featActions">
+        <Tooltip title={isFav ? "Quitar de favoritos" : "Guardar en favoritos"}>
+          <Button
+            className="hf-featGhost"
+            icon={isFav ? <HeartFilled /> : <HeartOutlined />}
+            onClick={() => onToggleFav(item.key)}
+          />
+        </Tooltip>
+
+        <Button
+          className="hf-featBtn"
+          type="primary"
+          onClick={() => onReserve(item)}
+        >
+          Ver y reservar
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function HomePage({
+  form,
+  setFormPatch,
+  onSearch,
+  onReserveFeatured,
+  onPickSucursal,
+  favorites,
+  onToggleFav,
+}) {
+  return (
+    <div className="hf-pageBody hf-viewEnter">
+      <HomeHero form={form} onChange={setFormPatch} onSearch={onSearch} />
+
+      <div className="hf-section hf-section--wide">
+        <Title level={4} className="hf-sectionTitle">
+          Sucursales
+        </Title>
+        <div className="hf-destsGrid">
+          {SUCURSALES.map((d) => (
+            <DestinationCard
+              key={d.key}
+              d={d}
+              onClick={() => onPickSucursal(d.key)}
+            />
+          ))}
+        </div>
+      </div>
+
+      <div className="hf-section hf-section--wide hf-section--tightTop">
+        <div className="hf-sectionRow">
+          <Title
+            level={4}
+            className="hf-sectionTitle"
+            style={{ marginBottom: 0 }}
+          >
+            Habitaciones destacadas
+          </Title>
+          <Segmented
+            className="hf-seg"
+            size="middle"
+            options={["Top", "Familia", "Mejor precio"]}
+            onChange={() => message.info("Filtro (demo UI)")}
+          />
+        </div>
+
+        <div className="hf-featureGrid">
+          {HABITACIONES_DESTACADAS.map((f) => (
+            <FeaturedCard
+              key={f.key}
+              item={f}
+              onReserve={onReserveFeatured}
+              isFav={favorites.has(f.key)}
+              onToggleFav={onToggleFav}
+            />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** SEARCH */
+function SearchSidebar({ filters, setFilters }) {
+  return (
+    <div className="hf-searchSidebar">
+      <div className="hf-sideTop">
+        <div className="hf-sideTopTitle">Filtros</div>
+        <DownOutlined style={{ opacity: 0.9 }} />
+      </div>
+
+      <div className="hf-sideBody">
+        <div className="hf-sideRow">
+          <div className="hf-sideLabel">Sucursal</div>
+          <Select
+            value={filters.location}
+            onChange={(v) => setFilters((s) => ({ ...s, location: v }))}
+            placeholder="Sucursal"
+            suffixIcon={<DownOutlined />}
+            className="hf-sideSelect"
+            options={[
+              { label: "Todas", value: "ALL" },
+              ...SUCURSALES.map((d) => ({
+                label: `${d.name} · ${d.subtitle}`,
+                value: d.key,
+              })),
+            ]}
+          />
+        </div>
+
+        <div className="hf-sideRow">
+          <div className="hf-sideLabel">Fechas</div>
+          <DatePicker.RangePicker
+            value={filters.range}
+            onChange={(v) => setFilters((s) => ({ ...s, range: v }))}
+            className="hf-sideRange"
+            placeholder={["Check-in", "Check-out"]}
+          />
+        </div>
+
+        <div className="hf-sideDivider" />
+
+        <div className="hf-sideRow">
+          <div className="hf-sideLabel">Precio por noche</div>
+          <div className="hf-miniPrice">
+            <div className="hf-miniPriceRow">
+              <div className="hf-miniBox">${filters.price[0]}</div>
+              <div className="hf-miniDash">|</div>
+              <div className="hf-miniBox">${filters.price[1]}</div>
+            </div>
+            <Slider
+              range
+              min={800}
+              max={2500}
+              step={50}
+              value={filters.price}
+              onChange={(v) => setFilters((s) => ({ ...s, price: v }))}
+            />
+          </div>
+        </div>
+
+        <div className="hf-sideDivider" />
+
+        <div className="hf-sideRow">
+          <div className="hf-sideLabel">Amenidades</div>
+          <Collapse
+            ghost
+            defaultActiveKey={["c1"]}
+            expandIconPosition="end"
+            className="hf-sideCollapse"
+            items={[
+              {
+                key: "c1",
+                label: <span className="hf-sideCollapseLabel">Incluye</span>,
+                children: (
+                  <Checkbox.Group
+                    value={filters.amenities}
+                    onChange={(v) =>
+                      setFilters((s) => ({ ...s, amenities: v }))
+                    }
+                    options={[
+                      { label: "WiFi", value: "wifi" },
+                      { label: "A/C", value: "ac" },
+                      { label: "Estacionamiento", value: "parking" },
+                      { label: "Cocina", value: "kitchen" },
+                    ]}
+                  />
+                ),
+              },
+            ]}
+          />
+        </div>
+
+        <div className="hf-sideDivider" />
+
+        <div className="hf-sideRow">
+          <div className="hf-sideLabel">Calificación mínima</div>
+          <Slider
+            min={1}
+            max={5}
+            step={0.5}
+            value={filters.stars}
+            onChange={(v) => setFilters((s) => ({ ...s, stars: v }))}
+          />
+          <div className="hf-starsRow">
+            <Rate allowHalf disabled value={filters.stars} />
+            <span className="hf-starsText">{filters.stars}+</span>
+          </div>
+        </div>
+
+        <Button
+          className="hf-sideReserveBtn"
+          type="primary"
+          onClick={() => message.success("Filtros aplicados")}
+        >
+          Aplicar filtros
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function SearchResultRow({ it, onReserve, isFav, onToggleFav }) {
+  return (
+    <div className="hf-resultRow">
       <div
-        style={{
-          minHeight: "100vh",
-          background: `linear-gradient(135deg, ${backgroundColor}, ${beachColors.sand}18 40%, ${beachColors.turquoise}0A)`,
-        }}
+        className="hf-resultThumb"
+        style={{ backgroundImage: `url('${it.img}')` }}
+      />
+      <div className="hf-resultMid">
+        <div className="hf-resultTitleRow">
+          <div className="hf-resultTitle">{it.title}</div>
+          <button
+            type="button"
+            className={"hf-favMini " + (isFav ? "isFav" : "")}
+            onClick={() => onToggleFav(it.key)}
+            aria-label={isFav ? "Quitar de favoritos" : "Guardar en favoritos"}
+          >
+            {isFav ? <HeartFilled /> : <HeartOutlined />}
+          </button>
+        </div>
+
+        <div className="hf-resultDesc">{it.desc}</div>
+
+        <div className="hf-resultMeta">
+          <Rate allowHalf disabled value={it.rating} />
+          <span className="hf-resultMetaText">({it.reviews})</span>
+          <span className="hf-dot">•</span>
+          <span className="hf-resultMetaText">${it.price}/noche</span>
+        </div>
+      </div>
+
+      <Button
+        className="hf-resultBtn"
+        type="primary"
+        onClick={() => onReserve(it)}
       >
-        {contextHolder}
+        Ver detalle <ArrowRightOutlined />
+      </Button>
+    </div>
+  );
+}
 
-        {/* HEADER */}
-        <header style={headerStyle}>
-          <Flex
-            justify="space-between"
-            align="center"
-            gap={16}
-            style={{ maxWidth: 1400, margin: "0 auto" }}
-          >
-            <Flex align="center" gap={10}>
-              <img
-                src={withBase("beachclub.svg")}
-                alt="logo"
-                style={{
-                  width: 32,
-                  height: 32,
-                  borderRadius: 10,
-                  boxShadow: "0 2px 6px rgba(15,23,42,0.35)",
-                }}
+function SearchPage({
+  initialForm,
+  onReserveGoDetail,
+  favorites,
+  onToggleFav,
+}) {
+  const [query, setQuery] = useState("");
+  const [filters, setFilters] = useState({
+    location: initialForm?.branch || "ALL",
+    range: initialForm?.range || null,
+    price: [1000, 2200],
+    stars: 4,
+    amenities: [],
+  });
+
+  const items = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return SEARCH_ITEMS.filter((it) => {
+      if (filters.location !== "ALL" && it.location !== filters.location)
+        return false;
+      if (it.price < filters.price[0] || it.price > filters.price[1])
+        return false;
+      if (it.rating < filters.stars) return false;
+
+      if (filters.amenities.length) {
+        const ok = filters.amenities.every((a) => it.amenities.includes(a));
+        if (!ok) return false;
+      }
+
+      if (q && !it.title.toLowerCase().includes(q)) return false;
+      return true;
+    });
+  }, [query, filters]);
+
+  return (
+    <div className="hf-pageBody hf-viewEnter">
+      <div className="hf-searchLayout hf-searchLayout--wide">
+        <div className="hf-searchLeft">
+          <SearchSidebar filters={filters} setFilters={setFilters} />
+        </div>
+
+        <div className="hf-searchRight">
+          <div className="hf-resultsCard">
+            <div className="hf-resultsTop">
+              <Input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Filtra por nombre de habitación…"
+                prefix={
+                  <SearchOutlined style={{ color: neutrals.textMuted }} />
+                }
+                className="hf-resultsSearch"
               />
-              <div style={{ lineHeight: 1.1 }}>
-                <Title
-                  level={4}
-                  style={{
-                    margin: 0,
-                    color: "#ffffff",
-                    fontWeight: 700,
-                    letterSpacing: 0.3,
-                  }}
-                >
-                  Hoteles Frida
-                </Title>
-                <Text style={{ fontSize: 10, color: "rgba(241,245,249,0.9)" }}>
-                  Reservas directas con un solo clic
-                </Text>
-              </div>
-            </Flex>
+              <Button className="hf-resultsDrop">
+                Ordenar <DownOutlined style={{ fontSize: 11 }} />
+              </Button>
+            </div>
 
-            {!isMobile && (
-              <Flex
-                align="center"
-                gap={10}
-                style={{
-                  flex: 1,
-                  justifyContent: "center",
-                  minWidth: 560,
-                  padding: "10px 14px",
-                  borderRadius: 18,
-                  background: "rgba(15,23,42,0.18)",
-                  backdropFilter: "blur(10px)",
-                  boxShadow: "0 4px 12px rgba(15,23,42,0.35)",
-                }}
-              >
-                {/* 🔎 Buscador con recomendaciones antes de buscar */}
-                <AutoComplete
-                  value={searchText}
-                  onChange={setSearchText}
-                  onSelect={handleSuggestionSelect}
-                  options={suggestionOptions}
-                  style={{ flex: 1 }}
-                  allowClear
-                >
-                  <Input
-                    onPressEnter={handleSearchClick}
-                    placeholder="Destino, ciudad o alojamiento"
-                    prefix={
-                      <EnvironmentOutlined
-                        style={{ color: beachColors.turquoise }}
-                      />
-                    }
-                    style={{
-                      borderRadius: 10,
-                      border: "none",
-                      height: 40,
-                      background: "rgba(255,255,255,0.98)",
-                    }}
-                  />
-                </AutoComplete>
-
-                <DatePicker.RangePicker
-                  value={dates}
-                  onChange={(v) => setDates(v)}
-                  style={{ width: 250, borderRadius: 10, height: 40 }}
-                  format="DD/MM/YYYY"
-                  allowClear
+            <div className="hf-resultsList">
+              {items.map((it) => (
+                <SearchResultRow
+                  key={it.key}
+                  it={it}
+                  onReserve={onReserveGoDetail}
+                  isFav={favorites.has(it.key)}
+                  onToggleFav={onToggleFav}
                 />
+              ))}
+              {!items.length ? (
+                <div className="hf-empty">
+                  <FilterOutlined /> Sin resultados con estos filtros.
+                </div>
+              ) : null}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
-                <Select
-                  value={guests}
-                  onChange={setGuests}
-                  style={{ width: 150, borderRadius: 10, height: 40 }}
-                >
-                  <Option value="1">1 adulto</Option>
-                  <Option value="2">2 adultos</Option>
-                  <Option value="3">3 adultos</Option>
-                  <Option value="4">Familia</Option>
-                </Select>
+/** DETAIL */
+function DetailPage({ selectedItem, initialForm, onConfirm }) {
+  const [range, setRange] = useState(initialForm?.range || null);
+  const [branch, setBranch] = useState(
+    initialForm?.branch || selectedItem?.location || "chelem"
+  );
+  const [people, setPeople] = useState(2);
 
-                <Button
-                  type="primary"
-                  icon={<SearchOutlined />}
-                  onClick={handleSearchClick}
-                  style={{
-                    borderRadius: 12,
-                    fontWeight: 600,
-                    paddingInline: 18,
-                    height: 40,
-                    background: `linear-gradient(90deg, ${beachColors.turquoise}, ${beachColors.oceanBlue})`,
-                    boxShadow: "0 6px 16px rgba(14,165,233,0.45)",
-                    border: "none",
-                  }}
-                >
-                  Buscar
-                </Button>
+  const pricePerNight = selectedItem?.price ?? 1500;
+  const nights = useMemo(() => {
+    if (!range?.[0] || !range?.[1]) return 0;
+    const diff = range[1].diff(range[0], "day");
+    return Math.max(1, diff || 0);
+  }, [range]);
 
-                <Button
-                  icon={<ReloadOutlined />}
-                  onClick={clearFilters}
-                  style={{ borderRadius: 12, height: 40 }}
-                >
-                  Limpiar
-                </Button>
-              </Flex>
-            )}
+  const total = pricePerNight * (nights || 1);
 
-            {!isMobile && (
-              <Space size={10} align="center">
-                <Tooltip
-                  title={
-                    fontScale === "large"
-                      ? "Reducir tamaño de fuente"
-                      : "Aumentar tamaño de fuente"
-                  }
-                >
-                  <Button
-                    type="text"
-                    icon={
-                      <FontSizeOutlined
-                        style={{ color: "#e5e7eb", fontSize: 16 }}
-                      />
-                    }
-                    onClick={toggleFontScale}
-                    style={{ color: "#e5e7eb" }}
-                    aria-label="Cambiar tamaño de fuente"
-                  />
-                </Tooltip>
+  const branchLabel = useMemo(() => {
+    const s = SUCURSALES.find((x) => x.key === branch);
+    return s ? `${s.name} · ${s.subtitle}` : "Sucursal";
+  }, [branch]);
 
-                <Button
-                  ghost
-                  href={withBase("panel.web/login.panel.web")}
-                  style={{
-                    borderRadius: 999,
-                    borderColor: "#ffffff",
-                    color: "#ffffff",
-                    fontSize: 12,
-                    paddingInline: 16,
-                  }}
-                >
-                  Acceso staff
-                </Button>
-              </Space>
-            )}
+  return (
+    <div className="hf-pageBody hf-viewEnter">
+      <div className="hf-detailWrap hf-detailWrap--wide">
+        <Title level={3} className="hf-detailH1">
+          {selectedItem?.title || "Detalle de habitación"}
+        </Title>
 
-            {isMobile && (
-              <Space size={8} align="center">
-                <Button
-                  type="text"
-                  icon={<SearchOutlined style={{ color: "#ffffff" }} />}
-                  onClick={() => setOpenBuscadorMovil(true)}
-                />
-                <Button
-                  type="text"
-                  icon={<MenuOutlined style={{ color: "#ffffff" }} />}
-                  onClick={() => setOpenFiltrosMovil(true)}
-                />
-                <Button
-                  type="text"
-                  icon={<FontSizeOutlined style={{ color: "#ffffff" }} />}
-                  onClick={toggleFontScale}
-                  aria-label="Cambiar tamaño de fuente"
-                />
-                <Button
-                  size="small"
-                  href={withBase("panel.web/login.panel.web")}
-                  style={{
-                    borderRadius: 999,
-                    paddingInline: 12,
-                    height: 30,
-                    fontSize: 11,
-                    background: "rgba(15,23,42,0.65)",
-                    color: "#ffffff",
-                    border: "1px solid rgba(248,250,252,0.45)",
-                    display: "flex",
-                    alignItems: "center",
-                  }}
-                >
-                  Staff
-                </Button>
-              </Space>
-            )}
-          </Flex>
-        </header>
-
-        {/* MAIN */}
-        <main
-          style={{ minHeight: "calc(100vh - 80px)" }}
-          //height: isMobile ? "auto" : "calc(100vh - 160px)",
-        >
-          <BuscadorMovil
-            beachColors={beachColors}
-            open={openBuscadorMovil}
-            onclose={() => setOpenBuscadorMovil(false)}
-            initialQuery={filters.q}
-            initialDates={{
-              startDate: filters.startDate
-                ? dayjs(filters.startDate, "YYYY-MM-DD")
-                : null,
-              endDate: filters.endDate
-                ? dayjs(filters.endDate, "YYYY-MM-DD")
-                : null,
-            }}
-            initialGuests={filters.guests}
-            onClear={() => {
-              clearFilters();
-              setOpenBuscadorMovil(false);
-            }}
-            onSearch={(payload) => {
-              runSearch(payload);
-              setOpenBuscadorMovil(false);
-            }}
-          />
-
-          <Drawer
-            title="Filtrar tu estancia"
-            placement="right"
-            width={310}
-            open={openFiltrosMovil}
-            onClose={() => setOpenFiltrosMovil(false)}
-          >
-            <Flex vertical gap={14}>
-              <Tree
-                checkable
-                defaultExpandAll
-                treeData={treeData}
-                checkedKeys={checkedKeys}
-                onCheck={(keys) => applyTreeCheckedKeys(keys)}
-              />
-
-              <Card size="small" style={{ borderRadius: 12 }}>
-                <Flex vertical gap={8}>
-                  <Flex align="center" gap={8}>
-                    <CalendarOutlined
-                      style={{ color: beachColors.oceanBlue }}
-                    />
-                    <Text strong>Disponibilidad</Text>
-                  </Flex>
-
-                  <Text style={{ fontSize: 11, color: "#64748b" }}>
-                    Este filtro funciona cuando el backend WS envía{" "}
-                    <b>available</b> según fechas.
-                  </Text>
-
-                  <Flex wrap gap={6}>
-                    <Tag color={hasDateFilter ? "green" : "default"}>
-                      {hasDateFilter
-                        ? `${filters.startDate} → ${filters.endDate}`
-                        : "Sin rango"}
-                    </Tag>
-                    <Tag color="blue">{filters.guests} huésped(es)</Tag>
-                    {hasDateFilter && filters.onlyAvailable ? (
-                      <Tag color="green">Solo disponibles</Tag>
-                    ) : null}
-                  </Flex>
-                </Flex>
-              </Card>
-
-              <Flex gap={8}>
-                <Button
-                  block
-                  onClick={clearFilters}
-                  style={{ borderRadius: 10 }}
-                >
-                  Limpiar
-                </Button>
-                <Button
-                  type="primary"
-                  block
-                  icon={<FilterOutlined />}
-                  style={{
-                    borderRadius: 10,
-                    background: beachColors.teal,
-                    borderColor: beachColors.teal,
-                  }}
-                  onClick={() => {
-                    handleApplyTreeFilters();
-                    setOpenFiltrosMovil(false);
-                  }}
-                >
-                  Aplicar
-                </Button>
-              </Flex>
-
-              <div style={{ marginTop: 4 }}>
-                <Text type="secondary" style={{ fontSize: 11 }}>
-                  Tip: marca los filtros y luego pulsa <b>Aplicar</b> para
-                  actualizar los resultados.
-                </Text>
-              </div>
-            </Flex>
-          </Drawer>
-          {/* CHAT DE ASISTENCIA / RESERVA 
-  
-            {isMobile && (
-            <FloatButton.Group
-              shape="circle"
-              style={{ right: 18, bottom: 90 }}
-              icon={<CommentOutlined />}
-            >
-              <FloatButton
-                icon={<CustomerServiceOutlined />}
-                onClick={() => setOpenChat(true)}
-              />
-            </FloatButton.Group>
-          )}
-  
-          */
-          }
-
-          <Splitter
-            layout={isMobile ? "vertical" : "horizontal"}
-            style={{
-              height: isMobile ? "auto" : "calc(100vh - 80px)",
-              //height: isMobile ? "auto" : "calc(100vh - 160px)",
-              border: "none",
-            }}
-          >
-            {!isMobile && (
-              <Splitter.Panel
-                defaultSize="18%"
-                min="18%"
-                max="20%"
-                style={panelStyles.left}
-                collapsible={{ start: true, end: true }}
-              >
-                <Flex vertical style={{ padding: 14, gap: 14 }}>
-                  <Flex align="center" gap={8}>
-                    <FilterOutlined style={{ color: beachColors.deepBlue }} />
-                    <Title
-                      level={4}
-                      style={{
-                        margin: 0,
-                        color: beachColors.deepBlue,
-                        fontSize: 16,
-                      }}
-                    >
-                      Filtros
-                    </Title>
-                  </Flex>
-
-                  <Tree
-                    checkable
-                    defaultExpandAll
-                    treeData={treeData}
-                    checkedKeys={checkedKeys}
-                    onCheck={(keys) => applyTreeCheckedKeys(keys)}
-                    style={{ fontSize: 12 }}
-                  />
-
-                  <Card size="small" style={{ borderRadius: 12 }}>
-                    <Flex vertical gap={8}>
-                      <Flex align="center" gap={8}>
-                        <CalendarOutlined
-                          style={{ color: beachColors.oceanBlue }}
-                        />
-                        <Text strong>Disponibilidad (fechas)</Text>
-                      </Flex>
-
-                      <Flex wrap gap={6}>
-                        <Tag color={hasDateFilter ? "green" : "default"}>
-                          {hasDateFilter
-                            ? `${filters.startDate} → ${filters.endDate}`
-                            : "Sin rango"}
-                        </Tag>
-                        <Tag color="blue">{filters.guests} huésped(es)</Tag>
-                        {hasDateFilter && filters.onlyAvailable ? (
-                          <Tag color="green">Solo disponibles</Tag>
-                        ) : null}
-                      </Flex>
-                    </Flex>
-                  </Card>
-
-                  <Flex gap={8}>
-                    <Button onClick={clearFilters} style={{ borderRadius: 10 }}>
-                      Limpiar
-                    </Button>
-                    <Button
-                      type="primary"
-                      icon={<FilterOutlined />}
-                      style={{
-                        borderRadius: 10,
-                        background: beachColors.teal,
-                        borderColor: beachColors.teal,
-                      }}
-                      onClick={handleApplyTreeFilters}
-                      loading={loadingHabitaciones}
-                    >
-                      Aplicar
-                    </Button>
-                  </Flex>
-                </Flex>
-              </Splitter.Panel>
-            )}
-
-            <Splitter.Panel
-              defaultSize={isMobile ? "100%" : "52%"}
-              min={isMobile ? "100%" : "52%"}
-              style={panelStyles.center}
-            >
-              <Flex
-                vertical
-                gap={18}
-                style={{ maxWidth: 900, margin: "0 auto" }}
-              >
-                <HeroCarousel currentUser={currentUser} />
-
-                <Flex
-                  justify="space-between"
-                  align="center"
-                  wrap
-                  gap={8}
-                  style={{ marginTop: 4 }}
-                >
-                  <Flex gap={10} align="center">
-                    <Title
-                      level={4}
-                      style={{
-                        margin: 0,
-                        fontSize: 18,
-                        color: "#0f172a",
-                        fontWeight: 600,
-                      }}
-                    >
-                      Alojamientos disponibles
-                    </Title>
-
-                    <Tooltip title="Resultados después de aplicar filtros">
-                      <Tag
-                        color={filteredCards.length ? "blue" : "default"}
-                        style={{ borderRadius: 999 }}
-                      >
-                        {filteredCards.length} resultado(s)
-                      </Tag>
-                    </Tooltip>
-
-                    {hasDateFilter && (
-                      <Tag
-                        color={filters.onlyAvailable ? "green" : "default"}
-                        style={{ borderRadius: 999 }}
-                      >
-                        {filters.onlyAvailable
-                          ? "Solo disponibles"
-                          : "Incluye ocupadas"}
-                      </Tag>
-                    )}
-                  </Flex>
-
-                  <Space size={6} align="center">
-                    <Button
-                      size="small"
-                      icon={<ReloadOutlined />}
-                      onClick={() => emitQuery({ showToast: true })}
-                      style={{ borderRadius: 999, fontSize: 10 }}
-                      loading={loadingHabitaciones}
-                    >
-                      Re-sincronizar
-                    </Button>
-                    {/* 
-                    {!isMobile && (
-                      <Button
-                        size="small"
-                        type="text"
-                        icon={
-                          <CommentOutlined
-                            style={{ color: beachColors.teal }}
-                          />
-                        }
-                        onClick={() => setOpenChat(true)}
-                      >
-                        Asistencia
-                      </Button>
-                    )}
-                    */}
-                  </Space>
-                </Flex>
-
-                {error ? (
-                  <Card style={{ borderRadius: 14 }}>
-                    <Text type="danger">
-                      Error al cargar habitaciones:{" "}
-                      {error?.message || "desconocido"}
-                    </Text>
-                  </Card>
-                ) : null}
-
-                {loadingHabitaciones ? (
-                  <Card style={{ borderRadius: 14 }}>
-                    <Flex align="center" gap={10}>
-                      <Spin />
-                      <Text>Sincronizando habitaciones…</Text>
-                    </Flex>
-                  </Card>
-                ) : filteredCards.length === 0 ? (
-                  <Card style={{ borderRadius: 14 }}>
-                    <Empty
-                      description={
-                        <Flex vertical gap={6}>
-                          <Text strong>No hay resultados con esos filtros</Text>
-                          <Text type="secondary" style={{ fontSize: 12 }}>
-                            Prueba limpiar filtros o ajustar fechas / servicios.
-                          </Text>
-                        </Flex>
-                      }
-                    />
-                    <Flex justify="center" gap={10} style={{ marginTop: 10 }}>
-                      <Button
-                        onClick={clearFilters}
-                        style={{ borderRadius: 999 }}
-                      >
-                        Limpiar filtros
-                      </Button>
-                      <Button
-                        type="primary"
-                        onClick={() => emitQuery({ showToast: true })}
-                        style={{ borderRadius: 999 }}
-                      >
-                        Reintentar
-                      </Button>
-                    </Flex>
-                  </Card>
-                ) : (
-                  <RoomCards
-                    beachColors={beachColors}
-                    cardsData={cardsToShow}
-                    loading={loadingHabitaciones}
-                    onReservaExpress={handleReservaExpress}
-                    onInfoWhatsapp={handleInfoWhatsapp}
-                    pagination={pagination}
-                    onPageChange={handleChangePageHabitaciones}
-                  />
-                )}
-              </Flex>
-            </Splitter.Panel>
-
-            <Splitter.Panel
-              defaultSize="30%"
-              min="30%"
-              max="30%"
-              style={panelStyles.right}
-            >
-              <Flex vertical gap={12}>
-                <Recommendcards
-                  recommendedDestinations={[]}
-                  beachColors={beachColors}
-                  loading={false}
-                />
-
-                <Card
-                  bordered={false}
-                  style={{
-                    borderRadius: 14,
-                    background: "#ffffff",
-                    boxShadow: "0 6px 18px rgba(148,163,253,0.16)",
-                  }}
-                >
-                  <Flex vertical gap={6}>
-                    <Text strong style={{ fontSize: 13, color: "#0f172a" }}>
-                      ¿Por qué reservar aquí?
-                    </Text>
-                    <Text style={{ fontSize: 11, color: "#6b7280" }}>
-                      Información directa, trato cercano y alojamientos
-                      seleccionados especialmente para tus huéspedes.
-                    </Text>
-                    <Flex gap={6} wrap>
-                      <Tag
-                        color={beachColors.teal}
-                        style={{
-                          borderRadius: 999,
-                          fontSize: 9,
-                          color: "#064e3b",
-                        }}
-                      >
-                        Atención personalizada
-                      </Tag>
-                      <Tag
-                        color={beachColors.turquoise}
-                        style={{
-                          borderRadius: 999,
-                          fontSize: 9,
-                          color: "#065f46",
-                        }}
-                      >
-                        Reservas seguras
-                      </Tag>
-                      <Tag
-                        color={beachColors.sand}
-                        style={{
-                          borderRadius: 999,
-                          fontSize: 9,
-                          color: beachColors.deepBlue,
-                        }}
-                      >
-                        Experiencias únicas
-                      </Tag>
-                    </Flex>
-                  </Flex>
-                </Card>
-              </Flex>
-            </Splitter.Panel>
-          </Splitter>
-        </main>
-
-        {/* FOOTER */}
-        <footer
-          style={{
-            //marginTop: 28,
-            padding: "28px 14px 22px",
-            background: `linear-gradient(135deg, ${beachColors.deepBlue}, ${beachColors.oceanBlue})`,
-            color: "white",
-            position: "relative",
-            overflow: "hidden",
-          }}
-        >
-          <div
-            style={{
-              position: "absolute",
-              inset: 0,
-              background:
-                "radial-gradient(900px 220px at 20% 0%, rgba(255,255,255,0.18), transparent 60%), radial-gradient(700px 240px at 85% 10%, rgba(45,212,191,0.14), transparent 55%)",
-              pointerEvents: "none",
-            }}
-          />
-
-          <Flex
-            vertical
-            gap={14}
-            style={{ position: "relative", maxWidth: 1100, margin: "0 auto" }}
-          >
-            <Flex
-              justify="space-between"
-              align="flex-start"
-              wrap
-              gap={16}
-              style={{
-                padding: "14px 16px",
-                borderRadius: 18,
-                background: "rgba(255,255,255,0.08)",
-                border: "1px solid rgba(255,255,255,0.16)",
-                backdropFilter: "blur(10px)",
-                boxShadow: "0 18px 40px rgba(0,0,0,0.18)",
-              }}
-            >
-              {/* Marca */}
-              <Flex
-                vertical
-                gap={8}
-                style={{ minWidth: 260, flex: "1 1 320px" }}
-              >
-                <Flex align="center" gap={10}>
-                  <div
-                    style={{
-                      width: 34,
-                      height: 34,
-                      borderRadius: 12,
-                      background: "rgba(255,255,255,0.12)",
-                      border: "1px solid rgba(255,255,255,0.18)",
-                      display: "grid",
-                      placeItems: "center",
-                      boxShadow: "0 10px 20px rgba(0,0,0,0.18)",
-                    }}
-                    aria-hidden
-                  >
-                    <span style={{ fontWeight: 800, fontSize: 14 }}>HF</span>
-                  </div>
-
-                  <div style={{ lineHeight: 1.1 }}>
-                    <Text
-                      style={{ color: "#fff", fontWeight: 800, fontSize: 14 }}
-                    >
-                      Hoteles Frida
-                    </Text>
-                    <div>
-                      <Text
-                        style={{
-                          color: "rgba(255,255,255,0.78)",
-                          fontSize: 11,
-                        }}
-                      >
-                        Reservas directas · Atención personalizada
-                      </Text>
-                    </div>
-                  </div>
-                </Flex>
-
-                <Text style={{ color: "rgba(255,255,255,0.80)", fontSize: 12 }}>
-                  Encuentra tu estancia ideal en la costa. Precios claros, trato
-                  cercano y confirmación rápida.
-                </Text>
-
-                {/* Trust badges (SIN emojis) */}
-                <Flex wrap gap={8}>
-                  <span
-                    style={{
-                      padding: "4px 10px",
-                      borderRadius: 999,
-                      fontSize: 11,
-                      background: "rgba(45,212,191,0.18)",
-                      border: "1px solid rgba(45,212,191,0.30)",
-                      color: "#ecfeff",
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: 6,
-                    }}
-                  >
-                    <SafetyCertificateOutlined style={{ fontSize: 12 }} />
-                    Reservas seguras
-                  </span>
-
-                  <span
-                    style={{
-                      padding: "4px 10px",
-                      borderRadius: 999,
-                      fontSize: 11,
-                      background: "rgba(255,255,255,0.10)",
-                      border: "1px solid rgba(255,255,255,0.18)",
-                      color: "rgba(255,255,255,0.92)",
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: 6,
-                    }}
-                  >
-                    <ThunderboltOutlined style={{ fontSize: 12 }} />
-                    Respuesta rápida
-                  </span>
-
-                  <span
-                    style={{
-                      padding: "4px 10px",
-                      borderRadius: 999,
-                      fontSize: 11,
-                      background: "rgba(251,146,60,0.16)",
-                      border: "1px solid rgba(251,146,60,0.28)",
-                      color: "#fff7ed",
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: 6,
-                    }}
-                  >
-                    <CompassOutlined style={{ fontSize: 12 }} />
-                    Experiencias únicas
-                  </span>
-                </Flex>
-              </Flex>
-
-              {/* Links (con iconos) */}
-              <Flex
-                vertical
-                gap={8}
-                style={{ minWidth: 180, flex: "0 1 220px" }}
-              >
-                <Text style={{ color: "#fff", fontWeight: 700, fontSize: 12 }}>
-                  Enlaces
-                </Text>
-
-                <Flex vertical gap={6}>
-                  {footerLinks.map((link, i) => (
-                    <a
-                      key={i}
-                      href={link.path}
-                      style={{
-                        color: "rgba(255,255,255,0.80)",
-                        fontSize: 12,
-                        textDecoration: "none",
-                        padding: "6px 10px",
-                        borderRadius: 10,
-                        border: "1px solid transparent",
-                        transition: "all 160ms ease",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 8,
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.color = "#ffffff";
-                        e.currentTarget.style.background =
-                          "rgba(255,255,255,0.10)";
-                        e.currentTarget.style.borderColor =
-                          "rgba(255,255,255,0.18)";
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.color = "rgba(255,255,255,0.80)";
-                        e.currentTarget.style.background = "transparent";
-                        e.currentTarget.style.borderColor = "transparent";
-                      }}
-                    >
-                      <span style={{ display: "inline-flex" }}>
-                        {link.icon}
-                      </span>
-                      {link.nombre}
-                    </a>
-                  ))}
-                </Flex>
-              </Flex>
-
-              {/* CTA */}
-              <Flex
-                vertical
-                gap={10}
-                style={{ minWidth: 220, flex: "0 1 260px" }}
-              >
-                <Text style={{ color: "#fff", fontWeight: 700, fontSize: 12 }}>
-                  ¿Necesitas ayuda?
-                </Text>
-
-                <Text style={{ color: "rgba(255,255,255,0.78)", fontSize: 12 }}>
-                  Escríbenos y te asesoramos con disponibilidad y
-                  recomendaciones.
-                </Text>
-
-                <Flex gap={10} wrap>
-                  <Button
-                    size="small"
-                    type="primary"
-                    icon={<WhatsAppOutlined />}
-                    style={{
-                      borderRadius: 999,
-                      height: 34,
-                      paddingInline: 14,
-                      fontWeight: 900,
-                      background: `linear-gradient(90deg, ${beachColors.turquoise}, ${beachColors.teal})`,
-                      border: "none",
-                      boxShadow: "0 10px 22px rgba(45,212,191,0.28)",
-                    }}
-                    onClick={() => {
-                      const numero = "9994485069";
-                      const texto =
-                        "Hola, quiero ayuda para reservar en Hoteles Frida.";
-                      window.open(
-                        `https://wa.me/${numero}?text=${encodeURIComponent(
-                          texto
-                        )}`,
-                        "_blank",
-                        "noopener,noreferrer"
-                      );
-                    }}
-                  >
-                    WhatsApp
-                  </Button>
-
-                  <Button
-                    size="small"
-                    ghost
-                    icon={<ArrowUpOutlined />}
-                    style={{
-                      borderRadius: 999,
-                      height: 34,
-                      paddingInline: 14,
-                      fontWeight: 900,
-                      color: "#fff",
-                      borderColor: "rgba(255,255,255,0.35)",
-                    }}
-                    onClick={() =>
-                      window.scrollTo({ top: 0, behavior: "smooth" })
-                    }
-                  >
-                    Volver arriba
-                  </Button>
-                </Flex>
-              </Flex>
-            </Flex>
-
+        <div className="hf-detailGrid">
+          <div className="hf-detailMain">
             <div
+              className="hf-detailImage"
               style={{
-                height: 1,
-                background: "rgba(255,255,255,0.14)",
-                marginTop: 2,
+                backgroundImage: `url('${
+                  selectedItem?.img ||
+                  "https://images.unsplash.com/photo-1520250497591-112f2f40a3f4?auto=format&fit=crop&w=2200&q=70"
+                }')`,
               }}
             />
 
-            <Flex
-              justify="space-between"
-              align="center"
-              wrap
-              gap={10}
-              style={{ paddingInline: 6 }}
-            >
-              <Text style={{ color: "rgba(255,255,255,0.80)", fontSize: 12 }}>
-                © {new Date().getFullYear()} Hoteles Frida. Todos los derechos
-                reservados.
-              </Text>
+            <div className="hf-detailFormCard">
+              <div className="hf-detailFormRow">
+                <div className="hf-field">
+                  <div className="hf-fieldLabel">Fechas</div>
+                  <DatePicker.RangePicker
+                    value={range}
+                    onChange={setRange}
+                    className="hf-fieldControl"
+                    placeholder={["Check-in", "Check-out"]}
+                    suffixIcon={<CalendarOutlined />}
+                  />
+                </div>
 
-              <Text style={{ color: "rgba(255,255,255,0.70)", fontSize: 11 }}>
-                Hecho con <HeartFilled style={{ fontSize: 12 }} /> en Yucatán
-              </Text>
-            </Flex>
-          </Flex>
-        </footer>
+                <div className="hf-field">
+                  <div className="hf-fieldLabel">Sucursal</div>
+                  <Select
+                    value={branch}
+                    onChange={setBranch}
+                    className="hf-fieldControl"
+                    options={SUCURSALES.map((s) => ({
+                      label: `${s.name} · ${s.subtitle}`,
+                      value: s.key,
+                    }))}
+                    suffixIcon={<DownOutlined />}
+                  />
+                </div>
+              </div>
 
-        <FloatButton
-          icon={<ArrowUpOutlined />}
-          tooltip="Volver arriba"
-          style={{ right: 18, bottom: 18 }}
-          onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
-        />
+              <div className="hf-detailFormRow hf-detailFormRow--bottom">
+                <div className="hf-field" style={{ flex: 1 }}>
+                  <div className="hf-fieldLabel">Huéspedes</div>
+                  <div className="hf-peopleRow">
+                    <InputNumber
+                      min={1}
+                      max={10}
+                      value={people}
+                      onChange={(v) => setPeople(v || 1)}
+                      className="hf-peopleInput"
+                    />
+                    <div
+                      className="hf-peopleMini"
+                      aria-label="Control rápido de huéspedes"
+                    >
+                      <button
+                        type="button"
+                        className="hf-miniBtn"
+                        onClick={() =>
+                          setPeople((p) => Math.max(1, (p || 1) - 1))
+                        }
+                      >
+                        -
+                      </button>
+                      <div className="hf-miniVal">{people}</div>
+                      <button
+                        type="button"
+                        className="hf-miniBtn"
+                        onClick={() =>
+                          setPeople((p) => Math.min(10, (p || 1) + 1))
+                        }
+                      >
+                        +
+                      </button>
+                    </div>
+                  </div>
+                </div>
 
-        {/*
-        <ChatSoporte
-          open={openChat}
-          onClose={() => setOpenChat(false)}
-          isMobile={isMobile}
-          habitacionSeleccionada={habitacionSeleccionada}
-          onFinalizarReserva={handleChatClosedForReserva}
-        />
-        */}
+                <div className="hf-detailIcons">
+                  <div className="hf-iconChip" title="Ubicación">
+                    <EnvironmentOutlined />
+                  </div>
+                  <div className="hf-iconChip" title="Huéspedes">
+                    <UserOutlined />
+                  </div>
+                </div>
+              </div>
+
+              <div className="hf-detailMiniNote">
+                <Text className="hf-detailMiniText">
+                  {branchLabel} ·{" "}
+                  {nights ? `${nights} noche(s)` : "Selecciona fechas"} · $
+                  {pricePerNight}/noche
+                </Text>
+              </div>
+            </div>
+          </div>
+
+          <div className="hf-detailSide">
+            <div className="hf-summaryCard">
+              <div className="hf-summaryTitle">Resumen</div>
+
+              <div className="hf-summaryLine">
+                <span>Fechas</span>
+                <span className="hf-summaryValue">
+                  {range?.[0] && range?.[1]
+                    ? `${range[0].format("DD/MM")} – ${range[1].format(
+                        "DD/MM"
+                      )}`
+                    : "—"}
+                </span>
+              </div>
+
+              <div className="hf-summaryLine">
+                <span>Sucursal</span>
+                <span className="hf-summaryValue">{branchLabel}</span>
+              </div>
+
+              <div className="hf-summaryLine">
+                <span>Huéspedes</span>
+                <span className="hf-summaryValue">{people}</span>
+              </div>
+
+              <div className="hf-summaryLine">
+                <span>Total</span>
+                <span className="hf-summaryValue">${total}</span>
+              </div>
+
+              <Button
+                className="hf-confirmBtn"
+                type="primary"
+                onClick={() =>
+                  onConfirm({
+                    range,
+                    branch,
+                    people,
+                    total,
+                    pricePerNight,
+                    nights,
+                  })
+                }
+                disabled={!range?.[0] || !range?.[1]}
+              >
+                Confirmar reserva
+              </Button>
+            </div>
+
+            <div className="hf-miniCard">
+              <div className="hf-miniCardTop">Info rápida</div>
+              <div className="hf-miniCardBody">
+                <div className="hf-miniPlay">
+                  <div className="hf-playIcon">✓</div>
+                  <div className="hf-playText">
+                    Check-in fácil y atención directa
+                  </div>
+                </div>
+                <div className="hf-miniPlay" style={{ marginTop: 10 }}>
+                  <div className="hf-playIcon">✓</div>
+                  <div className="hf-playText">
+                    WiFi y espacios listos para descansar
+                  </div>
+                </div>
+              </div>
+              <div
+                className="hf-miniCardImg"
+                style={{
+                  backgroundImage:
+                    "url('https://images.unsplash.com/photo-1505691938895-1758d7feb511?auto=format&fit=crop&w=1800&q=70')",
+                }}
+              />
+            </div>
+          </div>
+        </div>
       </div>
-    </ConfigProvider>
+    </div>
   );
 }
+
+/** ACCOUNT */
+function BookingRow({ b, onOpen }) {
+  const btnColor = beachColors.oceanBlue;
+  return (
+    <div className="hf-bookRow">
+      <div
+        className="hf-bookThumb"
+        style={{ backgroundImage: `url('${b.img}')` }}
+      />
+      <div className="hf-bookMid">
+        <div className="hf-bookTitle">{b.title}</div>
+        <div className="hf-bookMeta">
+          <Rate disabled value={b.stars} />
+          <span className="hf-bookMetaText">{b.details}</span>
+        </div>
+      </div>
+
+      <div className="hf-bookRight">
+        <StatusPill text={b.status.text} colorKey={b.status.color} />
+        <Button
+          className="hf-bookBtn"
+          type="primary"
+          style={{ background: btnColor, borderColor: btnColor }}
+          onClick={onOpen}
+        >
+          Ver detalle
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function AccountPage({ bookings, favoritesCount, onOpenDetail }) {
+  const hasBookings = bookings.length > 0;
+
+  return (
+    <div className="hf-pageBody hf-viewEnter">
+      <div className="hf-accountWrap hf-accountWrap--wide">
+        <div className="hf-accountCard">
+          <div className="hf-accountTabs">
+            <Tabs
+              defaultActiveKey="mis"
+              items={[
+                { key: "mis", label: "Mis Reservas" },
+                { key: "fav", label: `Favoritos (${favoritesCount})` },
+                { key: "msg", label: "Mensajes" },
+              ]}
+            />
+          </div>
+
+          <div className="hf-accountList">
+            {hasBookings ? (
+              bookings.map((b) => (
+                <BookingRow key={b.key} b={b} onOpen={() => onOpenDetail(b)} />
+              ))
+            ) : (
+              <div className="hf-empty hf-empty--pad">
+                <FilterOutlined /> Aún no tienes reservas. Haz una búsqueda y
+                confirma una estancia.
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** APP */
+const App = () => {
+  const [view, setView] = useState("home"); // home | search | detail | account
+
+  const [form, setForm] = useState({
+    branch: undefined,
+    range: null,
+  });
+
+  const [selected, setSelected] = useState(null);
+
+  const [favorites, setFavorites] = useState(() => new Set());
+  const [bookings, setBookings] = useState([]);
+
+  const theme = useMemo(
+    () => ({
+      token: {
+        colorPrimary: beachColors.oceanBlue,
+        colorInfo: beachColors.oceanBlue,
+        colorSuccess: beachColors.teal,
+        colorWarning: beachColors.sunset,
+        colorError: beachColors.coral,
+        fontFamily:
+          'ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Ubuntu, Cantarell, "Noto Sans", Arial',
+        borderRadius: 14,
+        controlHeight: 40,
+      },
+    }),
+    []
+  );
+
+  const setFormPatch = (patch) => setForm((s) => ({ ...s, ...patch }));
+
+  const goHome = () => setView("home");
+  const goSearch = () => {
+    setView("search");
+    message.info("Búsqueda abierta");
+  };
+  const goAccount = () => setView("account");
+
+  const toggleFav = (key) => {
+    setFavorites((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) {
+        next.delete(key);
+        message.info("Quitado de favoritos");
+      } else {
+        next.add(key);
+        message.success("Guardado en favoritos");
+      }
+      return next;
+    });
+  };
+
+  const reserveFromFeatured = (item) => {
+    setSelected(item);
+    setView("detail");
+    message.success("Abriendo detalle");
+  };
+
+  const reserveFromSearch = (it) => {
+    setSelected(it);
+    setView("detail");
+    message.success("Detalle seleccionado");
+  };
+
+  const confirmReserve = (payload) => {
+    const s = SUCURSALES.find((x) => x.key === payload.branch);
+    const branchLabel = s ? `${s.name} · ${s.subtitle}` : "Sucursal";
+
+    const newBooking = {
+      key: `b-${dayjs().valueOf()}`,
+      title: selected?.title || "Reserva",
+      img:
+        selected?.img ||
+        "https://images.unsplash.com/photo-1520250497591-112f2f40a3f4?auto=format&fit=crop&w=1400&q=70",
+      stars: Math.round((selected?.rating || 4.5) * 2) / 2,
+      details: `${branchLabel} · ${payload.nights} noche(s) · ${payload.people} huésped(es)`,
+      status: { text: "Próxima", color: "turquoise" },
+      payload,
+      selected,
+    };
+
+    setBookings((b) => [newBooking, ...b]);
+    message.success("Reserva confirmada ✅");
+    setView("account");
+  };
+
+  const pickSucursal = (key) => {
+    setFormPatch({ branch: key });
+    message.success("Sucursal seleccionada");
+    setView("search");
+  };
+
+  return (
+    <ConfigProvider theme={theme}>
+      <Layout className="hf-app">
+        <Content className="hf-root">
+          {/* Notch / Barra superior (solo hover en centro) */}
+          <NotchBar view={view} setView={setView} />
+
+          <div className="hf-canvasWrap">
+            <div className="hf-canvas">
+              <Navbar
+                variant={view === "search" ? "light" : "gradient"}
+                onGoSearch={goSearch}
+                onGoAccount={goAccount}
+                onGoHome={goHome}
+              />
+
+              {view === "home" ? (
+                <HomePage
+                  form={form}
+                  setFormPatch={setFormPatch}
+                  onSearch={goSearch}
+                  onReserveFeatured={reserveFromFeatured}
+                  onPickSucursal={pickSucursal}
+                  favorites={favorites}
+                  onToggleFav={toggleFav}
+                />
+              ) : null}
+
+              {view === "search" ? (
+                <SearchPage
+                  initialForm={form}
+                  onReserveGoDetail={reserveFromSearch}
+                  favorites={favorites}
+                  onToggleFav={toggleFav}
+                />
+              ) : null}
+
+              {view === "detail" ? (
+                <DetailPage
+                  selectedItem={selected}
+                  initialForm={form}
+                  onConfirm={confirmReserve}
+                />
+              ) : null}
+
+              {view === "account" ? (
+                <AccountPage
+                  bookings={bookings}
+                  favoritesCount={favorites.size}
+                  onOpenDetail={(b) => {
+                    setSelected(b.selected || null);
+                    setView("detail");
+                    message.info("Mostrando detalle");
+                  }}
+                />
+              ) : null}
+
+              <Footer />
+            </div>
+          </div>
+        </Content>
+      </Layout>
+    </ConfigProvider>
+  );
+};
 
 export default App;
