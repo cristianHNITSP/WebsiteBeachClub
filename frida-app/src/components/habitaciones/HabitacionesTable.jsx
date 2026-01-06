@@ -1,4 +1,15 @@
-import { Table, Space, Typography, Badge, Button, Popconfirm, Tag, Grid, Skeleton } from "antd";
+// src/components/habitaciones/HabitacionesTable.jsx
+import {
+  Table,
+  Space,
+  Typography,
+  Badge,
+  Button,
+  Popconfirm,
+  Tag,
+  Grid,
+  Skeleton,
+} from "antd";
 import {
   EditOutlined,
   DeleteOutlined,
@@ -30,7 +41,8 @@ const HabitacionesTable = ({
   onRestore,
   onDeletePermanent,
   deletingRoomId,
-  onViewFutureReservations, // ✅ NEW
+  onViewFutureReservations,
+  sedesMeta = {}, // mapa opcional: { [sedeKey]: { label, color?, textColor? } }
 }) => {
   const screens = useBreakpoint();
   const isMobile = !screens.md;
@@ -43,11 +55,33 @@ const HabitacionesTable = ({
       render: (codigo, record) => (
         <Space direction="vertical" size={0}>
           <Space size={6}>
-            <HomeOutlined style={{ fontSize: 13, color: beachColors.deepBlue }} />
-            <Text style={{ fontWeight: 600, color: neutrals.textMain, fontSize: 12 }}>{codigo}</Text>
-            {record.isDeleted && <Tag style={{ borderRadius: 999, fontSize: 10, marginLeft: 6 }}>Papelera</Tag>}
+            <HomeOutlined
+              style={{ fontSize: 13, color: beachColors.deepBlue }}
+            />
+            <Text
+              style={{
+                fontWeight: 600,
+                color: neutrals.textMain,
+                fontSize: 12,
+              }}
+            >
+              {codigo}
+            </Text>
+            {record.isDeleted && (
+              <Tag
+                style={{
+                  borderRadius: 999,
+                  fontSize: 10,
+                  marginLeft: 6,
+                }}
+              >
+                Papelera
+              </Tag>
+            )}
           </Space>
-          <Text style={{ fontSize: 10, color: neutrals.textMuted }}>{record.title}</Text>
+          <Text style={{ fontSize: 10, color: neutrals.textMuted }}>
+            {record.title}
+          </Text>
         </Space>
       ),
     },
@@ -57,11 +91,38 @@ const HabitacionesTable = ({
       key: "hotelCode",
       width: 130,
       responsive: ["md"],
-      render: (hotelCode) => {
-        const meta = getSedeMeta(hotelCode);
+      render: (hotelCode, record) => {
+        // clave preferida: sedeKey (nuevo) o hotelCode (legacy)
+        const key = record?.sedeKey || hotelCode;
+
+        // 1) meta que venga del backend (si algún día lo envías)
+        const apiMeta =
+          key && sedesMeta && Object.prototype.hasOwnProperty.call(sedesMeta, key)
+            ? sedesMeta[key]
+            : null;
+
+        // 2) fallback legacy: helpers.js (Casa Frida / Cabañas Frida)
+        const legacyMeta = getSedeMeta(hotelCode);
+
+        const label =
+          apiMeta?.label ||
+          apiMeta?.name ||
+          legacyMeta.label ||
+          hotelCode ||
+          "Sin sede";
+        const color = apiMeta?.color || legacyMeta.color || "#e5e7eb";
+        const textColor = apiMeta?.textColor || legacyMeta.textColor || "#111827";
+
         return (
-          <Tag color={meta.color} style={{ borderRadius: 999, fontSize: 10, color: meta.textColor }}>
-            {meta.label}
+          <Tag
+            color={color}
+            style={{
+              borderRadius: 999,
+              fontSize: 10,
+              color: textColor,
+            }}
+          >
+            {label}
           </Tag>
         );
       },
@@ -72,7 +133,11 @@ const HabitacionesTable = ({
       key: "roomType",
       width: 100,
       responsive: ["md"],
-      render: (roomType) => <Text style={{ fontSize: 11, color: neutrals.textMuted }}>{roomType}</Text>,
+      render: (roomType) => (
+        <Text style={{ fontSize: 11, color: neutrals.textMuted }}>
+          {roomType}
+        </Text>
+      ),
     },
     {
       title: "Ubicación",
@@ -80,7 +145,11 @@ const HabitacionesTable = ({
       key: "location",
       width: 160,
       responsive: ["lg"],
-      render: (location) => <Text style={{ fontSize: 11, color: neutrals.textMuted }}>{location}</Text>,
+      render: (location) => (
+        <Text style={{ fontSize: 11, color: neutrals.textMuted }}>
+          {location}
+        </Text>
+      ),
     },
     {
       title: "Capacidad",
@@ -91,7 +160,11 @@ const HabitacionesTable = ({
       render: (size) => (
         <Badge
           count={getCapacityLabel(size)}
-          style={{ backgroundColor: beachColors.turquoise, color: "#064e3b", fontSize: 9 }}
+          style={{
+            backgroundColor: beachColors.turquoise,
+            color: "#064e3b",
+            fontSize: 9,
+          }}
         />
       ),
     },
@@ -102,7 +175,13 @@ const HabitacionesTable = ({
       align: "right",
       width: 110,
       render: (price) => (
-        <Text style={{ fontSize: 11, color: neutrals.textMain, fontWeight: 500 }}>
+        <Text
+          style={{
+            fontSize: 11,
+            color: neutrals.textMain,
+            fontWeight: 500,
+          }}
+        >
           ${Number(price || 0).toLocaleString("es-MX")}
         </Text>
       ),
@@ -115,11 +194,28 @@ const HabitacionesTable = ({
       responsive: ["md"],
       render: (_, record) => {
         if (!hasPromo(record)) {
-          return <Tag style={{ borderRadius: 999, fontSize: 10, color: neutrals.textMuted }}>Sin promo</Tag>;
+          return (
+            <Tag
+              style={{
+                borderRadius: 999,
+                fontSize: 10,
+                color: neutrals.textMuted,
+              }}
+            >
+              Sin promo
+            </Tag>
+          );
         }
         const pct = record.offer.discountPercent;
         return (
-          <Tag color={beachColors.sunset} style={{ borderRadius: 999, fontSize: 10, color: "#7c2d12" }}>
+          <Tag
+            color={beachColors.sunset}
+            style={{
+              borderRadius: 999,
+              fontSize: 10,
+              color: "#7c2d12",
+            }}
+          >
             -{pct}% OFF
           </Tag>
         );
@@ -136,8 +232,20 @@ const HabitacionesTable = ({
         const favs = favoritesCount || 0;
         return (
           <Space size={4} style={{ justifyContent: "center" }}>
-            <HeartFilled style={{ fontSize: 12, color: favs > 0 ? beachColors.coral : "#d1d5db" }} />
-            <Text style={{ fontSize: 11, color: favs > 0 ? neutrals.textMain : neutrals.textMuted }}>{favs}</Text>
+            <HeartFilled
+              style={{
+                fontSize: 12,
+                color: favs > 0 ? beachColors.coral : "#d1d5db",
+              }}
+            />
+            <Text
+              style={{
+                fontSize: 11,
+                color: favs > 0 ? neutrals.textMain : neutrals.textMuted,
+              }}
+            >
+              {favs}
+            </Text>
           </Space>
         );
       },
@@ -152,7 +260,12 @@ const HabitacionesTable = ({
         return (
           <Tag
             color={meta.color}
-            style={{ borderRadius: 999, fontSize: 10, color: meta.textColor, opacity: record.isDeleted ? 0.65 : 1 }}
+            style={{
+              borderRadius: 999,
+              fontSize: 10,
+              color: meta.textColor,
+              opacity: record.isDeleted ? 0.65 : 1,
+            }}
           >
             {meta.label}
           </Tag>
@@ -229,7 +342,6 @@ const HabitacionesTable = ({
                   <Button
                     size="small"
                     type="text"
-                    icon={<RollbackOutlined />}
                     loading={deletingRoomId === record._id}
                     style={{ color: beachColors.teal }}
                   >
@@ -263,7 +375,8 @@ const HabitacionesTable = ({
     },
   ];
 
-  const showSkeleton = loading && (!habitaciones || habitaciones.length === 0);
+  const showSkeleton =
+    loading && (!habitaciones || habitaciones.length === 0);
   if (showSkeleton) {
     return (
       <div style={{ marginTop: 8 }}>
@@ -282,12 +395,27 @@ const HabitacionesTable = ({
           >
             <Skeleton.Avatar active size="small" shape="circle" />
             <div style={{ flex: 1 }}>
-              <Skeleton.Input active size="small" style={{ width: "60%", marginBottom: 4 }} />
-              <Skeleton.Input active size="small" style={{ width: "40%" }} />
+              <Skeleton.Input
+                active
+                size="small"
+                style={{
+                  width: "60%",
+                  marginBottom: 4,
+                }}
+              />
+              <Skeleton.Input
+                active
+                size="small"
+                style={{ width: "40%" }}
+              />
             </div>
             {!isMobile && (
               <div style={{ width: 140 }}>
-                <Skeleton.Input active size="small" style={{ width: "100%" }} />
+                <Skeleton.Input
+                  active
+                  size="small"
+                  style={{ width: "100%" }}
+                />
               </div>
             )}
           </div>
@@ -304,7 +432,11 @@ const HabitacionesTable = ({
         dataSource={habitaciones}
         rowKey="_id"
         loading={loading}
-        pagination={{ ...pagination, pageSize: 5, showSizeChanger: false }}
+        pagination={{
+          ...pagination,
+          pageSize: 5,
+          showSizeChanger: false,
+        }}
         onChange={(pag) => onChangePage(pag.current || 1)}
         style={{ marginTop: 4 }}
         scroll={{ x: "max-content" }}

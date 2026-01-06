@@ -10,6 +10,7 @@ const createHabitacionesRouter = require("./routes/habitaciones.routes");
 const reservasRoutes = require("./routes/reservas.routes");
 const heroSlideRoutes = require("./routes/heroSlide.routes");
 const publicReservasRouter = require("./routes/public.reservas.router");
+const sedesRoutes = require('./routes/sedes.routes');
 
 const Habitacion = require("./models/Habitacion");
 const { bindHabitacionesSocket } = require("./ws/habitaciones.socket");
@@ -76,7 +77,8 @@ bindHabitacionesSocket(io);
 app.use("/api/habitaciones", createHabitacionesRouter(io));
 app.use("/api/reservas", reservasRoutes);
 app.use("/api/hero-slides", heroSlideRoutes);
-app.use("/api/public", publicReservasRouter);   
+app.use("/api/public", publicReservasRouter);  
+app.use('/api/sedes', sedesRoutes);
 
 app.get("/", (req, res) => {
   res.send("🏨 reservas-service (habitaciones + reservas) OK con Socket.IO");

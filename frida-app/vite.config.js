@@ -33,6 +33,9 @@ export default defineConfig(({ mode }) => {
         "/api/habitaciones": { target: RESERVAS_TARGET, changeOrigin: true },
         "/api/hero-slides": { target: RESERVAS_TARGET, changeOrigin: true },
 
+        // NUEVO: sedes en reservas-service
+        "/api/sedes": { target: RESERVAS_TARGET, changeOrigin: true },
+
         // Socket.IO (muy importante)
         "/socket.io": {
           target: RESERVAS_TARGET,
@@ -40,11 +43,10 @@ export default defineConfig(({ mode }) => {
           ws: true,
         },
 
-
         // shop-service (ANTES de "/api")
         "/api/shop": { target: SHOP_TARGET, changeOrigin: true },
 
-        // Auth + users
+        // Auth + users (catch-all)
         "/api": { target: USERS_TARGET, changeOrigin: true },
       },
     },

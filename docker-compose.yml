@@ -15,11 +15,13 @@
 
 #COMANDOS DEV
 #sudo docker exec -it beachclub-users-service-dev node src/seed/seed-users.js
+#sudo docker exec -it beachclub-users-service-dev node src/seed/seed-sedes.js
 #sudo docker exec -it beachclub-reservas-service-dev node src/seed/seed-data.js
-#sudo docker exec -it beachclub-shop-service-dev node src/seed/shop-data.js
+#sudo docker exec -it beachclub-shop-service-dev node src/seed/seed-shop.js
 
 #COMANDOS PROD
 #sudo docker exec -it beachclub-users-service-prod node src/seed/seed-users.js
+#sudo docker exec -it beachclub-users-service-prod node src/seed/seed-sedes.js
 #sudo docker exec -it beachclub-reservas-service-prod node src/seed/seed-data.js
 #sudo docker exec -it beachclub-shop-service-prod node src/seed/seed-shop.js
 

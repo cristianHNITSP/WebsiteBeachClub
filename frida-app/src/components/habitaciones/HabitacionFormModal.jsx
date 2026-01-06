@@ -1,3 +1,4 @@
+// src/components/habitaciones/HabitacionFormModal.jsx
 import React from "react";
 import {
   Modal,
@@ -11,7 +12,6 @@ import {
   Typography,
 } from "antd";
 import {
-  SEDES,
   CAPACITY_OPTIONS,
   tiposHabitacion,
   INVENTORY_STATES,
@@ -29,7 +29,10 @@ const HabitacionFormModal = ({
   onCancel,
   onOk,
   saving,
+  sedesOptions = [], // 👈 opciones de sede que vienen ya con disabled si isActive === false
 }) => {
+  const opcionesSede = Array.isArray(sedesOptions) ? sedesOptions : [];
+
   return (
     <Modal
       open={visible}
@@ -109,7 +112,7 @@ const HabitacionFormModal = ({
         </Form.Item>
 
         <Form.Item label="Ubicación" name="location">
-          <Input placeholder="Ej. Tulum, frente al mar..." />
+          <Input placeholder="Ej. Chuburná, frente al mar..." />
         </Form.Item>
 
         <Form.Item label="Imagen (URL)" name="img">
@@ -129,9 +132,14 @@ const HabitacionFormModal = ({
               ]}
             >
               <Select placeholder="Selecciona">
-                {SEDES.map((s) => (
-                  <Option key={s.value} value={s.value}>
+                {opcionesSede.map((s) => (
+                  <Option
+                    key={s.value}
+                    value={s.value}
+                    disabled={s.disabled} // 👈 si la sede está inactiva, no se puede elegir
+                  >
                     {s.label}
+                    {s.disabled && " (inactiva)"}
                   </Option>
                 ))}
               </Select>

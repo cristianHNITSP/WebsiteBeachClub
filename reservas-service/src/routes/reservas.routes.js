@@ -132,6 +132,7 @@ function computeBilling({ price, offer, startDate, endDate }) {
  *  - roomMeta: { price, offer }
  *  - billing: cálculo dinámico desde Habitacion (por si cambias precio/oferta)
  *  - totalAmount: snapshot guardado en la reserva (si existe), o billing.total como fallback
+ *  - guest + paymentMethod
  */
 function toEventDto(r, habMeta = null) {
   const habitacionId = r?.habitacionId ? String(r.habitacionId) : null;
@@ -164,6 +165,8 @@ function toEventDto(r, habMeta = null) {
       ? round2(billing.total)
       : null;
 
+  const guest = r.guest || {};
+
   return {
     id: String(r._id),
     habitacionId,
@@ -180,6 +183,17 @@ function toEventDto(r, habMeta = null) {
     checkinAt: r.checkinAt || null,
     checkoutAt: r.checkoutAt || null,
     paidAt: r.paidAt || null,
+
+    guest: {
+      fullName: guest.fullName || "",
+      email: guest.email || "",
+      phone: guest.phone || "",
+      guests:
+        typeof guest.guests === "number" && guest.guests > 0
+          ? guest.guests
+          : 1,
+    },
+    paymentMethod: r.paymentMethod || "",
 
     roomMeta: habMeta
       ? { price: habMeta.price, offer: habMeta.offer || null }
@@ -263,7 +277,7 @@ router.get(
       const onlyAvail = String(onlyAvailable) === "true";
 
       const hq = { isDeleted: false };
-      if (hotel) hq.hotelCode = hotel;
+      if (hotel && hotel !== "todas") hq.hotelCode = hotel;
 
       if (q && String(q).trim()) {
         const s = String(q)
@@ -290,7 +304,7 @@ router.get(
 
       if (hasRange) {
         const rq = { isDeleted: false, type: "stay" };
-        if (hotel) rq.hotel = hotel;
+        if (hotel && hotel !== "todas") rq.hotel = hotel;
         rq.startDate = { $lte: endDate };
         rq.endDate = { $gte: startDate };
 
@@ -358,7 +372,7 @@ router.get(
       const { hotel, from, to } = req.query;
 
       const q = { isDeleted: false, type: "stay" };
-      if (hotel) q.hotel = hotel;
+      if (hotel && hotel !== "todas") q.hotel = hotel;
 
       if (isDateStr(from) && isDateStr(to)) {
         q.startDate = { $lte: to };
@@ -411,7 +425,7 @@ router.get(
       const { hotel, from, to } = req.query;
 
       const q = { isDeleted: true, type: "stay" };
-      if (hotel) q.hotel = hotel;
+      if (hotel && hotel !== "todas") q.hotel = hotel;
 
       if (isDateStr(from) && isDateStr(to)) {
         q.startDate = { $lte: to };
@@ -467,7 +481,7 @@ router.get(
       const { hotel, from, to } = req.query;
 
       const q = {};
-      if (hotel) q.hotel = hotel;
+      if (hotel && hotel !== "todas") q.hotel = hotel;
 
       if (isDateStr(from) || isDateStr(to)) {
         const gte = isDateStr(from)
@@ -493,17 +507,7 @@ router.get(
 
 /**
  * GET /api/reservas/stats/mensuales
- * Stats de los últimos N meses (por defecto 6):
- *  - roomsRented: cantidad de reservas que inician en ese mes
- *  - revenue: suma de totalAmount de esas reservas
- *  - nightsBooked / nights: noches ocupadas en el mes
- *  - totalRoomNights / availableRoomNights: habitaciones * días del mes
- *  - occupancyPct: noches ocupadas / noches disponibles
- *  - avgStayNights: estancia promedio (noches) de reservas que inician en el mes
- *  - avgLeadTimeDays: días de anticipación promedio (startDate - createdAt)
- *  - weekdayBreakdown: % de noches por día de la semana (mon..sun)
- *  - roomTypeBreakdown: [{ roomType, roomsRented, occupancyPct }]
- *  - channels: método de reservación (con count y revenue)
+ * (sigue calculando stats globales, sin filtro por hotel)
  */
 router.get(
   "/stats/mensuales",
@@ -888,6 +892,7 @@ router.get(
  * soporta "paid: true" para crear marcada como pagada
  * billing viene de Habitacion (no snapshot)
  * totalAmount se guarda en la reserva como snapshot
+ * guest + paymentMethod vienen del body
  */
 router.post(
   "/",
@@ -895,8 +900,17 @@ router.post(
   requirePermissions(["manage_reservations"]),
   async (req, res) => {
     try {
-      const { habitacionId, startDate, endDate, label, notes, origen, paid } =
-        req.body;
+      const {
+        habitacionId,
+        startDate,
+        endDate,
+        label,
+        notes,
+        origen,
+        paid,
+        guest,
+        paymentMethod,
+      } = req.body;
 
       if (!habitacionId || !isDateStr(startDate) || !isDateStr(endDate)) {
         return fail(
@@ -983,6 +997,16 @@ router.post(
         totalAmount = billing.total;
       }
 
+      const normalizedGuest = {
+        fullName: guest?.fullName || "",
+        email: guest?.email || "",
+        phone: guest?.phone || "",
+        guests:
+          typeof guest?.guests === "number" && guest.guests > 0
+            ? guest.guests
+            : 1,
+      };
+
       const reserva = await Reserva.create({
         habitacionId,
         hotel,
@@ -995,6 +1019,8 @@ router.post(
         origen: origen || "manual",
         paidAt: isPaid ? hoy : null,
         totalAmount,
+        guest: normalizedGuest,
+        paymentMethod: paymentMethod || "",
       });
 
       rlog("POST /reservas created", {

@@ -1,3 +1,4 @@
+// src/components/habitaciones/HabitacionesHeader.jsx
 import React from "react";
 import { Row, Col, Space, Typography, Button } from "antd";
 import { PlusOutlined, ReloadOutlined } from "@ant-design/icons";
@@ -12,6 +13,7 @@ const HabitacionesHeader = ({
   onNueva,
   onRecargar,
   loading,
+  onOpenSedes,
 }) => {
   return (
     <Row gutter={[12, 12]} align="middle" justify="space-between">
@@ -71,6 +73,20 @@ const HabitacionesHeader = ({
           >
             Recargar
           </Button>
+
+          {canManageRooms && (
+            <Button
+              size="small"
+              onClick={onOpenSedes}
+              disabled={loading}
+              style={{
+                borderRadius: 999,
+                fontSize: 11,
+              }}
+            >
+              Gestionar sedes
+            </Button>
+          )}
 
           <Button
             type="primary"

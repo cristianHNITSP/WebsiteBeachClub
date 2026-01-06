@@ -12,7 +12,7 @@ import {
   Card,
   Table,
   theme,
-  DatePicker, // ⬅️ nuevo
+  DatePicker,
 } from "antd";
 import {
   CalendarOutlined,
@@ -36,18 +36,28 @@ dayjs.locale("es");
 const { Text } = Typography;
 const DATE_FMT = "YYYY-MM-DD";
 
-/* ===================== SEDES ===================== */
-const HOTELES = {
-  casa_frida: "Casa Frida",
-  cabanas_fridas: "Cabañas Fridas",
-};
-const HOTELES_SHORT = {
-  casa_frida: "CF",
-  cabanas_fridas: "CB",
+/* ===================== SEDES ESCALABLES ===================== */
+const humanizeHotelCode = (code) => {
+  const s = String(code || "")
+    .trim()
+    .replace(/[-_]+/g, " ")
+    .replace(/\s+/g, " ");
+  if (!s) return "Sede no especificada";
+  return s
+    .split(" ")
+    .map((w) => (w ? w[0].toUpperCase() + w.slice(1) : ""))
+    .join(" ");
 };
 
-const getHotelLabel = (hotel) => HOTELES[hotel] || "Sede no especificada";
-const getHotelShort = (hotel) => HOTELES_SHORT[hotel] || "";
+const getHotelLabel = (hotel) => humanizeHotelCode(hotel);
+
+const getHotelShort = (hotel) => {
+  const label = humanizeHotelCode(hotel);
+  const words = label.split(" ").filter(Boolean);
+  if (!words.length) return "";
+  if (words.length === 1) return words[0].slice(0, 2).toUpperCase();
+  return (words[0][0] + words[words.length - 1][0]).toUpperCase();
+};
 
 /* ===================== ORIGEN / DINERO ===================== */
 const ORIGEN_LABELS = {
@@ -712,19 +722,16 @@ const RoomGridCalendar = ({
   onPopoverLock,
   onCloseAllPopovers,
 }) => {
-  // ⬅️ ahora guardamos una fecha seleccionada
   const [selectedDate, setSelectedDate] = useState(dayjs());
   const [hoveredChipKey, setHoveredChipKey] = useState(null);
   const [collapsedOverflowByRoom, setCollapsedOverflowByRoom] = useState({});
   const { token } = theme.useToken();
 
-  // el mes se deriva de la fecha seleccionada
   const month = useMemo(
     () => selectedDate.startOf("month"),
     [selectedDate]
   );
 
-  // Más compacto
   const FIRST_COL_WIDTH = compacto ? 190 : 220;
   const cellHeight = compacto ? 30 : 36;
   const cellWidth = compacto ? 56 : 72;
@@ -779,7 +786,7 @@ const RoomGridCalendar = ({
           key,
           hotel,
           room,
-          label: `${getHotelShort(hotel)} · Hab ${room}`,
+          label: `${getHotelShort(hotel) ? getHotelShort(hotel) + " · " : ""}Hab ${room}`,
         });
       }
     }
@@ -1196,7 +1203,6 @@ const RoomGridCalendar = ({
                   onPopoverToggle?.(instanceKey, open)
                 }
               >
-                {/* ===== CHIP RESERVA (grid para que el $ tenga su columna fija) ===== */}
                 <div
                   onMouseEnter={() => setHoveredChipKey(instanceKey)}
                   onMouseLeave={() =>
@@ -1346,7 +1352,6 @@ const RoomGridCalendar = ({
           </Text>
         </div>
 
-        {/* ⬅️ Nuevo selector de fecha + indicador de hoy */}
         <Space size={6} wrap>
           <DatePicker
             size="small"

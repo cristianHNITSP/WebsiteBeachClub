@@ -58,9 +58,9 @@ const { RangePicker } = DatePicker;
 const RESERVAS_ENDPOINT = "/api/reservas";
 const RESERVAS_HABS_ENDPOINT = "/api/reservas/habitaciones";
 const RESERVAS_DATE_CHANGES_ENDPOINT = "/api/reservas/date-changes";
-
-//NUEVO: endpoints de papelera (con fallback si tu backend no los tiene)
 const RESERVAS_TRASH_ENDPOINT = "/api/reservas/trash";
+//NUEVO: endpoint de sedes
+const SEDES_ENDPOINT = "/api/sedes";
 
 const DATE_FMT = "YYYY-MM-DD";
 
@@ -75,17 +75,29 @@ const moneyMXN = (n) => {
   return new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN" }).format(num);
 };
 
-/* ===================== SEDES ===================== */
-const HOTELES = {
-  casa_frida: "Casa Frida",
-  cabanas_fridas: "Cabañas Fridas",
+/* ===================== SEDES (ESCALABLES) ===================== */
+// Toma un code tipo "casa_frida" y lo vuelve "Casa Frida"
+const humanizeHotelCode = (code) => {
+  const s = String(code || "")
+    .trim()
+    .replace(/[-_]+/g, " ")
+    .replace(/\s+/g, " ");
+  if (!s) return "Sede no especificada";
+  return s
+    .split(" ")
+    .map((w) => (w ? w[0].toUpperCase() + w.slice(1) : ""))
+    .join(" ");
 };
-const HOTELES_SHORT = {
-  casa_frida: "CF",
-  cabanas_fridas: "CB",
+
+const getHotelLabel = (hotel) => humanizeHotelCode(hotel);
+
+const getHotelShort = (hotel) => {
+  const label = humanizeHotelCode(hotel);
+  const words = label.split(" ").filter(Boolean);
+  if (!words.length) return "";
+  if (words.length === 1) return words[0].slice(0, 2).toUpperCase();
+  return (words[0][0] + words[words.length - 1][0]).toUpperCase();
 };
-const getHotelLabel = (hotel) => HOTELES[hotel] || "Sede no especificada";
-const getHotelShort = (hotel) => HOTELES_SHORT[hotel] || "";
 
 /* ===================== STATUS / ROOM HELPERS ===================== */
 const getRoomStatusLabel = (inventoryStatus) => {
@@ -182,7 +194,7 @@ const TooltipContenidoEvento = ({
   const [openActions, setOpenActions] = useState(false);
   const [confirmKey, setConfirmKey] = useState(null); // "delete" | "checkout" | null
 
-  //aMantener Popover abierto mientras haya dropdown/confirm (evita Popconfirm pegado)
+  // a Mantener Popover abierto mientras haya dropdown/confirm (evita Popconfirm pegado)
   useEffect(() => {
     const locked = !!confirmKey || !!openActions;
     onLockPopover?.(popoverKey, locked);
@@ -208,10 +220,11 @@ const TooltipContenidoEvento = ({
   const todayStr = dayjs().format(DATE_FMT);
   const sameDayCheckoutRisk = !!evento?.checkinAt && String(evento.checkinAt) === todayStr && !evento?.checkoutAt;
 
-  //Billing viene del backend (Habitacion.price/offer)
+  // Billing viene del backend (Habitacion.price/offer)
   const billing = evento?.billing || null;
   const hasDiscount = Number.isFinite(Number(billing?.discountPercent)) && Number(billing.discountPercent) > 0;
-  const billingLooksInvalid = billing && (Number(billing.pricePerDay) <= 0 || Number(billing.total) <= 0) ? true : false;
+  const billingLooksInvalid =
+    billing && (Number(billing.pricePerDay) <= 0 || Number(billing.total) <= 0) ? true : false;
 
   const closeActions = () => setOpenActions(false);
   const closeConfirm = () => setConfirmKey(null);
@@ -229,12 +242,13 @@ const TooltipContenidoEvento = ({
     if (key === "delete") return onDelete?.(eid);
   };
 
-  const estadoAccion = pending?.[eid]?.any ? (
-    <div style={{ fontSize: 9.5, color: neutrals.textMuted, display: "flex", gap: 6, alignItems: "center" }}>
-      <ReloadOutlined spin />
-      <span>Aplicando cambios…</span>
-    </div>
-  ) : null;
+  const estadoAccion =
+    pending?.[eid]?.any ? (
+      <div style={{ fontSize: 9.5, color: neutrals.textMuted, display: "flex", gap: 6, alignItems: "center" }}>
+        <ReloadOutlined spin />
+        <span>Aplicando cambios…</span>
+      </div>
+    ) : null;
 
   const acciones = [
     esReserva
@@ -375,7 +389,8 @@ const TooltipContenidoEvento = ({
         flexDirection: "column",
         gap: 6,
         color: neutrals.textMain,
-        fontFamily: '"SF Pro Text", "Inter", -apple-system, BlinkMacSystemFont, system-ui, sans-serif',
+        fontFamily:
+          '"SF Pro Text", "Inter", -apple-system, BlinkMacSystemFont, system-ui, sans-serif',
         fontSize: 11,
         minWidth: 280,
       }}
@@ -702,7 +717,14 @@ const tooltipContenidoListaExtra = (lista) => (
 );
 
 /* ===================== PANEL PROGRAMACIÓN (BACKEND) ===================== */
-const PanelProgramacionManual = ({ esMobile, onCreated, filtroHotel, messageApi }) => {
+const PanelProgramacionManual = ({
+  esMobile,
+  onCreated,
+  filtroHotel,
+  messageApi,
+  sedesOptions,   // viene del padre
+  sedesLoading,   // viene del padre
+}) => {
   const [formulario] = Form.useForm();
   const [enviando, setEnviando] = useState(false);
 
@@ -818,7 +840,7 @@ const PanelProgramacionManual = ({ esMobile, onCreated, filtroHotel, messageApi 
         label: etiquetaFinal,
         notes: notas || "",
         origen: origen || "directo",
-        origenPanel: "manual", // si quieres distinguir en el futuro, solo a nivel de backend
+        origenPanel: "manual",
         origenUi: origen || "directo",
         origenSource: "panel",
         origenChannel: origen || "directo",
@@ -902,10 +924,20 @@ const PanelProgramacionManual = ({ esMobile, onCreated, filtroHotel, messageApi 
               placeholder="Sede"
               style={{ width: esMobile ? "100%" : 150 }}
               allowClear
+              loading={loadingHabOptions || sedesLoading}
               onChange={() => formulario.setFieldsValue({ habitacion: undefined })}
             >
-              <Option value="casa_frida">Casa Frida</Option>
-              <Option value="cabanas_fridas">Cabañas Fridas</Option>
+              {sedesOptions && sedesOptions.length ? (
+                sedesOptions.map((opt) => (
+                  <Option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </Option>
+                ))
+              ) : (
+                <Option key="no-sedes" value="__no_sede" disabled>
+                  No hay sedes activas
+                </Option>
+              )}
             </Select>
           </Form.Item>
 
@@ -1251,7 +1283,7 @@ const PapeleraTab = ({ filtroHotel, esMobile, onRestored }) => {
     if (filtroHotel !== "all") params.hotel = filtroHotel;
     if (range?.[0] && range?.[1]) {
       params.from = range[0].startOf("day").format(DATE_FMT);
-      params.to = range[1].endOf("day").format(DATE_FMT);
+      params.to = range[1].startOf("day").format(DATE_FMT);
     }
     if (q?.trim()) params.q = q.trim();
 
@@ -1615,6 +1647,10 @@ const HabitacionesReservaView = ({ isMobile: forzarMobile }) => {
   const [loadingEventos, setLoadingEventos] = useState(true);
   const [filtroHotel, setFiltroHotel] = useState("all");
 
+  // 👇 NUEVO: sedes desde backend
+  const [sedes, setSedes] = useState([]);
+  const [loadingSedes, setLoadingSedes] = useState(false);
+
   const [pending, setPending] = useState({});
   const setPendingAction = (id, action, value) => {
     const sid = String(id);
@@ -1662,6 +1698,33 @@ const HabitacionesReservaView = ({ isMobile: forzarMobile }) => {
     start: null,
     end: null,
   });
+
+  // 👇 NUEVO: carga de sedes desde /api/sedes
+  const loadSedes = useCallback(async () => {
+    setLoadingSedes(true);
+    try {
+      const res = await axios.get(SEDES_ENDPOINT);
+      const raw = res?.data || [];
+      const arr = Array.isArray(raw) ? raw : [];
+
+      const activos = arr.filter((s) => s.isActive !== false);
+      setSedes(activos);
+
+      if (DEBUG_RESERVAS) {
+        console.log("[UI loadSedes] sedes:", activos);
+      }
+    } catch (e) {
+      console.error("Error cargando sedes:", e);
+      setSedes([]);
+      messageApi.error("No se pudieron cargar las sedes (usando datos del calendario).");
+    } finally {
+      setLoadingSedes(false);
+    }
+  }, [messageApi, DEBUG_RESERVAS]);
+
+  useEffect(() => {
+    loadSedes();
+  }, [loadSedes]);
 
   const loadReservas = useCallback(async () => {
     const msgKey = "load_reservas";
@@ -1952,6 +2015,37 @@ const HabitacionesReservaView = ({ isMobile: forzarMobile }) => {
     </div>
   );
 
+  // 👇 NUEVO: opciones de sedes para selects (vienen del backend con fallback)
+  const sedesSelectOptions = useMemo(() => {
+    if (sedes && sedes.length) {
+      const arr = sedes.map((s) => ({
+        value: s.key,
+        label: s.name || getHotelLabel(s.key),
+      }));
+      arr.sort((a, b) => a.label.localeCompare(b.label, "es"));
+      return arr;
+    }
+
+    // Fallback si no se pudieron cargar sedes: derivar de eventos (comportamiento anterior)
+    const map = new Map();
+    for (const e of eventos) {
+      const code = e.hotel || e.hotelCode || e.siteKey || e.sede || "";
+      if (!code) continue;
+      if (!map.has(code)) {
+        map.set(code, {
+          value: code,
+          label: getHotelLabel(code),
+        });
+      }
+    }
+    return Array.from(map.values()).sort((a, b) => a.label.localeCompare(b.label, "es"));
+  }, [sedes, eventos]);
+
+  const hotelFilterOptions = useMemo(
+    () => [{ value: "all", label: "Todas las sedes" }, ...sedesSelectOptions],
+    [sedesSelectOptions]
+  );
+
   const selectorHotel = (
     <Select
       size="small"
@@ -1959,18 +2053,20 @@ const HabitacionesReservaView = ({ isMobile: forzarMobile }) => {
       onChange={setFiltroHotel}
       style={{ minWidth: 160 }}
       dropdownMatchSelectWidth={false}
+      loading={loadingSedes}
     >
-      <Option value="all">Todas las sedes</Option>
-      <Option value="casa_frida">Casa Frida</Option>
-      <Option value="cabanas_fridas">Cabañas Fridas</Option>
+      {hotelFilterOptions.map((opt) => (
+        <Option key={opt.value} value={opt.value}>
+          {opt.label}
+        </Option>
+      ))}
     </Select>
   );
 
   const renderCeldaFecha = (valor) => {
     const fechaStr = valor.format(DATE_FMT);
     const lista = eventos.filter(
-      (e) =>
-        eventoCubreFecha(e, fechaStr) && (filtroHotel === "all" || e.hotel === filtroHotel)
+      (e) => eventoCubreFecha(e, fechaStr) && (filtroHotel === "all" || e.hotel === filtroHotel)
     );
     if (!lista.length) return null;
 
@@ -2105,32 +2201,32 @@ const HabitacionesReservaView = ({ isMobile: forzarMobile }) => {
   };
 
   const calendarViewTabs = [
-{
-  key: "classic",
-  label: "Vista por días",
-  children: (
-    <RoomGridCalendar
-      eventos={eventos}
-      filtroHotel={filtroHotel}
-      compacto={esMobileFinal}
-      loading={loadingEventos}
-      // mismas acciones que el calendario moderno
-      onCheckin={marcarCheckin}
-      onCheckout={marcarCheckout}
-      onPaid={marcarPagado}
-      onUnpaid={marcarPendientePago}
-      onDelete={eliminarEvento}
-      onRequestEditDates={requestEditDates}
-      pending={pending}
-      // control global de popovers (compartido con ambas vistas)
-      isMobileUI={esMobileFinal}
-      openPopoverKey={openPopoverKey}
-      onPopoverToggle={setPopoverOpenSafe}
-      onPopoverLock={setPopoverLocked}
-      onCloseAllPopovers={closeAllPopovers}
-    />
-  ),
-},
+    {
+      key: "classic",
+      label: "Vista por días",
+      children: (
+        <RoomGridCalendar
+          eventos={eventos}
+          filtroHotel={filtroHotel}
+          compacto={esMobileFinal}
+          loading={loadingEventos}
+          // mismas acciones que el calendario moderno
+          onCheckin={marcarCheckin}
+          onCheckout={marcarCheckout}
+          onPaid={marcarPagado}
+          onUnpaid={marcarPendientePago}
+          onDelete={eliminarEvento}
+          onRequestEditDates={requestEditDates}
+          pending={pending}
+          // control global de popovers (compartido con ambas vistas)
+          isMobileUI={esMobileFinal}
+          openPopoverKey={openPopoverKey}
+          onPopoverToggle={setPopoverOpenSafe}
+          onPopoverLock={setPopoverLocked}
+          onCloseAllPopovers={closeAllPopovers}
+        />
+      ),
+    },
 
     {
       key: "modern",
@@ -2236,6 +2332,8 @@ const HabitacionesReservaView = ({ isMobile: forzarMobile }) => {
             onCreated={handleCreated}
             filtroHotel={filtroHotel}
             messageApi={messageApi}
+            sedesOptions={sedesSelectOptions}  // 👈 sedes desde backend
+            sedesLoading={loadingSedes}
           />
 
           <Tabs
@@ -2255,17 +2353,10 @@ const HabitacionesReservaView = ({ isMobile: forzarMobile }) => {
       children: <CambiosFechasTab filtroHotel={filtroHotel} esMobile={esMobileFinal} />,
     },
 
-    //NUEVO TAB: PAPELERA
     {
       key: "papelera",
       label: "Papelera",
-      children: (
-        <PapeleraTab
-          filtroHotel={filtroHotel}
-          esMobile={esMobileFinal}
-          onRestored={loadReservas}
-        />
-      ),
+      children: <PapeleraTab filtroHotel={filtroHotel} esMobile={esMobileFinal} onRestored={loadReservas} />,
     },
   ];
 
@@ -2318,22 +2409,16 @@ const HabitacionesReservaView = ({ isMobile: forzarMobile }) => {
         okText="Guardar"
         cancelText="Cancelar"
         onOk={applyEditDates}
-        onCancel={() =>
-          setEditModal({ open: false, eventoId: null, start: null, end: null })
-        }
+        onCancel={() => setEditModal({ open: false, eventoId: null, start: null, end: null })}
         destroyOnClose
       >
         {(() => {
-          const ev = eventos.find(
-            (x) => getEventId(x) === String(editModal.eventoId)
-          );
+          const ev = eventos.find((x) => getEventId(x) === String(editModal.eventoId));
           const hasCheckin = !!ev?.checkinAt;
           const hasCheckout = !!ev?.checkoutAt;
 
           return (
-            <div
-              style={{ display: "flex", flexDirection: "column", gap: 10 }}
-            >
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               {hasCheckout && (
                 <Text style={{ fontSize: 12, color: neutrals.textMuted }}>
                   Esta reserva ya tiene <b>check-out</b>. No se permiten cambios.
@@ -2342,8 +2427,7 @@ const HabitacionesReservaView = ({ isMobile: forzarMobile }) => {
 
               {hasCheckin && !hasCheckout && (
                 <Text style={{ fontSize: 12, color: neutrals.textMuted }}>
-                  Ya existe <b>check-in</b>. Solo puedes cambiar la{" "}
-                  <b>salida</b>.
+                  Ya existe <b>check-in</b>. Solo puedes cambiar la <b>salida</b>.
                 </Text>
               )}
 

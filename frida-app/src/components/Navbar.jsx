@@ -63,7 +63,7 @@ const Navbar = ({
   // Gradiente más sobrio (menos “glass”)
   const headerBg = isLight
     ? token.colorBgContainer
-    : `linear-gradient(180deg, ${beachColors.deepBlue} 0%, ${beachColors.oceanBlue} 100%)`;
+    : `linear-gradient(90deg, ${beachColors.oceanBlue}, ${beachColors.teal})`;
 
   const headerStyle = {
     height: TOKENS.h,
@@ -72,6 +72,7 @@ const Navbar = ({
     top: 0,
     zIndex: 50,
     background: headerBg,
+    //backgroundImage: `linear-gradient(90deg, ${beachColors.oceanBlue}, ${beachColors.teal})`,
     borderBottom: isLight
       ? `1px solid ${token.colorBorderSecondary}`
       : "1px solid rgba(255,255,255,.10)",

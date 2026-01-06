@@ -133,22 +133,6 @@ const SEARCH_ITEMS = [
   },
 ];
 
-function SoftWaveTop() {
-  return (
-    <svg
-      className="hf-heroWave"
-      viewBox="0 0 1440 180"
-      preserveAspectRatio="none"
-      aria-hidden="true"
-    >
-      <path
-        d="M0,95 C240,155 520,50 760,95 C1030,145 1220,130 1440,80 L1440,180 L0,180 Z"
-        fill="rgba(255,255,255,0.97)"
-      />
-    </svg>
-  );
-}
-
 function StatusPill({ text, colorKey }) {
   const map = {
     turquoise: beachColors.turquoise,

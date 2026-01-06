@@ -254,7 +254,7 @@ function createHabitacionesRouter(io) {
   /**
    * GET /api/habitaciones/:id/reservas.futuras?page=1&limit=6
    * Devuelve reservas futuras/activas PENDIENTES (sin checkout) de esa habitación.
-   * ✅ Ahora incluye billing calculado desde Habitacion.price/offer
+   * ✅ Incluye billing calculado desde Habitacion.price/offer
    */
   router.get(
     "/:id/reservas.futuras",
@@ -299,7 +299,9 @@ function createHabitacionesRouter(io) {
             .sort({ startDate: 1 })
             .skip(skip)
             .limit(limit)
-            .select("_id codigoReserva hotel room startDate endDate label notes origen checkinAt checkoutAt paidAt createdAt")
+            .select(
+              "_id codigoReserva hotel room startDate endDate label notes origen checkinAt checkoutAt paidAt createdAt guest paymentMethod totalAmount"
+            )
             .lean(),
           Reserva.countDocuments(baseQuery),
         ]);
@@ -347,7 +349,6 @@ function createHabitacionesRouter(io) {
   /**
    * GET /api/habitaciones/public
    * (no es tu carga inicial, pero se deja compatible)
-   * ✅ Ahora por defecto y máximo 5 habitaciones por página
    */
   router.get("/public", async (req, res) => {
     try {
@@ -355,7 +356,7 @@ function createHabitacionesRouter(io) {
       const limitRaw = parseInt(req.query.limit, 10);
 
       const page = Math.max(pageRaw || 1, 1);
-      const limit = Math.min(Math.max(limitRaw || 6, 1), 6); // <= 5 siempre
+      const limit = Math.min(Math.max(limitRaw || 6, 1), 6);
       const skip = (page - 1) * limit;
 
       const filter = buildHabitacionesFilterFromQuery(req.query, { forPublic: true });

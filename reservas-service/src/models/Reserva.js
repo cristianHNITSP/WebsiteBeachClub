@@ -46,7 +46,23 @@ const ReservaSchema = new mongoose.Schema(
       index: true,
     },
 
+    // 🔹 hotel = string de siempre (casa_frida, cabanas_fridas, etc.)
     hotel: { type: String, required: true, trim: true, index: true },
+
+    // 🔹 NUEVO: referencia a sede + clave
+    sedeId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Sede",
+      index: true,
+      default: null,
+    },
+    sedeKey: {
+      type: String,
+      trim: true,
+      index: true,
+      default: "",
+    },
+
     room: { type: String, required: true, trim: true, index: true },
 
     type: { type: String, enum: TYPES, default: "stay", index: true },
@@ -57,26 +73,24 @@ const ReservaSchema = new mongoose.Schema(
     label: { type: String, default: "", trim: true },
     notes: { type: String, default: "", trim: true },
 
-    // ahora puede ser: manual / web / seed / import / directo / whatsapp / booking / expedia / facebook
     origen: { type: String, enum: ORIGINS, default: "manual", index: true },
 
     checkinAt: { type: String, default: null, trim: true },
     checkoutAt: { type: String, default: null, trim: true },
     paidAt: { type: String, default: null, trim: true },
 
-    //PAPELERA (soft delete)
+    totalAmount: { type: Number, default: null }, // 💰 snapshot
+
     isDeleted: { type: Boolean, default: false, index: true },
     deletedAt: { type: Date, default: null, index: true },
 
-    // dentro del ReservaSchema
-guest: {
-  fullName: { type: String, default: "", trim: true },
-  email: { type: String, default: "", trim: true },
-  phone: { type: String, default: "", trim: true },
-  guests: { type: Number, default: 1, min: 1, max: 20 },
-},
-paymentMethod: { type: String, default: "", trim: true },
-
+    guest: {
+      fullName: { type: String, default: "", trim: true },
+      email: { type: String, default: "", trim: true },
+      phone: { type: String, default: "", trim: true },
+      guests: { type: Number, default: 1, min: 1, max: 20 },
+    },
+    paymentMethod: { type: String, default: "", trim: true },
   },
   {
     timestamps: { createdAt: "createdAt", updatedAt: "updatedAt" },
@@ -84,7 +98,7 @@ paymentMethod: { type: String, default: "", trim: true },
   }
 );
 
-// autogenera si faltara (por seguridad)
+// 🔹 Pre-validate: rellenar sedeKey si no existe
 ReservaSchema.pre("validate", function (next) {
   if (!this.codigoReserva) {
     this.codigoReserva = genCodigoReserva({
@@ -93,6 +107,11 @@ ReservaSchema.pre("validate", function (next) {
       startDate: this.startDate,
     });
   }
+
+  if (!this.sedeKey && this.hotel) {
+    this.sedeKey = this.hotel;
+  }
+
   next();
 });
 
