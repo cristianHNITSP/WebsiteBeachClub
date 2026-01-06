@@ -1454,7 +1454,9 @@ router.patch(
 );
 
 /**
- * DELETE /api/reservas/:id (compat soft delete)
+ * DELETE /api/reservas/:id
+ * - sin hard: soft delete (isDeleted = true, se puede restaurar)
+ * - con hard=true: eliminación definitiva del documento
  */
 router.delete(
   "/:id",
@@ -1462,17 +1464,36 @@ router.delete(
   requirePermissions(["manage_reservations"]),
   async (req, res) => {
     try {
-      const reserva = await Reserva.findById(req.params.id);
+      const id = String(req.params.id);
+      const hard = String(req.query.hard || "").toLowerCase() === "true";
+
+      const reserva = await Reserva.findById(id);
       if (!reserva)
         return fail(res, 404, "NOT_FOUND", "Reserva no encontrada.");
 
-      if (reserva.isDeleted) {
-        const habMetaExisting = await Habitacion.findById(reserva.habitacionId)
-          .select("_id price offer")
-          .lean();
+      // Siempre calculamos meta + dto a partir del documento que SÍ existe ahora
+      const habMeta = await Habitacion.findById(reserva.habitacionId)
+        .select("_id price offer")
+        .lean();
+      const dto = toEventDto(reserva.toObject(), habMeta);
+
+      // Si viene hard=true → eliminación definitiva
+      if (hard) {
+        await Reserva.deleteOne({ _id: reserva._id });
+
         return res.json({
           ok: true,
-          data: toEventDto(reserva.toObject(), habMetaExisting),
+          hardDeleted: true,
+          data: dto, // snapshot para que el front sepa qué se eliminó
+        });
+      }
+
+      // Soft delete (comportamiento antiguo) → se manda a papelera
+      if (reserva.isDeleted) {
+        // ya estaba eliminada lógicamente, solo devolvemos el estado actual
+        return res.json({
+          ok: true,
+          data: dto,
         });
       }
 
@@ -1480,15 +1501,13 @@ router.delete(
       reserva.deletedAt = new Date();
       await reserva.save();
 
-      const habMeta = await Habitacion.findById(reserva.habitacionId)
-        .select("_id price offer")
-        .lean();
-      res.json({ ok: true, data: toEventDto(reserva.toObject(), habMeta) });
+      return res.json({ ok: true, data: toEventDto(reserva.toObject(), habMeta) });
     } catch (err) {
       rerr("[DELETE /reservas/:id] Error:", err);
       res.status(400).json({ error: "BAD_REQUEST", details: err.message });
     }
   }
 );
+
 
 module.exports = router;

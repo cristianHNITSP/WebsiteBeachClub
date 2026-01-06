@@ -9,14 +9,22 @@ import {
   Tag,
   Grid,
   Skeleton,
+  Image,
+  Descriptions,
+  Flex,
+  Tooltip,
+  Row,
+  Col,
 } from "antd";
 import {
   EditOutlined,
   DeleteOutlined,
   HomeOutlined,
   HeartFilled,
-  RollbackOutlined,
   HistoryOutlined,
+  PictureOutlined,
+  StarFilled,
+  CopyOutlined,
 } from "@ant-design/icons";
 import {
   getCapacityLabel,
@@ -30,6 +38,14 @@ import {
 const { Text } = Typography;
 const { useBreakpoint } = Grid;
 
+const PLACEHOLDER_IMG =
+  "https://via.placeholder.com/320x220?text=Sin+foto";
+
+const safeImg = (url) => {
+  const s = String(url || "").trim();
+  return s ? s : PLACEHOLDER_IMG;
+};
+
 const HabitacionesTable = ({
   loading,
   habitaciones,
@@ -42,10 +58,302 @@ const HabitacionesTable = ({
   onDeletePermanent,
   deletingRoomId,
   onViewFutureReservations,
-  sedesMeta = {}, // mapa opcional: { [sedeKey]: { label, color?, textColor? } }
+  sedesMeta = {}, // { [sedeKey]: { label, color?, textColor? } }
 }) => {
   const screens = useBreakpoint();
   const isMobile = !screens.md;
+
+  const copyToClipboard = async (value) => {
+    try {
+      await navigator.clipboard.writeText(String(value || ""));
+    } catch (_) {}
+  };
+
+  const ExpandedRow = ({ record }) => {
+    const key = record?.sedeKey || record?.hotelCode;
+
+    const apiMeta =
+      key && sedesMeta && Object.prototype.hasOwnProperty.call(sedesMeta, key)
+        ? sedesMeta[key]
+        : null;
+
+    const legacyMeta = getSedeMeta(record?.hotelCode);
+    const sedeLabel =
+      apiMeta?.label ||
+      apiMeta?.name ||
+      legacyMeta.label ||
+      record?.hotelCode ||
+      "Sin sede";
+
+    const estadoMeta = getEstadoMeta(record?.inventoryStatus);
+
+    const promo = hasPromo(record) ? record.offer : null;
+    const pct = promo?.discountPercent;
+
+    const amenities = Array.isArray(record?.amenities) ? record.amenities : [];
+
+    const rating = Number(record?.rating || 0);
+    const favs = Number(record?.favoritesCount || 0);
+
+    return (
+      <div
+        style={{
+          padding: 12,
+          background: "#f9fafb",
+          borderRadius: 8,
+        }}
+      >
+        <Row gutter={16} wrap>
+          <Col xs={24} sm={8} md={6}>
+            <div
+              style={{
+                borderRadius: 10,
+                overflow: "hidden",
+                border: "1px solid #e5e7eb",
+                background: "#f8fafc",
+              }}
+            >
+              <Image
+                src={safeImg(record?.img)}
+                alt={record?.title || "Habitación"}
+                width="100%"
+                height={180}
+                preview={false}
+                style={{ objectFit: "cover" }}
+                fallback={PLACEHOLDER_IMG}
+                placeholder={
+                  <div
+                    style={{
+                      height: 180,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      color: neutrals.textMuted,
+                      gap: 8,
+                    }}
+                  >
+                    <PictureOutlined />
+                    Cargando imagen…
+                  </div>
+                }
+              />
+            </div>
+
+            <Space
+              direction="vertical"
+              size={4}
+              style={{ marginTop: 8, width: "100%" }}
+            >
+              <Tooltip title="Copiar URL de imagen">
+                <Button
+                  size="small"
+                  block
+                  icon={<PictureOutlined />}
+                  onClick={() => copyToClipboard(record?.img)}
+                >
+                  Copiar imagen
+                </Button>
+              </Tooltip>
+            </Space>
+          </Col>
+
+          <Col xs={24} sm={16} md={18}>
+            <Flex
+              justify="space-between"
+              align="flex-start"
+              wrap
+              style={{ marginBottom: 8, gap: 8 }}
+            >
+              <Space direction="vertical" size={0}>
+                <Text
+                  style={{
+                    fontWeight: 700,
+                    fontSize: 14,
+                    color: neutrals.textMain,
+                  }}
+                >
+                  {record?.codigo || "—"} · {record?.title || "Habitación"}
+                </Text>
+                <Space size={6} wrap>
+                  <Tag
+                    color={legacyMeta?.color || "#e5e7eb"}
+                    style={{
+                      borderRadius: 999,
+                      fontSize: 10,
+                      color: legacyMeta?.textColor || "#111827",
+                      margin: 0,
+                    }}
+                  >
+                    {sedeLabel}
+                  </Tag>
+
+                  <Tag
+                    color={estadoMeta.color}
+                    style={{
+                      borderRadius: 999,
+                      fontSize: 10,
+                      color: estadoMeta.textColor,
+                      margin: 0,
+                      opacity: record?.isDeleted ? 0.65 : 1,
+                    }}
+                  >
+                    {estadoMeta.label}
+                  </Tag>
+
+                  {record?.featured ? (
+                    <Tag
+                      color={beachColors.turquoise}
+                      style={{
+                        borderRadius: 999,
+                        fontSize: 10,
+                        margin: 0,
+                        color: "#064e3b",
+                      }}
+                    >
+                      Destacada
+                    </Tag>
+                  ) : null}
+
+                  {record?.badge ? (
+                    <Tag
+                      color={beachColors.coral}
+                      style={{
+                        borderRadius: 999,
+                        fontSize: 10,
+                        margin: 0,
+                        color: "#7f1d1d",
+                      }}
+                    >
+                      {record.badge}
+                    </Tag>
+                  ) : null}
+
+                  {promo ? (
+                    <Tag
+                      color={beachColors.sunset}
+                      style={{
+                        borderRadius: 999,
+                        fontSize: 10,
+                        margin: 0,
+                        color: "#7c2d12",
+                      }}
+                    >
+                      Promo {typeof pct === "number" ? `-${pct}%` : ""}
+                    </Tag>
+                  ) : (
+                    <Tag
+                      style={{
+                        borderRadius: 999,
+                        fontSize: 10,
+                        margin: 0,
+                        color: neutrals.textMuted,
+                      }}
+                    >
+                      Sin promo
+                    </Tag>
+                  )}
+
+                  {record?.isDeleted ? (
+                    <Tag
+                      style={{
+                        borderRadius: 999,
+                        fontSize: 10,
+                        margin: 0,
+                      }}
+                    >
+                      Papelera
+                    </Tag>
+                  ) : null}
+                </Space>
+              </Space>
+
+              <Space size={10}>
+                <Space size={4}>
+                  <StarFilled
+                    style={{
+                      color:
+                        rating > 0 ? beachColors.sunset : "#d1d5db",
+                    }}
+                  />
+                  <Text style={{ fontSize: 12, fontWeight: 700 }}>
+                    {rating > 0 ? rating.toFixed(1) : "—"}
+                  </Text>
+                </Space>
+                <Space size={4}>
+                  <HeartFilled
+                    style={{
+                      color:
+                        favs > 0 ? beachColors.coral : "#d1d5db",
+                    }}
+                  />
+                  <Text style={{ fontSize: 12, fontWeight: 700 }}>
+                    {favs}
+                  </Text>
+                </Space>
+              </Space>
+            </Flex>
+
+            <Descriptions
+              size="small"
+              column={isMobile ? 1 : 2}
+              labelStyle={{ color: neutrals.textMuted, fontSize: 11 }}
+              contentStyle={{
+                color: neutrals.textMain,
+                fontSize: 12,
+                fontWeight: 600,
+              }}
+            >
+              <Descriptions.Item label="Tipo">
+                {record?.roomType || "—"}
+              </Descriptions.Item>
+              <Descriptions.Item label="Ubicación">
+                {record?.location || "—"}
+              </Descriptions.Item>
+              <Descriptions.Item label="Capacidad">
+                {getCapacityLabel(record?.size) || "—"}
+              </Descriptions.Item>
+              <Descriptions.Item label="Tarifa base">
+                ${Number(record?.price || 0).toLocaleString("es-MX")}
+              </Descriptions.Item>
+              <Descriptions.Item label="Código interno">
+                {record?.roomNumber || "—"}
+              </Descriptions.Item>
+            </Descriptions>
+
+            {amenities.length ? (
+              <div style={{ marginTop: 8 }}>
+                <Text
+                  style={{
+                    fontSize: 11,
+                    color: neutrals.textMuted,
+                    fontWeight: 700,
+                  }}
+                >
+                  Servicios
+                </Text>
+                <div style={{ marginTop: 4 }}>
+                  <Space size={[6, 6]} wrap>
+                    {amenities.map((a, i) => (
+                      <Tag
+                        key={`${a}-${i}`}
+                        style={{
+                          borderRadius: 999,
+                          fontSize: 10,
+                          margin: 0,
+                        }}
+                      >
+                        {a}
+                      </Tag>
+                    ))}
+                  </Space>
+                </div>
+              </div>
+            ) : null}
+          </Col>
+        </Row>
+      </div>
+    );
+  };
 
   const columns = [
     {
@@ -53,35 +361,76 @@ const HabitacionesTable = ({
       dataIndex: "codigo",
       key: "codigo",
       render: (codigo, record) => (
-        <Space direction="vertical" size={0}>
-          <Space size={6}>
-            <HomeOutlined
-              style={{ fontSize: 13, color: beachColors.deepBlue }}
+        <Space size={10} align="start">
+          <div
+            style={{
+              width: 40,
+              height: 40,
+              borderRadius: 10,
+              overflow: "hidden",
+              border: "1px solid #e5e7eb",
+              background: "#f8fafc",
+              flex: "0 0 auto",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <Image
+              src={safeImg(record?.img)}
+              width={40}
+              height={40}
+              preview={false}
+              style={{ objectFit: "cover" }}
+              fallback={PLACEHOLDER_IMG}
             />
-            <Text
-              style={{
-                fontWeight: 600,
-                color: neutrals.textMain,
-                fontSize: 12,
-              }}
-            >
-              {codigo}
-            </Text>
-            {record.isDeleted && (
-              <Tag
+          </div>
+
+          <Space direction="vertical" size={0} style={{ minWidth: 0 }}>
+            <Space size={6} wrap>
+              <HomeOutlined
+                style={{ fontSize: 13, color: beachColors.deepBlue }}
+              />
+              <Text
                 style={{
-                  borderRadius: 999,
-                  fontSize: 10,
-                  marginLeft: 6,
+                  fontWeight: 800,
+                  color: neutrals.textMain,
+                  fontSize: 12,
                 }}
               >
-                Papelera
-              </Tag>
-            )}
+                {codigo}
+              </Text>
+              {record.isDeleted && (
+                <Tag
+                  style={{
+                    borderRadius: 999,
+                    fontSize: 10,
+                    marginLeft: 4,
+                  }}
+                >
+                  Papelera
+                </Tag>
+              )}
+            </Space>
+
+            <Text
+              className="frida-ellipsis"
+              style={{
+                fontSize: 10,
+                color: neutrals.textMuted,
+                maxWidth: isMobile ? 220 : 420,
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+              }}
+            >
+              {record.title}
+            </Text>
+
+            {!isMobile ? (
+              <Text style={{ fontSize: 10, color: neutrals.textMuted }}>
+                {record.location || "—"} · {record.roomType || "—"}
+              </Text>
+            ) : null}
           </Space>
-          <Text style={{ fontSize: 10, color: neutrals.textMuted }}>
-            {record.title}
-          </Text>
         </Space>
       ),
     },
@@ -89,19 +438,16 @@ const HabitacionesTable = ({
       title: "Sede",
       dataIndex: "hotelCode",
       key: "hotelCode",
-      width: 130,
+      width: 140,
       responsive: ["md"],
       render: (hotelCode, record) => {
-        // clave preferida: sedeKey (nuevo) o hotelCode (legacy)
         const key = record?.sedeKey || hotelCode;
 
-        // 1) meta que venga del backend (si algún día lo envías)
         const apiMeta =
           key && sedesMeta && Object.prototype.hasOwnProperty.call(sedesMeta, key)
             ? sedesMeta[key]
             : null;
 
-        // 2) fallback legacy: helpers.js (Casa Frida / Cabañas Frida)
         const legacyMeta = getSedeMeta(hotelCode);
 
         const label =
@@ -110,6 +456,7 @@ const HabitacionesTable = ({
           legacyMeta.label ||
           hotelCode ||
           "Sin sede";
+
         const color = apiMeta?.color || legacyMeta.color || "#e5e7eb";
         const textColor = apiMeta?.textColor || legacyMeta.textColor || "#111827";
 
@@ -128,35 +475,12 @@ const HabitacionesTable = ({
       },
     },
     {
-      title: "Tipo",
-      dataIndex: "roomType",
-      key: "roomType",
-      width: 100,
-      responsive: ["md"],
-      render: (roomType) => (
-        <Text style={{ fontSize: 11, color: neutrals.textMuted }}>
-          {roomType}
-        </Text>
-      ),
-    },
-    {
-      title: "Ubicación",
-      dataIndex: "location",
-      key: "location",
-      width: 160,
-      responsive: ["lg"],
-      render: (location) => (
-        <Text style={{ fontSize: 11, color: neutrals.textMuted }}>
-          {location}
-        </Text>
-      ),
-    },
-    {
       title: "Capacidad",
       dataIndex: "size",
       key: "size",
       align: "center",
-      width: 110,
+      width: 120,
+      responsive: ["md"],
       render: (size) => (
         <Badge
           count={getCapacityLabel(size)}
@@ -169,17 +493,17 @@ const HabitacionesTable = ({
       ),
     },
     {
-      title: "Tarifa base",
+      title: "Tarifa",
       dataIndex: "price",
       key: "price",
       align: "right",
-      width: 110,
+      width: 120,
       render: (price) => (
         <Text
           style={{
             fontSize: 11,
             color: neutrals.textMain,
-            fontWeight: 500,
+            fontWeight: 700,
           }}
         >
           ${Number(price || 0).toLocaleString("es-MX")}
@@ -187,74 +511,10 @@ const HabitacionesTable = ({
       ),
     },
     {
-      title: "Promo",
-      dataIndex: "offer",
-      key: "offer",
-      width: 120,
-      responsive: ["md"],
-      render: (_, record) => {
-        if (!hasPromo(record)) {
-          return (
-            <Tag
-              style={{
-                borderRadius: 999,
-                fontSize: 10,
-                color: neutrals.textMuted,
-              }}
-            >
-              Sin promo
-            </Tag>
-          );
-        }
-        const pct = record.offer.discountPercent;
-        return (
-          <Tag
-            color={beachColors.sunset}
-            style={{
-              borderRadius: 999,
-              fontSize: 10,
-              color: "#7c2d12",
-            }}
-          >
-            -{pct}% OFF
-          </Tag>
-        );
-      },
-    },
-    {
-      title: "Favoritos",
-      dataIndex: "favoritesCount",
-      key: "favoritesCount",
-      align: "center",
-      width: 110,
-      responsive: ["md"],
-      render: (favoritesCount) => {
-        const favs = favoritesCount || 0;
-        return (
-          <Space size={4} style={{ justifyContent: "center" }}>
-            <HeartFilled
-              style={{
-                fontSize: 12,
-                color: favs > 0 ? beachColors.coral : "#d1d5db",
-              }}
-            />
-            <Text
-              style={{
-                fontSize: 11,
-                color: favs > 0 ? neutrals.textMain : neutrals.textMuted,
-              }}
-            >
-              {favs}
-            </Text>
-          </Space>
-        );
-      },
-    },
-    {
       title: "Estado",
       dataIndex: "inventoryStatus",
       key: "inventoryStatus",
-      width: 100,
+      width: 110,
       render: (estado, record) => {
         const meta = getEstadoMeta(estado);
         return (
@@ -276,14 +536,17 @@ const HabitacionesTable = ({
       title: "Acciones",
       key: "acciones",
       align: "right",
-      width: isMobile ? 260 : 360,
+      width: isMobile ? 260 : 380,
       render: (_, record) => {
         const viewBtn = (
           <Button
             size="small"
             type="text"
             icon={<HistoryOutlined />}
-            onClick={() => onViewFutureReservations?.(record)}
+            onClick={(e) => {
+              e.stopPropagation();
+              onViewFutureReservations?.(record);
+            }}
             disabled={loading}
             style={{ color: beachColors.teal }}
           >
@@ -291,12 +554,10 @@ const HabitacionesTable = ({
           </Button>
         );
 
-        if (!canManageRooms) {
-          return <Space size={4}>{viewBtn}</Space>;
-        }
+        if (!canManageRooms) return <Space size={4}>{viewBtn}</Space>;
 
         return (
-          <Space size={4}>
+          <Space size={4} onClick={(e) => e.stopPropagation()}>
             {viewBtn}
 
             {!record.isDeleted ? (
@@ -305,7 +566,10 @@ const HabitacionesTable = ({
                   size="small"
                   type="text"
                   icon={<EditOutlined />}
-                  onClick={() => onEdit(record)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onEdit(record);
+                  }}
                   disabled={loading}
                   style={{ color: beachColors.deepBlue }}
                 >
@@ -314,7 +578,7 @@ const HabitacionesTable = ({
 
                 <Popconfirm
                   title="Enviar a papelera"
-                  description="La habitación se oculta del público y del inventario activo. Se puede restaurar."
+                  description="La habitación se oculta de la lista, pero podrás restaurarla más adelante."
                   okText="Enviar"
                   cancelText="Cancelar"
                   onConfirm={() => onTrash(record._id)}
@@ -325,6 +589,7 @@ const HabitacionesTable = ({
                     icon={<DeleteOutlined />}
                     loading={deletingRoomId === record._id}
                     style={{ color: beachColors.coral }}
+                    onClick={(e) => e.stopPropagation()}
                   >
                     Papelera
                   </Button>
@@ -334,7 +599,7 @@ const HabitacionesTable = ({
               <>
                 <Popconfirm
                   title="Restaurar habitación"
-                  description="Vuelve al inventario activo."
+                  description="Volverá a estar visible en la lista."
                   okText="Restaurar"
                   cancelText="Cancelar"
                   onConfirm={() => onRestore(record._id)}
@@ -344,15 +609,16 @@ const HabitacionesTable = ({
                     type="text"
                     loading={deletingRoomId === record._id}
                     style={{ color: beachColors.teal }}
+                    onClick={(e) => e.stopPropagation()}
                   >
                     Restaurar
                   </Button>
                 </Popconfirm>
 
                 <Popconfirm
-                  title="Eliminar permanente"
-                  description="Esto borra el documento de Mongo. No se puede deshacer."
-                  okText="Eliminar definitivo"
+                  title="Eliminar definitivamente"
+                  description="La habitación se eliminará por completo. Esta acción no se puede deshacer."
+                  okText="Eliminar"
                   cancelText="Cancelar"
                   okButtonProps={{ danger: true }}
                   onConfirm={() => onDeletePermanent(record._id)}
@@ -363,8 +629,9 @@ const HabitacionesTable = ({
                     type="text"
                     loading={deletingRoomId === record._id}
                     style={{ color: "#b91c1c" }}
+                    onClick={(e) => e.stopPropagation()}
                   >
-                    Eliminar definitivo
+                    Eliminar
                   </Button>
                 </Popconfirm>
               </>
@@ -393,15 +660,12 @@ const HabitacionesTable = ({
               gap: 12,
             }}
           >
-            <Skeleton.Avatar active size="small" shape="circle" />
+            <Skeleton.Avatar active size="small" shape="square" />
             <div style={{ flex: 1 }}>
               <Skeleton.Input
                 active
                 size="small"
-                style={{
-                  width: "60%",
-                  marginBottom: 4,
-                }}
+                style={{ width: "60%", marginBottom: 4 }}
               />
               <Skeleton.Input
                 active
@@ -425,13 +689,19 @@ const HabitacionesTable = ({
   }
 
   return (
-    <div style={{ marginTop: 4, overflowX: "auto" }}>
+    <div style={{ marginTop: 4 }}>
+      <style>{`
+        .frida-row-deleted td { opacity: .72; }
+        .frida-ellipsis { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+      `}</style>
+
       <Table
         size="small"
         columns={columns}
         dataSource={habitaciones}
         rowKey="_id"
         loading={loading}
+        tableLayout="fixed"
         pagination={{
           ...pagination,
           pageSize: 5,
@@ -439,7 +709,16 @@ const HabitacionesTable = ({
         }}
         onChange={(pag) => onChangePage(pag.current || 1)}
         style={{ marginTop: 4 }}
-        scroll={{ x: "max-content" }}
+        // solo damos scroll horizontal en mobile si hace falta
+        scroll={isMobile ? { x: 720 } : undefined}
+        rowClassName={(record) =>
+          record?.isDeleted ? "frida-row-deleted" : ""
+        }
+        expandable={{
+          expandedRowRender: (record) => <ExpandedRow record={record} />,
+          expandRowByClick: true,
+          rowExpandable: () => true,
+        }}
       />
     </div>
   );

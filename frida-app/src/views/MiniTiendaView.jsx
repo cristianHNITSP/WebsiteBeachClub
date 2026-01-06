@@ -7,57 +7,28 @@ import {
   Tabs,
   Tag,
   Button,
-  Select,
-  Row,
-  Col,
-  Badge,
-  List,
   Divider,
-  Tooltip,
-  Empty,
+  message,
   Modal,
   Form,
-  InputNumber,
-  Switch,
-  Popconfirm,
-  Dropdown,
-  message,
-  Skeleton,
-  Input,
-  Spin,
-  Flex,
 } from "antd";
 import {
-  ShopOutlined,
-  ShoppingCartOutlined,
-  MinusOutlined,
-  PlusOutlined,
-  ReloadOutlined,
-  WarningOutlined,
-  DeleteOutlined,
-  PlusCircleOutlined,
-  SettingOutlined,
-  MoreOutlined,
-  EditOutlined,
-  SearchOutlined,
   ExclamationCircleOutlined,
-  CheckCircleOutlined,
-  UndoOutlined,
-  FileTextOutlined,
-  HistoryOutlined,
-  CloseOutlined,
   InfoCircleOutlined,
+  CheckCircleOutlined,
 } from "@ant-design/icons";
 import axios from "@api/axios";
 import { beachColors, neutrals } from "../theme/beachTheme";
 
-const { Title, Text } = Typography;
+import MiniTiendaHeader from "../components/shop/MiniTiendaHeader";
+import CategoryBar from "../components/shop/CategoryBar";
+import ProductsGrid from "../components/shop/ProductsGrid";
+import CartPanel from "../components/shop/CartPanel";
+import AdminPanel from "../components/shop/AdminPanel";
+import CategoryModal from "../components/shop/CategoryModal";
+import ProductModal from "../components/shop/ProductModal";
 
-const money = (n) =>
-  (Number(n) || 0).toLocaleString("es-MX", {
-    style: "currency",
-    currency: "MXN",
-  });
+const { Text } = Typography;
 
 const SECTION_TABS = [
   { key: "normal", label: "Tienda" },
@@ -69,8 +40,14 @@ const SITE_LABELS = {
   cabanas_fridas: "Cabañas Fridas",
 };
 
+const money = (n) =>
+  (Number(n) || 0).toLocaleString("es-MX", {
+    style: "currency",
+    currency: "MXN",
+  });
+
 function prettySite(raw) {
-  if (!raw) return "—";
+  if (!raw) return "";
   if (SITE_LABELS[raw]) return SITE_LABELS[raw];
   return String(raw)
     .replace(/_/g, " ")
@@ -102,54 +79,7 @@ function normalizePerms(currentUser) {
   return [];
 }
 
-const MotionStyles = () => (
-  <style>{`
-    @keyframes mtFadeUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
-    .mtFadeUp { animation: mtFadeUp 220ms ease both; }
-    .mtSoft { transition: opacity 180ms ease, transform 180ms ease, filter 180ms ease; }
-    .mtCard { transition: transform 160ms ease, box-shadow 160ms ease, opacity 160ms ease; }
-    .mtCard:hover { transform: translateY(-2px); box-shadow: 0 18px 34px rgba(15,23,42,0.12); }
-    .mtPillBtn { transition: transform 140ms ease; }
-    .mtPillBtn:active { transform: scale(0.98); }
-
-    .mtHeaderRight { position: relative; z-index: 3; }
-    .mtSearchWrap { flex: 1 1 320px; min-width: 220px; }
-
-    .mtSearchWrap .ant-input-group .ant-input-affix-wrapper {
-      border-radius: 999px 0 0 999px !important;
-    }
-    .mtSearchWrap .ant-input-group-addon .ant-btn {
-      border-radius: 0 999px 999px 0 !important;
-    }
-  `}</style>
-);
-
-/** Panel plegable tipo “empuja hacia abajo” (sin Drawer) */
-const SlidePanel = ({
-  open,
-  children,
-  maxHeight = 900,
-  style,
-  innerStyle,
-}) => {
-  return (
-    <div
-      style={{
-        maxHeight: open ? maxHeight : 0,
-        opacity: open ? 1 : 0,
-        marginTop: open ? 12 : 0,
-        overflow: "hidden",
-        transform: open ? "translateY(0)" : "translateY(-8px)",
-        transition: "all 0.25s ease",
-        ...style,
-      }}
-    >
-      {open && <div style={{ padding: 0, ...innerStyle }}>{children}</div>}
-    </div>
-  );
-};
-
-export default function MiniTiendaView({ isMobile, currentUser }) {
+const MiniTiendaView = ({ isMobile, currentUser }) => {
   const [msgApi, msgCtx] = message.useMessage();
 
   const roleKey = getRoleKey(currentUser);
@@ -176,19 +106,16 @@ export default function MiniTiendaView({ isMobile, currentUser }) {
   const [searchDraft, setSearchDraft] = useState("");
   const [search, setSearch] = useState("");
 
-  // ✅ Paneles (sin Drawer)
   const [cartOpen, setCartOpen] = useState(false);
   const [adminOpen, setAdminOpen] = useState(false);
 
   const [cart, setCart] = useState([]);
 
-  // Gestión: modales
   const [catModalOpen, setCatModalOpen] = useState(false);
   const [prodModalOpen, setProdModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
   const [editingCategory, setEditingCategory] = useState(null);
 
-  // Gestión: papelera + historial
   const [trashLoading, setTrashLoading] = useState(false);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [trashProducts, setTrashProducts] = useState([]);
@@ -201,7 +128,10 @@ export default function MiniTiendaView({ isMobile, currentUser }) {
 
   const bootRef = useRef(false);
 
-  const cartCount = useMemo(() => cart.reduce((a, x) => a + x.qty, 0), [cart]);
+  const cartCount = useMemo(
+    () => cart.reduce((a, x) => a + x.qty, 0),
+    [cart]
+  );
   const cartTotal = useMemo(
     () => cart.reduce((a, x) => a + x.qty * x.unitPrice, 0),
     [cart]
@@ -217,7 +147,6 @@ export default function MiniTiendaView({ isMobile, currentUser }) {
     [sites]
   );
 
-  /** Mensajes humanos (sin “logs”, “permiso_xxx” visible) */
   const notifyNoAccess = (action = "realizar esta acción") => {
     msgApi.warning({
       content: `Tu usuario no puede ${action}. Si lo necesitas, pide apoyo al administrador.`,
@@ -225,7 +154,6 @@ export default function MiniTiendaView({ isMobile, currentUser }) {
     });
   };
 
-  /** Error UX: mensaje corto + “Ver detalles” opcional */
   const notifyError = (e, userMsg = "Ocurrió un problema") => {
     const status = e?.response?.status;
     const detail =
@@ -428,7 +356,11 @@ export default function MiniTiendaView({ isMobile, currentUser }) {
       });
 
       setCartOpen(true);
-      msgApi.open({ type: "success", content: "Agregado al carrito.", duration: 1.3 });
+      msgApi.open({
+        type: "success",
+        content: "Agregado al carrito.",
+        duration: 1.3,
+      });
       return;
     }
 
@@ -450,7 +382,9 @@ export default function MiniTiendaView({ isMobile, currentUser }) {
   const dec = (productId) => {
     setCart((prev) =>
       prev
-        .map((x) => (x.productId === productId ? { ...x, qty: x.qty - 1 } : x))
+        .map((x) =>
+          x.productId === productId ? { ...x, qty: x.qty - 1 } : x
+        )
         .filter((x) => x.qty > 0)
     );
   };
@@ -464,7 +398,7 @@ export default function MiniTiendaView({ isMobile, currentUser }) {
     msgApi.info("Carrito vaciado.");
   };
 
-  const confirmIfCartDirty = async ({ title, content, onOk }) => {
+  const confirmIfCartDirty = ({ title, content, onOk }) => {
     if (!cart.length) return onOk();
     Modal.confirm({
       title,
@@ -490,17 +424,16 @@ export default function MiniTiendaView({ isMobile, currentUser }) {
     });
   };
 
+  // 🔹 AHORA ya NO vaciamos el carrito al cambiar de sección
   const handleChangeSection = (next) => {
-    confirmIfCartDirty({
-      title: "Cambiar sección",
-      content:
-        "Para evitar confusiones, el carrito se vaciará al cambiar de sección. ¿Continuar?",
-      onOk: () => {
-        setSection(next);
-        setSearchDraft("");
-        setSearch("");
-      },
-    });
+    setSection(next);
+    setSearchDraft("");
+    setSearch("");
+    if (cart.length) {
+      msgApi.info(
+        "Cambiaste de sección, el carrito conserva los productos ya agregados."
+      );
+    }
   };
 
   const checkout = async () => {
@@ -508,17 +441,26 @@ export default function MiniTiendaView({ isMobile, currentUser }) {
     if (!site) return msgApi.error("Selecciona una sede para continuar.");
     if (!canPOS) return notifyNoAccess("confirmar ventas");
 
-    msgApi.loading({ content: "Registrando la venta…", key: "checkout", duration: 0 });
+    msgApi.loading({
+      content: "Registrando la venta…",
+      key: "checkout",
+      duration: 0,
+    });
     try {
       const payload = {
         site,
         section,
-        items: cart.map((x) => ({ productId: x.productId, qty: x.qty })),
+        items: cart.map((x) => ({
+          productId: x.productId,
+          qty: x.qty,
+        })),
         paymentMethod: "interno",
         note: "",
       };
 
-      await axios.post("/api/shop/sales", payload, { withCredentials: true });
+      await axios.post("/api/shop/sales", payload, {
+        withCredentials: true,
+      });
 
       msgApi.success({
         content: "Venta registrada correctamente ✅",
@@ -581,7 +523,9 @@ export default function MiniTiendaView({ isMobile, currentUser }) {
       }
 
       msgApi.success({
-        content: editingCategory ? "Categoría actualizada ✅" : "Categoría creada ✅",
+        content: editingCategory
+          ? "Categoría actualizada ✅"
+          : "Categoría creada ✅",
         key: "catSave",
         duration: 2,
       });
@@ -600,12 +544,20 @@ export default function MiniTiendaView({ isMobile, currentUser }) {
 
   const deleteCategory = async (cat) => {
     if (!canManage) return notifyNoAccess("eliminar categorías");
-    msgApi.loading({ content: "Enviando a papelera…", key: "catDel", duration: 0 });
+    msgApi.loading({
+      content: "Enviando a papelera…",
+      key: "catDel",
+      duration: 0,
+    });
     try {
       await axios.delete(`/api/shop/categories/${cat._id}`, {
         withCredentials: true,
       });
-      msgApi.success({ content: "Categoría enviada a papelera ✅", key: "catDel", duration: 2 });
+      msgApi.success({
+        content: "Categoría enviada a papelera ✅",
+        key: "catDel",
+        duration: 2,
+      });
       await loadCategories(section, { silent: true });
       await loadProducts({ silent: true });
     } catch (e) {
@@ -619,7 +571,8 @@ export default function MiniTiendaView({ isMobile, currentUser }) {
   const openCreateProduct = () => {
     if (!canManage) return notifyNoAccess("gestionar productos");
     if (!site) return msgApi.warning("Selecciona una sede primero.");
-    if (!categoryId) return msgApi.warning("Selecciona una categoría primero.");
+    if (!categoryId)
+      return msgApi.warning("Selecciona una categoría primero.");
 
     setEditingProduct(null);
     prodForm.resetFields();
@@ -688,7 +641,9 @@ export default function MiniTiendaView({ isMobile, currentUser }) {
       }
 
       msgApi.success({
-        content: editingProduct ? "Producto actualizado ✅" : "Producto creado ✅",
+        content: editingProduct
+          ? "Producto actualizado ✅"
+          : "Producto creado ✅",
         key: "prodSave",
         duration: 2,
       });
@@ -706,12 +661,20 @@ export default function MiniTiendaView({ isMobile, currentUser }) {
 
   const deleteProduct = async (p) => {
     if (!canManage) return notifyNoAccess("eliminar productos");
-    msgApi.loading({ content: "Enviando a papelera…", key: "prodDel", duration: 0 });
+    msgApi.loading({
+      content: "Enviando a papelera…",
+      key: "prodDel",
+      duration: 0,
+    });
     try {
       await axios.delete(`/api/shop/products/${p._id}`, {
         withCredentials: true,
       });
-      msgApi.success({ content: "Producto enviado a papelera ✅", key: "prodDel", duration: 2 });
+      msgApi.success({
+        content: "Producto enviado a papelera ✅",
+        key: "prodDel",
+        duration: 2,
+      });
       await loadProducts({ silent: true });
     } catch (e) {
       console.error(e);
@@ -721,7 +684,7 @@ export default function MiniTiendaView({ isMobile, currentUser }) {
   };
 
   // ---------- GESTIÓN (panel): PAPELERA + HISTORIAL ----------
-  const openAdminPanel = async () => {
+  const openAdminPanel = () => {
     if (!canManage) return notifyNoAccess("abrir gestión");
     setAdminOpen(true);
     setCartOpen(false);
@@ -738,7 +701,6 @@ export default function MiniTiendaView({ isMobile, currentUser }) {
         }),
       ];
 
-      // productos trash requiere site
       if (site) {
         reqs.unshift(
           axios.get("/api/shop/products/trash", {
@@ -749,8 +711,6 @@ export default function MiniTiendaView({ isMobile, currentUser }) {
       }
 
       const res = await Promise.all(reqs);
-
-      // si site existe, [tp, tc]; si no, [tc]
       const tp = site ? res[0] : null;
       const tc = site ? res[1] : res[0];
 
@@ -766,14 +726,22 @@ export default function MiniTiendaView({ isMobile, currentUser }) {
 
   const restoreProduct = async (p) => {
     if (!canManage) return;
-    msgApi.loading({ content: "Restaurando producto…", key: "restoreProd", duration: 0 });
+    msgApi.loading({
+      content: "Restaurando producto…",
+      key: "restoreProd",
+      duration: 0,
+    });
     try {
       await axios.patch(
         `/api/shop/products/${p._id}/restore`,
         {},
         { withCredentials: true }
       );
-      msgApi.success({ content: "Producto restaurado ✅", key: "restoreProd", duration: 2 });
+      msgApi.success({
+        content: "Producto restaurado ✅",
+        key: "restoreProd",
+        duration: 2,
+      });
       await loadTrash();
       await loadProducts({ silent: true });
     } catch (e) {
@@ -785,14 +753,22 @@ export default function MiniTiendaView({ isMobile, currentUser }) {
 
   const restoreCategory = async (c) => {
     if (!canManage) return;
-    msgApi.loading({ content: "Restaurando categoría…", key: "restoreCat", duration: 0 });
+    msgApi.loading({
+      content: "Restaurando categoría…",
+      key: "restoreCat",
+      duration: 0,
+    });
     try {
       await axios.patch(
         `/api/shop/categories/${c._id}/restore`,
         {},
         { withCredentials: true }
       );
-      msgApi.success({ content: "Categoría restaurada ✅", key: "restoreCat", duration: 2 });
+      msgApi.success({
+        content: "Categoría restaurada ✅",
+        key: "restoreCat",
+        duration: 2,
+      });
       await loadTrash();
       await loadCategories(section, { silent: true });
     } catch (e) {
@@ -803,8 +779,7 @@ export default function MiniTiendaView({ isMobile, currentUser }) {
   };
 
   const loadHistory = async () => {
-    if (!canView) return;
-    if (!site) return;
+    if (!canView || !site) return;
     setHistoryLoading(true);
     try {
       const [mov, sales] = await Promise.all([
@@ -846,665 +821,80 @@ export default function MiniTiendaView({ isMobile, currentUser }) {
     );
   }
 
-  const headerStyle = {
-    borderRadius: 18,
-    background: `linear-gradient(135deg, ${beachColors.oceanBlue}, ${beachColors.teal})`,
-    boxShadow: "0 16px 40px rgba(15,23,42,0.18)",
-    overflow: "hidden",
-  };
+  const headerBg = `radial-gradient(circle at top left, ${beachColors.turquoise}12, transparent 55%),
+                     radial-gradient(circle at bottom right, ${beachColors.sand}25, transparent 55%), #f8fafc`;
 
   const gridKey = `${site}-${section}-${categoryId}-${search}`;
-
-  // Category pill
-  const CategoryPill = ({ c }) => {
-    const active = String(c._id) === String(categoryId);
-    const bg = active ? beachColors.turquoise : "rgba(148,163,184,0.16)";
-    const fg = active ? "#064e3b" : neutrals.textMain;
-
-    const menu = {
-      items: [
-        {
-          key: "edit",
-          icon: <EditOutlined />,
-          label: "Editar",
-          onClick: () => openEditCategory(c),
-        },
-        {
-          key: "del",
-          danger: true,
-          icon: <DeleteOutlined />,
-          label: (
-            <Popconfirm
-              title="Enviar a papelera"
-              description="Podrás restaurar la categoría desde Gestión."
-              okText="Enviar"
-              cancelText="Cancelar"
-              onConfirm={() => deleteCategory(c)}
-            >
-              <span>Enviar a papelera</span>
-            </Popconfirm>
-          ),
-        },
-      ],
-    };
-
-    return (
-      <Tag
-        onClick={() => setCategoryId(String(c._id))}
-        style={{
-          margin: 0,
-          cursor: "pointer",
-          userSelect: "none",
-          border: "none",
-          background: bg,
-          color: fg,
-          borderRadius: 999,
-          padding: canManage ? "6px 6px 6px 12px" : "6px 12px",
-          display: "inline-flex",
-          alignItems: "center",
-          gap: 8,
-          fontWeight: active ? 900 : 800,
-        }}
-      >
-        <span style={{ whiteSpace: "nowrap", lineHeight: 1 }}>{c.name}</span>
-
-        {canManage && (
-          <Dropdown trigger={["click"]} menu={menu}>
-            <Button
-              type="text"
-              size="small"
-              icon={<MoreOutlined />}
-              onClick={(e) => e.stopPropagation()}
-              style={{
-                width: 28,
-                height: 28,
-                padding: 0,
-                borderRadius: 999,
-                display: "inline-flex",
-                alignItems: "center",
-                justifyContent: "center",
-                color: fg,
-              }}
-            />
-          </Dropdown>
-        )}
-      </Tag>
-    );
-  };
-
-  const CARD_MIN_HEIGHT = isMobile ? 186 : 196;
 
   return (
     <div
       style={{
         minHeight: "100%",
-        background: `radial-gradient(circle at top left, ${beachColors.turquoise}12, transparent 55%),
-                     radial-gradient(circle at bottom right, ${beachColors.sand}25, transparent 55%), #f8fafc`,
+        background: headerBg,
       }}
     >
-      <MotionStyles />
       {msgCtx}
 
-      {/* HEADER */}
-      <Card
-        bordered={false}
-        style={headerStyle}
-        bodyStyle={{ padding: isMobile ? 14 : 18 }}
-      >
-        <Row gutter={[12, 12]} align="middle" justify="space-between">
-          <Col>
-            <Space align="center" size={10}>
-              <Badge
-                count={null}
-                style={{ background: "rgba(255,255,255,0.22)", color: "#fff" }}
-              >
-                <div
-                  style={{
-                    width: 34,
-                    height: 34,
-                    borderRadius: 999,
-                    background: "rgba(255,255,255,0.18)",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                  }}
-                >
-                  <ShopOutlined style={{ color: "#fff" }} />
-                </div>
-              </Badge>
+      <MiniTiendaHeader
+        isMobile={isMobile}
+        canManage={canManage}
+        site={site}
+        siteLabel={prettySite(site)}
+        section={section}
+        siteOptions={siteOptions}
+        sitesLoading={sitesLoading}
+        searchDraft={searchDraft}
+        onSearchDraftChange={setSearchDraft}
+        loadingProducts={loading}
+        onReloadProducts={() => loadProducts({ silent: false })}
+        adminOpen={adminOpen}
+        onToggleAdmin={() =>
+          adminOpen ? setAdminOpen(false) : openAdminPanel()
+        }
+        cartOpen={cartOpen}
+        cartCount={cartCount}
+        onToggleCart={() => {
+          setCartOpen((v) => !v);
+          if (!cartOpen) setAdminOpen(false);
+        }}
+        onChangeSite={handleChangeSite}
+      />
 
-              <div>
-                <Space size={8} align="baseline">
-                  <Title
-                    level={4}
-                    style={{
-                      margin: 0,
-                      color: "#fff",
-                      fontSize: isMobile ? 18 : 20,
-                    }}
-                  >
-                    Tienda
-                  </Title>
+      <CartPanel
+        open={cartOpen}
+        isMobile={isMobile}
+        siteLabel={prettySite(site)}
+        cart={cart}
+        cartTotal={cartTotal}
+        canPOS={canPOS}
+        onClose={() => setCartOpen(false)}
+        onClearCart={clearCart}
+        onInc={inc}
+        onDec={dec}
+        onRemoveLine={removeLine}
+        onCheckout={checkout}
+      />
 
-                  {canManage && (
-                    <Tag
-                      style={{
-                        borderRadius: 999,
-                        border: "none",
-                        background: "rgba(255,255,255,0.18)",
-                        color: "#fff",
-                      }}
-                    >
-                      Gestión
-                    </Tag>
-                  )}
-                </Space>
+      <AdminPanel
+        open={adminOpen}
+        isMobile={isMobile}
+        siteLabel={prettySite(site)}
+        section={section}
+        trashLoading={trashLoading}
+        historyLoading={historyLoading}
+        trashCategories={trashCategories}
+        trashProducts={trashProducts}
+        stockLogs={stockLogs}
+        salesLogs={salesLogs}
+        onClose={() => setAdminOpen(false)}
+        onReloadAll={() => {
+          loadTrash();
+          loadHistory();
+        }}
+        onRestoreCategory={restoreCategory}
+        onRestoreProduct={restoreProduct}
+      />
 
-                <Text style={{ display: "block", color: "rgba(255,255,255,0.82)", fontSize: 12 }}>
-                  {prettySite(site)} · {section === "normal" ? "Snacks y bebidas" : "Alcohol"}
-                </Text>
-              </div>
-            </Space>
-          </Col>
-
-          <Col>
-            <Flex
-              className="mtHeaderRight"
-              gap={10}
-              align="center"
-              justify="flex-end"
-              style={{ width: "100%" }}
-            >
-              <Select
-                value={site || undefined}
-                onChange={handleChangeSite}
-                placeholder="Sede"
-                style={{ minWidth: isMobile ? 170 : 240, flex: "0 0 auto" }}
-                options={siteOptions}
-                loading={sitesLoading}
-              />
-
-              <div className="mtSearchWrap">
-                <Input.Search
-                  value={searchDraft}
-                  onChange={(e) => setSearchDraft(e.target.value)}
-                  onSearch={(v) => setSearchDraft(String(v || ""))}
-                  placeholder="Busca un producto…"
-                  allowClear
-                  autoComplete="off"
-                 
-                  loading={loading}
-                  style={{ width: "100%" }}
-                />
-              </div>
-
-              <Tooltip title="Actualizar productos">
-                <Button
-                  className="mtPillBtn"
-                  icon={<ReloadOutlined />}
-                  onClick={() => loadProducts({ silent: false })}
-                  loading={loading}
-                  style={{
-                    borderRadius: 999,
-                    background: "rgba(255,255,255,0.14)",
-                    borderColor: "rgba(255,255,255,0.35)",
-                    color: "#fff",
-                  }}
-                />
-              </Tooltip>
-
-              {canManage && (
-                <Dropdown
-                  trigger={["click"]}
-                  menu={{
-                    items: [
-                      {
-                        key: "newCat",
-                        icon: <PlusCircleOutlined />,
-                        label: "Nueva categoría",
-                        onClick: openCreateCategory,
-                      },
-                      {
-                        key: "newProd",
-                        icon: <PlusCircleOutlined />,
-                        label: "Nuevo producto",
-                        onClick: openCreateProduct,
-                      },
-                      { type: "divider" },
-                      {
-                        key: "adminCenter",
-                        icon: <SettingOutlined />,
-                        label: adminOpen ? "Cerrar gestión" : "Abrir gestión",
-                        onClick: () => (adminOpen ? setAdminOpen(false) : openAdminPanel()),
-                      },
-                    ],
-                  }}
-                >
-                  <Button
-                    className="mtPillBtn"
-                    icon={<SettingOutlined />}
-                    style={{
-                      borderRadius: 999,
-                      background: "rgba(255,255,255,0.14)",
-                      borderColor: "rgba(255,255,255,0.35)",
-                      color: "#fff",
-                      fontWeight: 800,
-                    }}
-                  >
-                    {!isMobile && "Gestión"}
-                  </Button>
-                </Dropdown>
-              )}
-
-              <Badge count={cartCount} overflowCount={99}>
-                <Button
-                  className="mtPillBtn"
-                  icon={<ShoppingCartOutlined />}
-                  onClick={() => {
-                    setCartOpen((v) => !v);
-                    if (!cartOpen) setAdminOpen(false);
-                  }}
-                  style={{
-                    borderRadius: 999,
-                    background: beachColors.sand,
-                    borderColor: "transparent",
-                    color: beachColors.deepBlue,
-                    fontWeight: 900,
-                  }}
-                >
-                  {!isMobile && (cartOpen ? "Cerrar carrito" : "Carrito")}
-                </Button>
-              </Badge>
-            </Flex>
-          </Col>
-        </Row>
-      </Card>
-
-      {/* PANEL: CARRITO (sin Drawer) */}
-      <SlidePanel open={cartOpen} maxHeight={820}>
-        <Card
-          bordered={false}
-          style={{
-            borderRadius: 18,
-            marginTop: 12,
-            boxShadow: "0 14px 32px rgba(15,23,42,0.08)",
-            background: "#fff",
-          }}
-          bodyStyle={{ padding: isMobile ? 12 : 14 }}
-          title={
-            <Space>
-              <ShoppingCartOutlined />
-              <span>Carrito · {prettySite(site)}</span>
-            </Space>
-          }
-          extra={
-            <Space>
-              <Popconfirm
-                title="Vaciar carrito"
-                description="Se eliminarán todos los productos del carrito."
-                okText="Vaciar"
-                cancelText="Cancelar"
-                onConfirm={clearCart}
-                disabled={!cart.length}
-              >
-                <Button disabled={!cart.length} icon={<DeleteOutlined />}>
-                  Vaciar
-                </Button>
-              </Popconfirm>
-
-              <Button icon={<CloseOutlined />} onClick={() => setCartOpen(false)}>
-                Cerrar
-              </Button>
-            </Space>
-          }
-        >
-          {cart.length === 0 ? (
-            <Empty description="Tu carrito está vacío" />
-          ) : (
-            <>
-              <List
-                dataSource={cart}
-                renderItem={(it) => (
-                  <List.Item
-                    style={{ padding: "10px 0" }}
-                    actions={[
-                      <Button
-                        key="dec"
-                        icon={<MinusOutlined />}
-                        onClick={() => dec(it.productId)}
-                        style={{ borderRadius: 10 }}
-                      />,
-                      <Text
-                        key="qty"
-                        style={{
-                          minWidth: 18,
-                          textAlign: "center",
-                          fontWeight: 900,
-                        }}
-                      >
-                        {it.qty}
-                      </Text>,
-                      <Button
-                        key="inc"
-                        icon={<PlusOutlined />}
-                        onClick={() => inc(it.productId)}
-                        style={{ borderRadius: 10 }}
-                        disabled={it.qty >= it.stock}
-                      />,
-                      <Popconfirm
-                        key="rm"
-                        title="Quitar producto"
-                        okText="Quitar"
-                        cancelText="Cancelar"
-                        onConfirm={() => removeLine(it.productId)}
-                      >
-                        <Tooltip title="Quitar del carrito">
-                          <Button
-                            danger
-                            icon={<DeleteOutlined />}
-                            style={{ borderRadius: 10 }}
-                          />
-                        </Tooltip>
-                      </Popconfirm>,
-                    ]}
-                  >
-                    <List.Item.Meta
-                      title={<Text style={{ fontWeight: 900 }}>{it.name}</Text>}
-                      description={
-                        <Space size={10} wrap>
-                          <Text type="secondary" style={{ fontSize: 11 }}>
-                            {money(it.unitPrice)} · stock {it.stock}
-                          </Text>
-                          <Tag
-                            style={{
-                              borderRadius: 999,
-                              margin: 0,
-                              fontWeight: 900,
-                            }}
-                          >
-                            {money(it.qty * it.unitPrice)}
-                          </Tag>
-                        </Space>
-                      }
-                    />
-                  </List.Item>
-                )}
-              />
-
-              <Divider />
-
-              <Space direction="vertical" size={10} style={{ width: "100%" }}>
-                <div style={{ display: "flex", justifyContent: "space-between" }}>
-                  <Text>Total</Text>
-                  <Text style={{ fontWeight: 900, fontSize: 16 }}>
-                    {money(cartTotal)}
-                  </Text>
-                </div>
-
-                <Popconfirm
-                  title="Confirmar venta"
-                  description="Se registrará la venta y se actualizará el stock."
-                  okText="Confirmar"
-                  cancelText="Cancelar"
-                  onConfirm={checkout}
-                  disabled={!canPOS}
-                >
-                  <Button
-                    type="primary"
-                    block
-                    disabled={!canPOS}
-                    style={{
-                      borderRadius: 14,
-                      height: 44,
-                      fontWeight: 900,
-                      background: `linear-gradient(90deg, ${beachColors.oceanBlue}, ${beachColors.teal})`,
-                    }}
-                  >
-                    Confirmar venta
-                  </Button>
-                </Popconfirm>
-
-                {!canPOS && (
-                  <Text type="secondary" style={{ fontSize: 11 }}>
-                    Tu usuario no tiene acceso para confirmar ventas.
-                  </Text>
-                )}
-              </Space>
-            </>
-          )}
-        </Card>
-      </SlidePanel>
-
-      {/* PANEL: GESTIÓN (sin Drawer) */}
-      <SlidePanel open={adminOpen} maxHeight={1200}>
-        <Card
-          bordered={false}
-          style={{
-            borderRadius: 18,
-            marginTop: 12,
-            boxShadow: "0 14px 32px rgba(15,23,42,0.08)",
-            background: "#fff",
-          }}
-          bodyStyle={{ padding: isMobile ? 12 : 14 }}
-          title={
-            <Space>
-              <SettingOutlined />
-              <span>Gestión</span>
-            </Space>
-          }
-          extra={
-            <Space>
-              <Tooltip title="Actualizar">
-                <Button
-                  icon={<ReloadOutlined />}
-                  onClick={() => {
-                    loadTrash();
-                    loadHistory();
-                  }}
-                />
-              </Tooltip>
-              <Button icon={<CloseOutlined />} onClick={() => setAdminOpen(false)}>
-                Cerrar
-              </Button>
-            </Space>
-          }
-        >
-          <Tabs
-            items={[
-              {
-                key: "trash",
-                label: (
-                  <Space size={6}>
-                    <DeleteOutlined />
-                    <span>Papelera</span>
-                  </Space>
-                ),
-                children: (
-                  <Spin spinning={trashLoading}>
-                    <Divider orientation="left" style={{ marginTop: 0 }}>
-                      Categorías
-                    </Divider>
-
-                    {trashCategories.length === 0 ? (
-                      <Empty
-                        image={Empty.PRESENTED_IMAGE_SIMPLE}
-                        description="No hay categorías en papelera"
-                      />
-                    ) : (
-                      <List
-                        dataSource={trashCategories}
-                        renderItem={(c) => (
-                          <List.Item
-                            actions={[
-                              <Popconfirm
-                                key="restore"
-                                title="Restaurar categoría"
-                                okText="Restaurar"
-                                cancelText="Cancelar"
-                                onConfirm={() => restoreCategory(c)}
-                              >
-                                <Button icon={<UndoOutlined />}>Restaurar</Button>
-                              </Popconfirm>,
-                            ]}
-                          >
-                            <List.Item.Meta
-                              title={<Text style={{ fontWeight: 900 }}>{c.name}</Text>}
-                              description={<Text type="secondary">Sección: {c.section}</Text>}
-                            />
-                          </List.Item>
-                        )}
-                      />
-                    )}
-
-                    <Divider orientation="left">
-                      Productos ({prettySite(site)} · {section})
-                    </Divider>
-
-                    {!site ? (
-                      <Empty
-                        image={Empty.PRESENTED_IMAGE_SIMPLE}
-                        description="Selecciona una sede para ver productos en papelera."
-                      />
-                    ) : trashProducts.length === 0 ? (
-                      <Empty
-                        image={Empty.PRESENTED_IMAGE_SIMPLE}
-                        description="No hay productos en papelera"
-                      />
-                    ) : (
-                      <List
-                        dataSource={trashProducts}
-                        renderItem={(p) => (
-                          <List.Item
-                            actions={[
-                              <Popconfirm
-                                key="restore"
-                                title="Restaurar producto"
-                                okText="Restaurar"
-                                cancelText="Cancelar"
-                                onConfirm={() => restoreProduct(p)}
-                              >
-                                <Button icon={<UndoOutlined />}>Restaurar</Button>
-                              </Popconfirm>,
-                            ]}
-                          >
-                            <List.Item.Meta
-                              title={<Text style={{ fontWeight: 900 }}>{p.name}</Text>}
-                              description={
-                                <Text type="secondary">
-                                  {money(p.unitPrice)} · stock {p.stock}
-                                </Text>
-                              }
-                            />
-                          </List.Item>
-                        )}
-                      />
-                    )}
-                  </Spin>
-                ),
-              },
-              {
-                key: "history",
-                label: (
-                  <Space size={6}>
-                    <HistoryOutlined />
-                    <span>Historial</span>
-                  </Space>
-                ),
-                children: (
-                  <Spin spinning={historyLoading}>
-                    {!site ? (
-                      <Empty
-                        image={Empty.PRESENTED_IMAGE_SIMPLE}
-                        description="Selecciona una sede para ver el historial."
-                      />
-                    ) : (
-                      <>
-                        <Divider orientation="left" style={{ marginTop: 0 }}>
-                          Movimientos de stock
-                        </Divider>
-
-                        {stockLogs.length === 0 ? (
-                          <Empty
-                            image={Empty.PRESENTED_IMAGE_SIMPLE}
-                            description="Sin movimientos"
-                          />
-                        ) : (
-                          <List
-                            size="small"
-                            dataSource={stockLogs}
-                            renderItem={(m) => (
-                              <List.Item>
-                                <Space direction="vertical" size={2} style={{ width: "100%" }}>
-                                  <Space
-                                    style={{
-                                      justifyContent: "space-between",
-                                      width: "100%",
-                                    }}
-                                  >
-                                    <Text style={{ fontWeight: 900 }}>
-                                      {m.type} · {m.delta > 0 ? `+${m.delta}` : m.delta}
-                                    </Text>
-                                    <Tag style={{ borderRadius: 999 }}>
-                                      {new Date(m.createdAt || Date.now()).toLocaleString("es-MX")}
-                                    </Tag>
-                                  </Space>
-                                  <Text type="secondary" style={{ fontSize: 12 }}>
-                                    Stock {m.before} → {m.after} · {m.reason || "—"}
-                                  </Text>
-                                </Space>
-                              </List.Item>
-                            )}
-                          />
-                        )}
-
-                        <Divider orientation="left">
-                          Ventas recientes <FileTextOutlined />
-                        </Divider>
-
-                        {salesLogs.length === 0 ? (
-                          <Empty
-                            image={Empty.PRESENTED_IMAGE_SIMPLE}
-                            description="Sin ventas"
-                          />
-                        ) : (
-                          <List
-                            dataSource={salesLogs}
-                            renderItem={(s) => (
-                              <List.Item>
-                                <Space direction="vertical" size={2} style={{ width: "100%" }}>
-                                  <Space
-                                    style={{
-                                      justifyContent: "space-between",
-                                      width: "100%",
-                                    }}
-                                  >
-                                    <Text style={{ fontWeight: 900 }}>
-                                      {money(s.total)}
-                                    </Text>
-                                    <Tag style={{ borderRadius: 999 }}>
-                                      {new Date(s.createdAt || Date.now()).toLocaleString("es-MX")}
-                                    </Tag>
-                                  </Space>
-                                  <Text type="secondary" style={{ fontSize: 12 }}>
-                                    Productos: {Array.isArray(s.items) ? s.items.length : 0} ·
-                                    método: {s.paymentMethod || "—"} · sección: {s.section}
-                                  </Text>
-                                </Space>
-                              </List.Item>
-                            )}
-                          />
-                        )}
-                      </>
-                    )}
-                  </Spin>
-                ),
-              },
-            ]}
-          />
-        </Card>
-      </SlidePanel>
-
-      {/* MAIN */}
       <Card
         bordered={false}
         style={{
@@ -1532,7 +922,9 @@ export default function MiniTiendaView({ isMobile, currentUser }) {
                     background: "rgba(148,163,184,0.15)",
                   }}
                 >
-                  {t.key === "normal" ? "snacks / bebidas" : "vinos / cervezas / licores"}
+                  {t.key === "normal"
+                    ? "snacks / bebidas"
+                    : "vinos / cervezas / licores"}
                 </Tag>
               </Space>
             ),
@@ -1541,408 +933,55 @@ export default function MiniTiendaView({ isMobile, currentUser }) {
 
         <Divider style={{ margin: "10px 0 12px" }} />
 
-        {/* Categorías */}
-        <div className="mtSoft" style={{ marginBottom: 10 }}>
-          <Space
-            align="center"
-            style={{ width: "100%", justifyContent: "space-between" }}
-          >
-            <Text style={{ fontSize: 11, color: neutrals.textMuted }}>
-              Categoría:{" "}
-              <strong style={{ color: neutrals.textMain }}>
-                {selectedCategory?.name || "—"}
-              </strong>
-            </Text>
+        <CategoryBar
+          categories={categories}
+          selectedCategory={selectedCategory}
+          catsLoading={catsLoading}
+          canManage={canManage}
+          onSelectCategory={(cat) => setCategoryId(String(cat._id))}
+          onEditCategory={openEditCategory}
+          onDeleteCategory={deleteCategory}
+        />
 
-            {catsLoading && (
-              <Space size={6}>
-                <Spin size="small" />
-                <Text style={{ fontSize: 11, color: neutrals.textMuted }}>
-                  Cargando categorías…
-                </Text>
-              </Space>
-            )}
-          </Space>
-
-          <div style={{ marginTop: 10 }}>
-            {categories.length === 0 && !catsLoading ? (
-              <Empty
-                image={Empty.PRESENTED_IMAGE_SIMPLE}
-                description={
-                  <span style={{ color: neutrals.textMuted }}>
-                    No hay categorías por ahora.{" "}
-                    {canManage ? "Puedes crear una desde Gestión." : ""}
-                  </span>
-                }
-              />
-            ) : (
-              <Space size={[10, 10]} wrap>
-                {categories.map((c) => (
-                  <CategoryPill key={c._id} c={c} />
-                ))}
-              </Space>
-            )}
-          </div>
-        </div>
-
-        {/* Grid */}
-        <div key={gridKey} className="mtFadeUp">
-          {loading ? (
-            <Row gutter={[12, 12]}>
-              {Array.from({ length: isMobile ? 6 : 10 }).map((_, idx) => (
-                <Col key={idx} xs={12} sm={8} md={6} lg={6} xl={4}>
-                  <Card
-                    bordered={false}
-                    style={{
-                      borderRadius: 16,
-                      boxShadow: "0 10px 22px rgba(15,23,42,0.08)",
-                    }}
-                    bodyStyle={{ padding: 12 }}
-                  >
-                    <Skeleton active paragraph={{ rows: 2 }} />
-                  </Card>
-                </Col>
-              ))}
-            </Row>
-          ) : products.length === 0 ? (
-            <Empty
-              description="No encontramos productos con esos filtros."
-              style={{ marginTop: 18 }}
-            />
-          ) : (
-            <Row gutter={[12, 12]}>
-              {products.map((p) => {
-                const low =
-                  Number(p.stock || 0) <= Number(p.minStock || 0) &&
-                  Number(p.stock || 0) > 0;
-                const out = Number(p.stock || 0) <= 0;
-
-                const menuItems = [
-                  {
-                    key: "edit",
-                    icon: <EditOutlined />,
-                    label: "Editar",
-                    onClick: () => openEditProduct(p),
-                  },
-                  {
-                    key: "del",
-                    danger: true,
-                    icon: <DeleteOutlined />,
-                    label: (
-                      <Popconfirm
-                        title="Enviar a papelera"
-                        description="Podrás restaurarlo desde Gestión."
-                        okText="Enviar"
-                        cancelText="Cancelar"
-                        onConfirm={() => deleteProduct(p)}
-                      >
-                        <span>Enviar a papelera</span>
-                      </Popconfirm>
-                    ),
-                  },
-                ];
-
-                return (
-                  <Col
-                    key={p._id}
-                    xs={12}
-                    sm={8}
-                    md={6}
-                    lg={6}
-                    xl={4}
-                    style={{ display: "flex" }}
-                  >
-                    <Card
-                      hoverable
-                      className="mtCard"
-                      onClick={() => addToCart(p)}
-                      bordered={false}
-                      style={{
-                        width: "100%",
-                        height: "100%",
-                        minHeight: CARD_MIN_HEIGHT,
-                        borderRadius: 16,
-                        boxShadow: "0 10px 22px rgba(15,23,42,0.08)",
-                        background: out ? "rgba(148,163,184,0.10)" : "#fff",
-                        opacity: out ? 0.78 : 1,
-                        cursor: canPOS || canManage ? "pointer" : "not-allowed",
-                      }}
-                      bodyStyle={{
-                        padding: 12,
-                        height: "100%",
-                        display: "flex",
-                        flexDirection: "column",
-                      }}
-                    >
-                      <Flex vertical gap={10} style={{ height: "100%" }}>
-                        <Flex align="flex-start" justify="space-between" gap={10}>
-                          <Text
-                            style={{
-                              fontWeight: 900,
-                              color: neutrals.textMain,
-                              fontSize: 13,
-                              lineHeight: 1.15,
-                              flex: 1,
-                              minWidth: 0,
-                            }}
-                            ellipsis={{ rows: 2, tooltip: p.name }}
-                          >
-                            {p.name}
-                          </Text>
-
-                          <Space size={6} align="start">
-                            <Tag
-                              style={{
-                                borderRadius: 999,
-                                border: "none",
-                                background: "rgba(59,130,246,0.10)",
-                                color: beachColors.deepBlue,
-                                fontSize: 10,
-                                margin: 0,
-                                fontWeight: 900,
-                              }}
-                            >
-                              {money(p.unitPrice)}
-                            </Tag>
-
-                            {canManage && (
-                              <Dropdown trigger={["click"]} menu={{ items: menuItems }}>
-                                <Button
-                                  size="small"
-                                  type="text"
-                                  icon={<MoreOutlined />}
-                                  onClick={(e) => e.stopPropagation()}
-                                  style={{
-                                    width: 28,
-                                    height: 28,
-                                    padding: 0,
-                                    borderRadius: 10,
-                                    display: "inline-flex",
-                                    alignItems: "center",
-                                    justifyContent: "center",
-                                    color: neutrals.textMuted,
-                                  }}
-                                />
-                              </Dropdown>
-                            )}
-                          </Space>
-                        </Flex>
-
-                        <Flex align="center" justify="space-between">
-                          <Text style={{ fontSize: 11, color: neutrals.textMuted }}>
-                            Stock: <b style={{ color: neutrals.textMain }}>{p.stock}</b>
-                          </Text>
-
-                          {out ? (
-                            <Tag color="red" style={{ borderRadius: 999, margin: 0, fontSize: 10 }}>
-                              Agotado
-                            </Tag>
-                          ) : low ? (
-                            <Tag
-                              icon={<WarningOutlined />}
-                              color="gold"
-                              style={{ borderRadius: 999, margin: 0, fontSize: 10 }}
-                            >
-                              Bajo
-                            </Tag>
-                          ) : (
-                            <Tag color="green" style={{ borderRadius: 999, margin: 0, fontSize: 10 }}>
-                              OK
-                            </Tag>
-                          )}
-                        </Flex>
-
-                        <div style={{ flex: 1 }} />
-
-                        <Button
-                          disabled={(!canPOS && !canManage) || out}
-                          style={{
-                            borderRadius: 12,
-                            fontWeight: 900,
-                            height: 40,
-                            background: out
-                              ? "rgba(148,163,184,0.2)"
-                              : beachColors.sand,
-                            borderColor: "transparent",
-                            color: beachColors.deepBlue,
-                          }}
-                          icon={canPOS ? <PlusOutlined /> : <EditOutlined />}
-                          block
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            if (canPOS) addToCart(p);
-                            else openEditProduct(p);
-                          }}
-                        >
-                          {canPOS ? "Agregar" : "Editar"}
-                        </Button>
-                      </Flex>
-                    </Card>
-                  </Col>
-                );
-              })}
-            </Row>
-          )}
+        <div key={gridKey}>
+          <ProductsGrid
+            loading={loading}
+            products={products}
+            isMobile={isMobile}
+            canPOS={canPOS}
+            canManage={canManage}
+            onAddToCart={addToCart}
+            onEditProduct={openEditProduct}
+            onDeleteProduct={deleteProduct}
+          />
         </div>
       </Card>
 
-      {/* Modal: Crear/Editar categoría */}
-      <Modal
-        title={editingCategory ? "Editar categoría" : "Nueva categoría"}
+      <CategoryModal
         open={catModalOpen}
+        editingCategory={editingCategory}
+        form={catForm}
         onCancel={() => {
           setCatModalOpen(false);
           setEditingCategory(null);
         }}
         onOk={saveCategory}
-        okText={editingCategory ? "Guardar" : "Crear"}
-        cancelText="Cancelar"
-        destroyOnClose
-      >
-        <Form form={catForm} layout="vertical">
-          <Form.Item
-            label="Sección"
-            name="section"
-            rules={[{ required: true, message: "Selecciona una sección" }]}
-          >
-            <Select
-              options={[
-                { label: "Normal", value: "normal" },
-                { label: "Alcohol", value: "alcohol" },
-              ]}
-            />
-          </Form.Item>
+      />
 
-          <Form.Item
-            label="Nombre"
-            name="name"
-            rules={[
-              { required: true, message: "Escribe el nombre" },
-              { min: 2, message: "Mínimo 2 caracteres" },
-            ]}
-          >
-            <Input placeholder="Ej: Bebidas" />
-          </Form.Item>
-
-          <Text type="secondary" style={{ fontSize: 12 }}>
-            Tip: el botón ⋯ en la etiqueta te deja editar o enviar a papelera.
-          </Text>
-        </Form>
-      </Modal>
-
-      {/* Modal: Crear/Editar producto */}
-      <Modal
-        title={editingProduct ? "Editar producto" : "Nuevo producto"}
+      <ProductModal
         open={prodModalOpen}
+        editingProduct={editingProduct}
+        form={prodForm}
+        siteOptions={siteOptions}
+        categories={categories}
         onCancel={() => {
           setProdModalOpen(false);
           setEditingProduct(null);
         }}
         onOk={saveProduct}
-        okText={editingProduct ? "Guardar" : "Crear"}
-        cancelText="Cancelar"
-        destroyOnClose
-        width={560}
-      >
-        <Form form={prodForm} layout="vertical">
-          <Row gutter={12}>
-            <Col span={14}>
-              <Form.Item
-                label="Nombre"
-                name="name"
-                rules={[
-                  { required: true, message: "Nombre requerido" },
-                  { min: 2, message: "Mínimo 2 caracteres" },
-                ]}
-              >
-                <Input placeholder="Ej: Agua 600ml" />
-              </Form.Item>
-            </Col>
-            <Col span={10}>
-              <Form.Item
-                label="Sección"
-                name="section"
-                rules={[{ required: true, message: "Sección requerida" }]}
-              >
-                <Select
-                  options={[
-                    { label: "Normal", value: "normal" },
-                    { label: "Alcohol", value: "alcohol" },
-                  ]}
-                />
-              </Form.Item>
-            </Col>
-          </Row>
-
-          <Row gutter={12}>
-            <Col span={12}>
-              <Form.Item
-                label="Sede"
-                name="site"
-                rules={[{ required: true, message: "Sede requerida" }]}
-              >
-                <Select options={siteOptions} />
-              </Form.Item>
-            </Col>
-            <Col span={12}>
-              <Form.Item
-                label="Categoría"
-                name="categoryId"
-                rules={[{ required: true, message: "Categoría requerida" }]}
-              >
-                <Select
-                  options={categories.map((c) => ({ label: c.name, value: c._id }))}
-                  showSearch
-                  optionFilterProp="label"
-                />
-              </Form.Item>
-            </Col>
-          </Row>
-
-          <Row gutter={12}>
-            <Col span={8}>
-              <Form.Item
-                label="Precio"
-                name="unitPrice"
-                rules={[{ required: true, message: "Precio requerido" }]}
-              >
-                <InputNumber min={0} style={{ width: "100%" }} />
-              </Form.Item>
-            </Col>
-            <Col span={8}>
-              <Form.Item
-                label="Stock"
-                name="stock"
-                rules={[{ required: true, message: "Stock requerido" }]}
-              >
-                <InputNumber min={0} style={{ width: "100%" }} />
-              </Form.Item>
-            </Col>
-            <Col span={8}>
-              <Form.Item label="Min. stock" name="minStock">
-                <InputNumber min={0} style={{ width: "100%" }} />
-              </Form.Item>
-            </Col>
-          </Row>
-
-          <Row gutter={12}>
-            <Col span={18}>
-              <Form.Item label="Imagen URL (opcional)" name="imageUrl">
-                <Input placeholder="https://..." />
-              </Form.Item>
-            </Col>
-            <Col span={6}>
-              <Form.Item label="Activo" name="active" valuePropName="checked">
-                <Switch />
-              </Form.Item>
-            </Col>
-          </Row>
-
-          <Text type="secondary" style={{ fontSize: 12 }}>
-            Si algo falla, usa “Ver detalles” en el mensaje de error para compartirlo con soporte.
-          </Text>
-        </Form>
-      </Modal>
+      />
     </div>
   );
-}
+};
+
+export default MiniTiendaView;
