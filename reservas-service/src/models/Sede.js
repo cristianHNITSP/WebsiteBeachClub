@@ -35,8 +35,7 @@ const SedeSchema = new mongoose.Schema(
       type: String,
       required: true,
       trim: true,
-      index: true,
-      // ⚠️ OJO: no ponemos unique aquí para evitar índice duplicado sin collation
+
     },
     name: {
       type: String,
