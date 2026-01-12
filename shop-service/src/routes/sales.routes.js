@@ -1,22 +1,47 @@
+// shop-service/src/routes/sales.routes.js
 const express = require("express");
 const Product = require("../models/Product");
 const Sale = require("../models/Sale");
 const StockMovement = require("../models/StockMovement");
+const Sede = require("../models/Sede");
 const auth = require("../middlewares/auth.middleware");
 const { requirePermissions } = require("../middlewares/permissions.middleware");
 
 const router = express.Router();
 
-// POST /api/shop/sales
-// body: { site, section, items:[{productId, qty}], paymentMethod?, note? }
-router.post("/", auth, requirePermissions(["pos_shop"]), async (req, res) => {
-  const { site, section, items, paymentMethod, note } = req.body || {};
+function getRoleKey(u) {
+  const r = u?.role;
+  if (!r) return "";
+  if (typeof r === "string") return r;
+  return r?.key || r?.name || "";
+}
 
-  if (!site || !section || !Array.isArray(items) || items.length === 0) {
-    return res.status(400).json({ message: "site, section e items son requeridos" });
+async function resolveSedeKeyOrFail(rawKey) {
+  const k = Sede.normalizeKey(rawKey);
+  if (!k) return { ok: false, status: 400, message: "sedeKey inválida." };
+
+  const sede = await Sede.findByKey(k);
+  if (!sede) return { ok: false, status: 409, message: "La sede no existe. Regístrala primero." };
+  if (sede.isActive === false)
+    return { ok: false, status: 409, message: "La sede está desactivada." };
+
+  return { ok: true, key: sede.key, sedeId: sede._id };
+}
+
+// POST /api/shop/sales
+// body: { sedeKey, section, items:[{productId, qty}], paymentMethod?, note? }
+router.post("/", auth, requirePermissions(["pos_shop"]), async (req, res) => {
+  const { section, items, paymentMethod, note } = req.body || {};
+  const sedeKeyRaw = req.body?.sedeKey ?? req.body?.sede ?? req.body?.site;
+
+  if (!sedeKeyRaw || !section || !Array.isArray(items) || items.length === 0) {
+    return res.status(400).json({ message: "sedeKey, section e items son requeridos" });
   }
 
-  // consolidar por productId (por si se repite)
+  const sedeResolved = await resolveSedeKeyOrFail(sedeKeyRaw);
+  if (!sedeResolved.ok) return res.status(sedeResolved.status).json({ message: sedeResolved.message });
+
+  // consolidar por productId
   const map = new Map();
   for (const it of items) {
     const pid = String(it?.productId || "");
@@ -28,7 +53,7 @@ router.post("/", auth, requirePermissions(["pos_shop"]), async (req, res) => {
   const normalized = Array.from(map.entries()).map(([productId, qty]) => ({ productId, qty }));
   if (!normalized.length) return res.status(400).json({ message: "items inválidos" });
 
-  const applied = []; // para rollback: { _id, qty, before, after }
+  const applied = [];
   const saleItems = [];
   let total = 0;
 
@@ -36,7 +61,7 @@ router.post("/", auth, requirePermissions(["pos_shop"]), async (req, res) => {
     for (const it of normalized) {
       const p = await Product.findOne({
         _id: it.productId,
-        site: String(site),
+        site: sedeResolved.key,
         section,
         isDeleted: false,
         active: true,
@@ -47,7 +72,6 @@ router.post("/", auth, requirePermissions(["pos_shop"]), async (req, res) => {
       const before = p.stock;
       if (before < it.qty) throw new Error(`Stock insuficiente: ${p.name} (stock ${before})`);
 
-      // aplicar descuento stock
       p.stock = before - it.qty;
       await p.save();
 
@@ -68,6 +92,7 @@ router.post("/", auth, requirePermissions(["pos_shop"]), async (req, res) => {
 
       await StockMovement.create({
         site: p.site,
+        section: p.section,
         productId: p._id,
         type: "sale",
         delta: -it.qty,
@@ -77,13 +102,13 @@ router.post("/", auth, requirePermissions(["pos_shop"]), async (req, res) => {
         createdBy: {
           id: String(req.user?.id || ""),
           email: String(req.user?.email || ""),
-          role: String(req.user?.role || ""),
+          role: getRoleKey(req.user),
         },
       });
     }
 
     const createdSale = await Sale.create({
-      site: String(site),
+      site: sedeResolved.key,
       section,
       items: saleItems,
       total: Math.round((total + Number.EPSILON) * 100) / 100,
@@ -92,13 +117,12 @@ router.post("/", auth, requirePermissions(["pos_shop"]), async (req, res) => {
       createdBy: {
         id: String(req.user?.id || ""),
         email: String(req.user?.email || ""),
-        role: String(req.user?.role || ""),
+        role: getRoleKey(req.user),
       },
     });
 
     res.status(201).json({ item: createdSale });
   } catch (err) {
-    // rollback simple (no transacciones porque mongo single node normalmente no trae replica set)
     for (const a of applied) {
       await Product.findByIdAndUpdate(a._id, { stock: a.before });
     }
@@ -106,12 +130,13 @@ router.post("/", auth, requirePermissions(["pos_shop"]), async (req, res) => {
   }
 });
 
-// GET /api/shop/sales?site=&from=&to=&page=&limit=
+// GET /api/shop/sales?sedeKey=&from=&to=&page=&limit=
 router.get("/", auth, requirePermissions(["view_shop"]), async (req, res) => {
-  const { site, from, to, page = 1, limit = 30 } = req.query;
+  const sedeKey = req.query.sedeKey ?? req.query.sede ?? req.query.site;
+  const { from, to, page = 1, limit = 30 } = req.query;
 
   const q = { isDeleted: false };
-  if (site) q.site = String(site);
+  if (sedeKey) q.site = String(sedeKey);
 
   if (from || to) {
     q.createdAt = {};

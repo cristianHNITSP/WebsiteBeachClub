@@ -15,7 +15,7 @@ const router = express.Router();
 router.get(
   "/",
   authMiddleware,
-  requirePermissions(["manage_rooms"]), // o el permiso que prefieras
+  requirePermissions(["view_rooms"]), // o el permiso que prefieras
   async (req, res) => {
     try {
       const sedes = await Sede.find({}).sort({ name: 1 }).lean();

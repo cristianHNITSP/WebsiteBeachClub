@@ -1,7 +1,7 @@
-// src/views/InicioSesionApp.jsx
-import { useState, useEffect } from "react";
+// src/page/InicioSesionApp.jsx
+import { useEffect, useMemo, useRef, useState } from "react";
 import axios from "@api/axios";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import {
   ConfigProvider,
   Layout,
@@ -28,15 +28,20 @@ import {
   BulbOutlined,
 } from "@ant-design/icons";
 import { beachColors, neutrals } from "../theme/beachTheme";
+import { normalizeAuthError } from "@api/axios";
 
 const { Content } = Layout;
 const { Title, Text } = Typography;
 const { useBreakpoint } = Grid;
 
+const CLIENT_MIN_INTERVAL_MS = 1200; // evita doble-submit ultra rápido
+const CLIENT_WINDOW_MS = 60_000; // ventana para límite de intentos
+const CLIENT_MAX_ATTEMPTS = 6; // intentos por minuto (cliente)
+
 const InicioSesionPanel = () => {
   const [loading, setLoading] = useState(false);
 
-  // 🔔 Mensajes y alertas
+  // Mensajes y alertas
   const [errorMsg, setErrorMsg] = useState("");
   const [errorType, setErrorType] = useState("error"); // 'error' | 'warning' | 'info'
   const [messageApi, contextHolder] = message.useMessage();
@@ -45,12 +50,17 @@ const InicioSesionPanel = () => {
   const [rememberEmailChecked, setRememberEmailChecked] = useState(false);
 
   const screens = useBreakpoint();
-  const isMobile = !screens.md; // < md
-  const isTablet = screens.md && !screens.lg;
+  const isMobile = !screens.md;
 
   const navigate = useNavigate();
+  const location = useLocation();
 
-  // Leer correo guardado en localStorage al montar
+  // Locks / anti-spam
+  const inFlightRef = useRef(false);
+  const lastStartRef = useRef(0);
+  const attemptsRef = useRef([]); // timestamps
+
+  // Leer correo guardado
   useEffect(() => {
     try {
       const storedEmail = window.localStorage.getItem("hb_admin_email");
@@ -58,14 +68,135 @@ const InicioSesionPanel = () => {
         form.setFieldsValue({ email: storedEmail });
         setRememberEmailChecked(true);
       }
-    } catch (e) {
-      console.warn("No se pudo acceder a localStorage:", e);
-    }
+    } catch {}
   }, [form]);
 
+  // Mensajes coherentes según el motivo de llegada al login
+  useEffect(() => {
+    const reason = location?.state?.reason; // 'expired' | 'signed_out' | 'logout'
+    const TOAST_KEY = "auth_reason_toast";
+
+    let expiredFlag = null;
+    let logoutFlag = null;
+
+    try {
+      expiredFlag = window.sessionStorage.getItem("hb_session_expired");
+      if (expiredFlag) window.sessionStorage.removeItem("hb_session_expired");
+
+      logoutFlag = window.sessionStorage.getItem("hb_logout_success");
+      if (logoutFlag) window.sessionStorage.removeItem("hb_logout_success");
+    } catch {}
+
+    // 1) Expirada (TOKEN_EXPIRED)
+    if (reason === "expired" || expiredFlag) {
+      setErrorType("warning");
+      setErrorMsg("Tu sesión expiró. Inicia sesión nuevamente para continuar.");
+      messageApi.open({
+        type: "warning",
+        content: "Tu sesión expiró. Vuelve a iniciar sesión.",
+        key: TOAST_KEY,
+        duration: 3,
+      });
+      return;
+    }
+
+    // 2) Logout manual -> mostrar confirmación
+    if (reason === "logout" || logoutFlag) {
+      setErrorMsg("");
+      messageApi.open({
+        type: "success",
+        content: "Sesión cerrada correctamente.",
+        key: TOAST_KEY,
+        duration: 2,
+      });
+      return;
+    }
+
+    // 3) Signed out (NO_TOKEN/INVALID_TOKEN) -> mensaje neutro (pero visible)
+    if (reason === "signed_out") {
+      setErrorMsg("");
+      messageApi.open({
+        type: "info",
+        content: "Inicia sesión para continuar.",
+        key: TOAST_KEY,
+        duration: 2,
+      });
+      return;
+    }
+  }, [location, messageApi]);
+
+  const canAttemptNow = () => {
+    const now = Date.now();
+
+    // 1) single-flight: si ya hay petición en vuelo, no mandes otra
+    if (inFlightRef.current) {
+      messageApi.info({
+        content: "Estamos iniciando sesión…",
+        key: "login_toast",
+      });
+      return { ok: false };
+    }
+
+    // 2) mínimo intervalo (anti doble click)
+    const delta = now - lastStartRef.current;
+    if (delta < CLIENT_MIN_INTERVAL_MS) {
+      const waitMs = CLIENT_MIN_INTERVAL_MS - delta;
+      messageApi.warning({
+        content: `Espera ${Math.ceil(waitMs / 1000)}s e inténtalo de nuevo.`,
+        key: "login_toast",
+      });
+      return { ok: false };
+    }
+
+    // 3) rate limit cliente por ventana
+    attemptsRef.current = attemptsRef.current.filter(
+      (t) => now - t < CLIENT_WINDOW_MS
+    );
+    if (attemptsRef.current.length >= CLIENT_MAX_ATTEMPTS) {
+      const oldest = attemptsRef.current[0];
+      const retryIn = Math.max(
+        1,
+        Math.ceil((CLIENT_WINDOW_MS - (now - oldest)) / 1000)
+      );
+      messageApi.warning({
+        content: `Demasiados intentos seguidos. Intenta de nuevo en ${retryIn}s.`,
+        key: "login_toast",
+      });
+      setErrorType("warning");
+      setErrorMsg(
+        `Demasiados intentos seguidos. Intenta de nuevo en ${retryIn}s.`
+      );
+      return { ok: false };
+    }
+
+    return { ok: true };
+  };
+
+  const clearUserFacingErrorOnChange = useMemo(() => {
+    return () => {
+      if (errorMsg) setErrorMsg("");
+    };
+  }, [errorMsg]);
+
   const onFinish = async (values) => {
-    setErrorMsg("");
+    clearUserFacingErrorOnChange();
+
+    const gate = canAttemptNow();
+    if (!gate.ok) return;
+
+    // marca intento (cliente)
+    attemptsRef.current.push(Date.now());
+    lastStartRef.current = Date.now();
+
     setLoading(true);
+    inFlightRef.current = true;
+
+    messageApi.open({
+      type: "loading",
+      content: "Iniciando sesión…",
+      key: "login_toast",
+      duration: 0,
+    });
 
     try {
       const response = await axios.post(
@@ -74,86 +205,47 @@ const InicioSesionPanel = () => {
           email: values.email,
           password: values.password,
         },
-        {
-          withCredentials: true,
-        }
+        { withCredentials: true }
       );
 
-      const user = response.data;
+      const user = response.data || {};
 
-      // Guardar / borrar correo según el checkbox
+      // Guardar / borrar correo según checkbox
       try {
         if (rememberEmailChecked) {
           window.localStorage.setItem("hb_admin_email", values.email);
         } else {
           window.localStorage.removeItem("hb_admin_email");
         }
-      } catch (e) {
-        console.warn("No se pudo escribir en localStorage:", e);
-      }
+      } catch {}
 
-      messageApi.success(`Bienvenido, ${user.name || "usuario"} 👋`, 2);
+      // ✅ Si había flag de expiración anterior, límpialo al entrar
+      try {
+        window.sessionStorage.removeItem("hb_session_expired");
+      } catch {}
 
-      // Redirección directa al panel admin
+      try {
+        window.sessionStorage.setItem("hb_login_success", user.name || "");
+      } catch {}
+
       navigate("/panel.web/panel.admin.web", { replace: true });
     } catch (err) {
-      console.error("Error al iniciar sesión:", err);
+      const info = normalizeAuthError(err);
 
-      const backendMsg =
-        err.response?.data?.message ||
-        err.response?.data?.error ||
-        "Revisa tus credenciales e inténtalo nuevamente.";
+      setErrorType(info.type || "error");
+      setErrorMsg(
+        info.description || "No se pudo iniciar sesión. Intenta de nuevo."
+      );
 
-      const errorCode = err.response?.data?.error;
-
-      // 🌐 Sin respuesta del servidor (caída, CORS, offline, etc.)
-      if (!err.response) {
-        setErrorType("error");
-        setErrorMsg(
-          "No se pudo contactar con el servidor. Verifica tu conexión o inténtalo de nuevo en unos momentos."
-        );
-        messageApi.error(
-          "No se pudo contactar con el servidor. Intenta de nuevo."
-        );
-      }
-      // 👤 Usuario inactivo
-      else if (errorCode === "USER_INACTIVE") {
-        setErrorType("warning");
-        setErrorMsg(
-          backendMsg ||
-            "Tu usuario está inactivo. Contacta al administrador del sistema para recuperar el acceso."
-        );
-        messageApi.warning("Tu usuario esta inactivo.");
-      }
-      // ❌ Credenciales incorrectas
-      else if (errorCode === "INVALID_CREDENTIALS") {
-        setErrorType("error");
-        setErrorMsg(
-          backendMsg ||
-            "Usuario o contraseña incorrectos. Verifica la información e inténtalo de nuevo."
-        );
-        messageApi.error("Usuario o contraseña incorrectos.");
-      }
-      // Datos incompletos / mal formados
-      else if (errorCode === "VALIDATION_ERROR") {
-        setErrorType("error");
-        setErrorMsg(
-          backendMsg ||
-            "Algunos datos no son válidos. Revisa el correo y la contraseña."
-        );
-        messageApi.error("Datos inválidos. Revisa el formulario.");
-      }
-      // Cualquier otro error backend conocido
-      else {
-        setErrorType("error");
-        setErrorMsg(
-          backendMsg ||
-            "No se pudo iniciar sesión en este momento. Intenta nuevamente más tarde."
-        );
-        messageApi.error("Ocurrió un error al iniciar sesión.");
-      }
+      messageApi.open({
+        type: info.type || "error",
+        content: info.toast || "Ocurrió un error.",
+        key: "login_toast",
+        duration: 3,
+      });
     } finally {
       setLoading(false);
+      inFlightRef.current = false;
     }
   };
 
@@ -168,28 +260,15 @@ const InicioSesionPanel = () => {
             '-apple-system, BlinkMacSystemFont, system-ui, "SF Pro Text", sans-serif',
         },
         components: {
-          Button: {
-            borderRadius: 12,
-            fontWeight: 600,
-          },
-          Input: {
-            borderRadius: 10,
-          },
-          Card: {
-            borderRadius: 20,
-          },
+          Button: { borderRadius: 12, fontWeight: 600 },
+          Input: { borderRadius: 10 },
+          Card: { borderRadius: 20 },
         },
       }}
     >
-      {/* Contexto de mensajes */}
       {contextHolder}
 
-      <Layout
-        style={{
-          minHeight: "100vh",
-          background: neutrals.bg,
-        }}
-      >
+      <Layout style={{ minHeight: "100vh", background: neutrals.bg }}>
         <Content
           style={{
             minHeight: "100vh",
@@ -280,10 +359,7 @@ const InicioSesionPanel = () => {
                     Una plataforma hecha a la medida de tu equipo.
                   </Title>
                   <Text
-                    style={{
-                      fontSize: 13,
-                      color: "rgba(241,245,249,0.9)",
-                    }}
+                    style={{ fontSize: 13, color: "rgba(241,245,249,0.9)" }}
                   >
                     Accede a tu panel centralizado para consultar información
                     clave, supervisar la operación diaria y trabajar con tu
@@ -295,10 +371,7 @@ const InicioSesionPanel = () => {
                   <Space size={8}>
                     <CheckCircleTwoTone twoToneColor={beachColors.sand} />
                     <Text
-                      style={{
-                        fontSize: 12,
-                        color: "rgba(241,245,249,0.96)",
-                      }}
+                      style={{ fontSize: 12, color: "rgba(241,245,249,0.96)" }}
                     >
                       Acceso exclusivo para personal autorizado.
                     </Text>
@@ -306,10 +379,7 @@ const InicioSesionPanel = () => {
                   <Space size={8}>
                     <CheckCircleTwoTone twoToneColor={beachColors.sand} />
                     <Text
-                      style={{
-                        fontSize: 12,
-                        color: "rgba(241,245,249,0.96)",
-                      }}
+                      style={{ fontSize: 12, color: "rgba(241,245,249,0.96)" }}
                     >
                       Información clara y actualizada en un solo lugar.
                     </Text>
@@ -317,10 +387,7 @@ const InicioSesionPanel = () => {
                   <Space size={8}>
                     <CheckCircleTwoTone twoToneColor={beachColors.sand} />
                     <Text
-                      style={{
-                        fontSize: 12,
-                        color: "rgba(241,245,249,0.96)",
-                      }}
+                      style={{ fontSize: 12, color: "rgba(241,245,249,0.96)" }}
                     >
                       Configuración y acompañamiento adaptados a tu operación.
                     </Text>
@@ -341,20 +408,12 @@ const InicioSesionPanel = () => {
                 <Space direction="vertical" size={4} style={{ width: "100%" }}>
                   <Space size={8}>
                     <SafetyCertificateOutlined />
-                    <Text
-                      style={{
-                        fontSize: 11,
-                        color: "#e5e7eb",
-                      }}
-                    >
+                    <Text style={{ fontSize: 11, color: "#e5e7eb" }}>
                       Entorno protegido · Accesos controlados por usuario.
                     </Text>
                   </Space>
                   <Text
-                    style={{
-                      fontSize: 10,
-                      color: "rgba(209,213,219,0.95)",
-                    }}
+                    style={{ fontSize: 10, color: "rgba(209,213,219,0.95)" }}
                   >
                     Ante cualquier duda sobre tu acceso, contacta con el
                     administrador del sistema.
@@ -363,7 +422,7 @@ const InicioSesionPanel = () => {
               </div>
             </Col>
 
-            {/* PANEL DERECHO: LOGIN */}
+            {/* PANEL DERECHO */}
             <Col
               xs={24}
               md={13}
@@ -385,14 +444,10 @@ const InicioSesionPanel = () => {
                     : "0 12px 30px rgba(15,23,42,0.08)",
                   borderRadius: isMobile ? 16 : 22,
                   padding: 4,
-                  transition: "all 0.25s ease",
                 }}
-                bodyStyle={{
-                  padding: isMobile ? 16 : 22,
-                }}
+                bodyStyle={{ padding: isMobile ? 16 : 22 }}
               >
                 <Flex vertical gap={12}>
-                  {/* Encabezado compacto */}
                   <Flex
                     align="center"
                     gap={10}
@@ -427,10 +482,7 @@ const InicioSesionPanel = () => {
                           Hotel Beach Club
                         </Text>
                         <Text
-                          style={{
-                            fontSize: 10,
-                            color: neutrals.textMuted,
-                          }}
+                          style={{ fontSize: 10, color: neutrals.textMuted }}
                         >
                           Acceso del equipo
                         </Text>
@@ -460,16 +512,10 @@ const InicioSesionPanel = () => {
                   >
                     Inicia sesión
                   </Title>
-                  <Text
-                    style={{
-                      fontSize: 12,
-                      color: neutrals.textMuted,
-                    }}
-                  >
+                  <Text style={{ fontSize: 12, color: neutrals.textMuted }}>
                     Introduce tus credenciales asignadas para continuar.
                   </Text>
 
-                  {/* Mensaje seguridad */}
                   <Space
                     size={6}
                     align="center"
@@ -484,12 +530,7 @@ const InicioSesionPanel = () => {
                     <BulbOutlined
                       style={{ color: beachColors.sunset, fontSize: 14 }}
                     />
-                    <Text
-                      style={{
-                        fontSize: 10,
-                        color: neutrals.textMuted,
-                      }}
-                    >
+                    <Text style={{ fontSize: 10, color: neutrals.textMuted }}>
                       No compartas tus datos. Si necesitas acceso, pide ayuda al
                       responsable.
                     </Text>
@@ -501,7 +542,7 @@ const InicioSesionPanel = () => {
                       showIcon
                       message={
                         errorType === "warning"
-                          ? "Revisa tu acceso"
+                          ? "Atención"
                           : "No se pudo iniciar sesión"
                       }
                       description={errorMsg}
@@ -509,13 +550,15 @@ const InicioSesionPanel = () => {
                     />
                   )}
 
-                  {/* FORM */}
                   <Form
                     form={form}
                     layout="vertical"
                     style={{ width: "100%", marginTop: 8 }}
                     onFinish={onFinish}
                     requiredMark={false}
+                    onValuesChange={() => {
+                      if (errorMsg) setErrorMsg("");
+                    }}
                   >
                     <Form.Item
                       label="Usuario o correo"
@@ -540,6 +583,7 @@ const InicioSesionPanel = () => {
                           />
                         }
                         allowClear
+                        disabled={loading}
                       />
                     </Form.Item>
 
@@ -547,10 +591,7 @@ const InicioSesionPanel = () => {
                       label="Contraseña"
                       name="password"
                       rules={[
-                        {
-                          required: true,
-                          message: "Ingresa tu contraseña",
-                        },
+                        { required: true, message: "Ingresa tu contraseña" },
                       ]}
                     >
                       <Input.Password
@@ -559,6 +600,7 @@ const InicioSesionPanel = () => {
                         prefix={
                           <LockOutlined style={{ color: beachColors.teal }} />
                         }
+                        disabled={loading}
                       />
                     </Form.Item>
 
@@ -574,13 +616,25 @@ const InicioSesionPanel = () => {
                     >
                       <Checkbox
                         checked={rememberEmailChecked}
+                        disabled={loading}
                         onChange={(e) =>
                           setRememberEmailChecked(e.target.checked)
                         }
                       >
                         Recordar correo en este dispositivo
                       </Checkbox>
-                      <Button type="link" size="small" style={{ padding: 0 }}>
+
+                      <Button
+                        type="link"
+                        size="small"
+                        disabled={loading}
+                        style={{ padding: 0 }}
+                        onClick={() => {
+                          messageApi.info(
+                            "Si olvidaste tu contraseña, contacta al administrador del sistema."
+                          );
+                        }}
+                      >
                         Olvidé mi contraseña
                       </Button>
                     </Flex>
@@ -603,22 +657,18 @@ const InicioSesionPanel = () => {
                       Acceder al panel
                     </Button>
 
-                    {/* 🔙 Botón para regresar a la ruta raíz */}
                     <Button
                       type="default"
                       size="middle"
                       block
+                      disabled={loading}
                       onClick={() => navigate("/")}
-                      style={{
-                        borderRadius: 999,
-                        marginTop: 4,
-                      }}
+                      style={{ borderRadius: 999, marginTop: 4 }}
                     >
                       Volver al inicio
                     </Button>
                   </Form>
 
-                  {/* Pie */}
                   <Flex
                     justify={isMobile ? "flex-start" : "space-between"}
                     align="center"
@@ -627,21 +677,11 @@ const InicioSesionPanel = () => {
                   >
                     <Space size={6}>
                       <CheckCircleTwoTone twoToneColor={beachColors.teal} />
-                      <Text
-                        style={{
-                          fontSize: 10,
-                          color: neutrals.textMuted,
-                        }}
-                      >
+                      <Text style={{ fontSize: 10, color: neutrals.textMuted }}>
                         Acceso protegido. Solo personal autorizado.
                       </Text>
                     </Space>
-                    <Text
-                      style={{
-                        fontSize: 9,
-                        color: neutrals.textMuted,
-                      }}
-                    >
+                    <Text style={{ fontSize: 9, color: neutrals.textMuted }}>
                       © {new Date().getFullYear()} Hotel Beach Club
                     </Text>
                   </Flex>

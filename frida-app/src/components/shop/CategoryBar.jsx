@@ -1,4 +1,3 @@
-// src/components/shop/CategoryBar.jsx
 import React from "react";
 import {
   Space,
@@ -100,10 +99,7 @@ function CategoryBar({
 }) {
   return (
     <div className="mtSoft" style={{ marginBottom: 10 }}>
-      <Space
-        align="center"
-        style={{ width: "100%", justifyContent: "space-between" }}
-      >
+      <Space align="center" style={{ width: "100%", justifyContent: "space-between" }}>
         <Text style={{ fontSize: 11, color: neutrals.textMuted }}>
           Categoría:{" "}
           <strong style={{ color: neutrals.textMain }}>
@@ -128,7 +124,7 @@ function CategoryBar({
             description={
               <span style={{ color: neutrals.textMuted }}>
                 No hay categorías por ahora.{" "}
-                {canManage ? "Puedes crear una desde Gestión." : ""}
+                {canManage ? "Puedes crear una desde Gestión o con el botón “Nueva categoría”." : ""}
               </span>
             }
           />

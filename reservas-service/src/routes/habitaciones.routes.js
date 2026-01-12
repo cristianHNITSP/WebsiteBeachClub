@@ -1,10 +1,60 @@
+// src/routes/habitaciones.routes.js
 const express = require("express");
 const crypto = require("crypto");
 const mongoose = require("mongoose");
+const path = require("path");
+const fs = require("fs");
+const multer = require("multer");
+
 const Habitacion = require("../models/Habitacion");
 const Reserva = require("../models/Reserva");
 const authMiddleware = require("../middlewares/auth.middleware");
 const { requirePermissions } = require("../middlewares/require.Permissions");
+
+/* ===================== ✅ Normalización hotelCode + aliases (compat) ===================== */
+const normalizeSedeKey = (name) => {
+  return (
+    String(name || "")
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-z0-9]+/g, "_")
+      .replace(/^_+|_+$/g, "") || "sede"
+  );
+};
+
+// Alias viejo -> canonical (NO es hardcode de sedes, es compat)
+const SEDE_ALIASES = {
+  cabanas_fridas: "cabanas_frida",
+};
+
+// reverse: canonical -> [aliases...]
+const SEDE_ALIAS_REVERSE = Object.entries(SEDE_ALIASES).reduce((acc, [from, to]) => {
+  acc[to] = acc[to] || [];
+  acc[to].push(from);
+  return acc;
+}, {});
+
+const normalizeHotelCode = (code) => {
+  const k = normalizeSedeKey(code);
+  return SEDE_ALIASES[k] || k || "sede";
+};
+
+const expandHotelCodeFilter = (hotelCode) => {
+  const raw = normalizeSedeKey(hotelCode);
+  const canonical = normalizeHotelCode(raw);
+  const list = [canonical];
+
+  // si canonical tiene aliases antiguos, incluirlos para que encuentres docs viejos
+  const rev = SEDE_ALIAS_REVERSE[canonical] || [];
+  for (const a of rev) list.push(a);
+
+  // si el usuario mandó un raw distinto, incluirlo también por seguridad
+  if (raw && raw !== canonical) list.push(raw);
+
+  // unique
+  return [...new Set(list.filter(Boolean))];
+};
 
 /* =============== Favoritos: seguimos usando IP hash (solo favoritos) =============== */
 const getRawIp = (req) => {
@@ -13,13 +63,90 @@ const getRawIp = (req) => {
   return req.ip || req.connection?.remoteAddress || "unknown";
 };
 
+/* ===================== Upload config ===================== */
+const UPLOAD_ROOT = path.join(__dirname, "..", "uploads");
+const HAB_UPLOAD_DIR = path.join(UPLOAD_ROOT, "habitaciones");
+fs.mkdirSync(HAB_UPLOAD_DIR, { recursive: true });
+
+const storage = multer.diskStorage({
+  destination: (_req, _file, cb) => cb(null, HAB_UPLOAD_DIR),
+  filename: (_req, file, cb) => {
+    const ext = path.extname(file.originalname || "").toLowerCase();
+    const safeExt = ext && ext.length <= 8 ? ext : "";
+    const name = crypto.randomBytes(16).toString("hex");
+    cb(null, `${Date.now()}_${name}${safeExt}`);
+  },
+});
+
+const fileFilter = (_req, file, cb) => {
+  const ok = /^image\/(jpeg|jpg|png|webp|gif)$/i.test(file.mimetype || "");
+  if (!ok) return cb(new Error("INVALID_IMAGE_TYPE"));
+  cb(null, true);
+};
+
+const upload = multer({
+  storage,
+  fileFilter,
+  limits: { fileSize: 6 * 1024 * 1024 }, // 6MB
+});
+
+/* ===================== Helpers: imágenes locales (borrado seguro) ===================== */
+const cleanUrl = (u) => String(u || "").trim();
+
+const normalizeRoomImages = (room) => {
+  const arr = Array.isArray(room?.images)
+    ? room.images.map(cleanUrl).filter(Boolean)
+    : [];
+  if (arr.length) return arr;
+  const legacy = cleanUrl(room?.img);
+  return legacy ? [legacy] : [];
+};
+
+function extractHabitacionFilenameFromUrl(url) {
+  const u = cleanUrl(url);
+  if (!u) return null;
+
+  const marker = "/uploads/habitaciones/";
+  const idx = u.indexOf(marker);
+  if (idx === -1) return null;
+
+  let rest = u.slice(idx + marker.length);
+  rest = rest.split("?")[0].split("#")[0];
+
+  const base = path.basename(rest);
+  if (!base) return null;
+
+  // Si cambia al hacer basename => intentaron path traversal
+  if (base !== rest) return null;
+
+  return base;
+}
+
+async function safeUnlinkHabitacionByUrl(url) {
+  const filename = extractHabitacionFilenameFromUrl(url);
+  if (!filename) return { ok: false, reason: "NOT_LOCAL_OR_INVALID" };
+
+  const abs = path.join(HAB_UPLOAD_DIR, filename);
+
+  try {
+    await fs.promises.unlink(abs);
+    return { ok: true, deleted: true };
+  } catch (err) {
+    if (err && err.code === "ENOENT") {
+      return { ok: true, deleted: false }; // ya no existe, ok
+    }
+    throw err;
+  }
+}
+
 /* ===================== Normaliza offer payload ===================== */
 function normalizeOfferPayload(body) {
   const offer = body?.offer || {};
   const isSpecial = !!offer.isSpecial;
   let discount = offer.discountPercent;
 
-  if (!isSpecial) return { isSpecial: false, description: "", discountPercent: null };
+  if (!isSpecial)
+    return { isSpecial: false, description: "", discountPercent: null };
 
   discount = Number(discount);
   if (!Number.isFinite(discount) || discount <= 0 || discount >= 100) {
@@ -66,8 +193,15 @@ function buildHabitacionesFilterFromQuery(query, { forPublic = false } = {}) {
     } else and.push({ isDeleted: { $ne: true } }); // default excluir
   }
 
-  if (hotelCode && hotelCode !== "todas") and.push({ hotelCode });
-  if (inventoryStatus && inventoryStatus !== "todas") and.push({ inventoryStatus });
+  // ✅ hotelCode (compat con aliases viejos)
+  if (hotelCode && hotelCode !== "todas") {
+    const codes = expandHotelCodeFilter(hotelCode);
+    if (codes.length === 1) and.push({ hotelCode: codes[0] });
+    else and.push({ hotelCode: { $in: codes } });
+  }
+
+  if (inventoryStatus && inventoryStatus !== "todas")
+    and.push({ inventoryStatus });
 
   // roomType CSV
   if (roomType && String(roomType).trim()) {
@@ -96,7 +230,9 @@ function buildHabitacionesFilterFromQuery(query, { forPublic = false } = {}) {
 
     if (list.length) {
       and.push({
-        $or: list.map((tag) => ({ location: { $regex: tag, $options: "i" } })),
+        $or: list.map((tag) => ({
+          location: { $regex: tag, $options: "i" },
+        })),
       });
     }
   }
@@ -122,13 +258,20 @@ function buildHabitacionesFilterFromQuery(query, { forPublic = false } = {}) {
 
   if (favorites === "con_favs") and.push({ favoritesCount: { $gt: 0 } });
   else if (favorites === "sin_favs") {
-    and.push({ $or: [{ favoritesCount: { $exists: false } }, { favoritesCount: 0 }] });
+    and.push({
+      $or: [{ favoritesCount: { $exists: false } }, { favoritesCount: 0 }],
+    });
   }
 
   if (q && typeof q === "string" && q.trim() !== "") {
     const regex = new RegExp(q.trim(), "i");
     and.push({
-      $or: [{ codigo: regex }, { title: regex }, { roomType: regex }, { location: regex }],
+      $or: [
+        { codigo: regex },
+        { title: regex },
+        { roomType: regex },
+        { location: regex },
+      ],
     });
   }
 
@@ -158,7 +301,12 @@ async function hydrateAvailability(rooms, startDate, endDate) {
   if (!hasRange) {
     return rooms.map((hab) => {
       const reservableByStatus = !isRoomUnavailable(hab);
-      return { ...hab, reservableByStatus, blockedByBooking: false, available: reservableByStatus };
+      return {
+        ...hab,
+        reservableByStatus,
+        blockedByBooking: false,
+        available: reservableByStatus,
+      };
     });
   }
 
@@ -169,20 +317,29 @@ async function hydrateAvailability(rooms, startDate, endDate) {
     endDate: { $gte: startDate },
   };
 
-  const reservas = await Reserva.find(rq).select("hotel room startDate endDate").lean();
-  const reservedSet = new Set();
+  const reservas = await Reserva.find(rq)
+    .select("hotel room startDate endDate")
+    .lean();
 
+  const reservedSet = new Set();
   for (const r of reservas) {
     if (rangesOverlap(startDate, endDate, r.startDate, r.endDate)) {
-      reservedSet.add(`${r.hotel}__${String(r.room)}`);
+      reservedSet.add(`${normalizeHotelCode(r.hotel)}__${String(r.room)}`);
     }
   }
 
   return rooms.map((hab) => {
-    const roomKey = `${hab.hotelCode}__${String(hab.roomNumber || hab.codigo)}`;
+    const roomKey = `${normalizeHotelCode(hab.hotelCode)}__${String(
+      hab.roomNumber || hab.codigo
+    )}`;
     const reservableByStatus = !isRoomUnavailable(hab);
     const blockedByBooking = reservedSet.has(roomKey);
-    return { ...hab, reservableByStatus, blockedByBooking, available: reservableByStatus && !blockedByBooking };
+    return {
+      ...hab,
+      reservableByStatus,
+      blockedByBooking,
+      available: reservableByStatus && !blockedByBooking,
+    };
   });
 }
 
@@ -213,7 +370,9 @@ function computeBilling({ price, offer, startDate, endDate }) {
   const hasDiscount = disc !== null && disc > 0;
 
   const totalBeforeDiscount = round2(price * days);
-  const total = hasDiscount ? round2(totalBeforeDiscount * (1 - disc / 100)) : totalBeforeDiscount;
+  const total = hasDiscount
+    ? round2(totalBeforeDiscount * (1 - disc / 100))
+    : totalBeforeDiscount;
 
   return {
     days,
@@ -245,16 +404,125 @@ function createHabitacionesRouter(io) {
         { habitacionId: new mongoose.Types.ObjectId(habitacionId) },
         { checkoutAt: null },
         {
-          $or: [{ endDate: { $gte: todayStr } }, { endDate: { $exists: false }, startDate: { $gte: todayStr } }],
+          $or: [
+            { endDate: { $gte: todayStr } },
+            { endDate: { $exists: false }, startDate: { $gte: todayStr } },
+          ],
         },
       ],
     });
   };
 
+  /* ===================== ✅ UPLOAD: imágenes habitaciones ===================== */
+  router.post(
+    "/upload",
+    authMiddleware,
+    requirePermissions(["manage_rooms"]),
+    upload.single("file"),
+    async (req, res) => {
+      try {
+        if (!req.file) {
+          return res.status(400).json({
+            error: "NO_FILE",
+            message: "No se recibió ningún archivo.",
+          });
+        }
+
+        const url = `/uploads/habitaciones/${req.file.filename}`;
+
+        const baseFromEnv = String(process.env.PUBLIC_BASE_URL || "")
+          .trim()
+          .replace(/\/+$/, "");
+        const baseFromReq = `${req.protocol}://${req.get("host")}`;
+        const absoluteUrl = `${(baseFromEnv || baseFromReq).replace(/\/+$/, "")}${url}`;
+
+        return res.json({
+          url, // ✅ recomendado guardar este
+          absoluteUrl,
+          filename: req.file.filename,
+        });
+      } catch (err) {
+        console.error("[POST /habitaciones/upload] Error:", err);
+        return res.status(500).json({
+          error: "UPLOAD_FAILED",
+          message: "No se pudo subir la imagen.",
+        });
+      }
+    }
+  );
+
+  /* ===================== ✅ DELETE: borrar imagen física (seguro) ===================== */
+  router.delete(
+    "/images",
+    authMiddleware,
+    requirePermissions(["manage_rooms"]),
+    async (req, res) => {
+      try {
+        const url = cleanUrl(req.query?.url || req.body?.url);
+        if (!url) {
+          return res.status(400).json({
+            error: "MISSING_URL",
+            message: "Falta el parámetro url.",
+          });
+        }
+
+        const r = await safeUnlinkHabitacionByUrl(url);
+        if (!r.ok) {
+          return res.status(400).json({
+            error: "INVALID_URL",
+            message: "La URL no corresponde a un archivo local válido.",
+          });
+        }
+
+        return res.json({
+          ok: true,
+          deleted: !!r.deleted,
+        });
+      } catch (err) {
+        console.error("[DELETE /habitaciones/images] Error:", err);
+        return res.status(500).json({
+          error: "INTERNAL_ERROR",
+          message: "No se pudo eliminar la imagen del servidor.",
+        });
+      }
+    }
+  );
+
+  router.post(
+    "/images/delete",
+    authMiddleware,
+    requirePermissions(["manage_rooms"]),
+    async (req, res) => {
+      try {
+        const url = cleanUrl(req.body?.url);
+        if (!url) {
+          return res.status(400).json({
+            error: "MISSING_URL",
+            message: "Falta el campo url.",
+          });
+        }
+
+        const r = await safeUnlinkHabitacionByUrl(url);
+        if (!r.ok) {
+          return res.status(400).json({
+            error: "INVALID_URL",
+            message: "La URL no corresponde a un archivo local válido.",
+          });
+        }
+
+        return res.json({ ok: true, deleted: !!r.deleted });
+      } catch (err) {
+        console.error("[POST /habitaciones/images/delete] Error:", err);
+        return res.status(500).json({
+          error: "INTERNAL_ERROR",
+          message: "No se pudo eliminar la imagen del servidor.",
+        });
+      }
+    }
+  );
+
   /**
    * GET /api/habitaciones/:id/reservas.futuras?page=1&limit=6
-   * Devuelve reservas futuras/activas PENDIENTES (sin checkout) de esa habitación.
-   * ✅ Incluye billing calculado desde Habitacion.price/offer
    */
   router.get(
     "/:id/reservas.futuras",
@@ -265,7 +533,10 @@ function createHabitacionesRouter(io) {
         const { id } = req.params;
 
         if (!mongoose.Types.ObjectId.isValid(id)) {
-          return res.status(400).json({ error: "INVALID_ID", message: "ID de habitación inválido." });
+          return res.status(400).json({
+            error: "INVALID_ID",
+            message: "ID de habitación inválido.",
+          });
         }
 
         const pageRaw = parseInt(req.query.page, 10);
@@ -275,17 +546,18 @@ function createHabitacionesRouter(io) {
         const limit = Math.min(Math.max(limitRaw || 6, 1), 50);
         const skip = (page - 1) * limit;
 
-        // checamos que exista la habitación (aunque esté en papelera, tú decides si lo permites)
         const room = await Habitacion.findById(id)
           .select("_id hotelCode roomNumber codigo isDeleted price offer")
           .lean();
+
         if (!room) {
-          return res.status(404).json({ error: "NOT_FOUND", message: "Habitación no encontrada." });
+          return res
+            .status(404)
+            .json({ error: "NOT_FOUND", message: "Habitación no encontrada." });
         }
 
-        const hoy = todayMeridaStr(); // YYYY-MM-DD
+        const hoy = todayMeridaStr();
 
-        // "futuras o activas" + "pendientes": endDate >= hoy y checkoutAt null
         const baseQuery = {
           isDeleted: { $ne: true },
           type: "stay",
@@ -306,8 +578,11 @@ function createHabitacionesRouter(io) {
           Reserva.countDocuments(baseQuery),
         ]);
 
-        // ✅ adjuntar billing calculado con el precio y oferta actuales de la habitación
-        const price = typeof room.price === "number" && Number.isFinite(room.price) ? room.price : null;
+        const price =
+          typeof room.price === "number" && Number.isFinite(room.price)
+            ? room.price
+            : null;
+
         const offer = room.offer || null;
 
         const items = itemsRaw.map((r) => {
@@ -341,14 +616,16 @@ function createHabitacionesRouter(io) {
         });
       } catch (err) {
         console.error("[GET /habitaciones/:id/reservas.futuras] Error:", err);
-        return res.status(500).json({ error: "INTERNAL_ERROR", message: "No se pudieron cargar las reservas futuras." });
+        return res.status(500).json({
+          error: "INTERNAL_ERROR",
+          message: "No se pudieron cargar las reservas futuras.",
+        });
       }
     }
   );
 
   /**
    * GET /api/habitaciones/public
-   * (no es tu carga inicial, pero se deja compatible)
    */
   router.get("/public", async (req, res) => {
     try {
@@ -359,7 +636,9 @@ function createHabitacionesRouter(io) {
       const limit = Math.min(Math.max(limitRaw || 6, 1), 6);
       const skip = (page - 1) * limit;
 
-      const filter = buildHabitacionesFilterFromQuery(req.query, { forPublic: true });
+      const filter = buildHabitacionesFilterFromQuery(req.query, {
+        forPublic: true,
+      });
 
       const { startDate, endDate } = req.query;
       const onlyAvailable = String(req.query.onlyAvailable) === "true";
@@ -443,7 +722,9 @@ function createHabitacionesRouter(io) {
         const limit = Math.min(Math.max(limitRaw || 5, 1), 50);
         const skip = (page - 1) * limit;
 
-        const filter = buildHabitacionesFilterFromQuery(req.query, { forPublic: false });
+        const filter = buildHabitacionesFilterFromQuery(req.query, {
+          forPublic: false,
+        });
 
         const [items, total] = await Promise.all([
           Habitacion.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit),
@@ -475,9 +756,16 @@ function createHabitacionesRouter(io) {
       const { id } = req.params;
 
       const room = await Habitacion.findById(id).select("+favoriteIpHashes");
-      if (!room) return res.status(404).json({ error: "NOT_FOUND", message: "Habitación no encontrada." });
+      if (!room)
+        return res
+          .status(404)
+          .json({ error: "NOT_FOUND", message: "Habitación no encontrada." });
 
-      if (room.isDeleted) return res.status(409).json({ error: "TRASHED", message: "Esta habitación está en papelera." });
+      if (room.isDeleted)
+        return res.status(409).json({
+          error: "TRASHED",
+          message: "Esta habitación está en papelera.",
+        });
 
       const ip = getRawIp(req);
       const hash = crypto
@@ -486,7 +774,10 @@ function createHabitacionesRouter(io) {
         .digest("hex");
 
       if (room.favoriteIpHashes.includes(hash)) {
-        return res.status(409).json({ error: "ALREADY_FAVORITED", message: "Ya habías marcado esta habitación como favorita." });
+        return res.status(409).json({
+          error: "ALREADY_FAVORITED",
+          message: "Ya habías marcado esta habitación como favorita.",
+        });
       }
 
       room.favoriteIpHashes.push(hash);
@@ -495,10 +786,16 @@ function createHabitacionesRouter(io) {
       await room.save();
       if (io) io.emit("habitaciones:updated", room);
 
-      return res.json({ message: "Favorito registrado correctamente.", favoritesCount: room.favoritesCount });
+      return res.json({
+        message: "Favorito registrado correctamente.",
+        favoritesCount: room.favoritesCount,
+      });
     } catch (err) {
       console.error("[POST /habitaciones/:id/favorite] Error:", err);
-      return res.status(500).json({ error: "INTERNAL_ERROR", message: "Error al registrar favorito." });
+      return res.status(500).json({
+        error: "INTERNAL_ERROR",
+        message: "Error al registrar favorito.",
+      });
     }
   });
 
@@ -512,7 +809,14 @@ function createHabitacionesRouter(io) {
     async (req, res) => {
       try {
         const offer = normalizeOfferPayload(req.body);
-        const payload = { ...req.body, offer, isDeleted: false, deletedAt: null };
+        const payload = {
+          ...req.body,
+          offer,
+          isDeleted: false,
+          deletedAt: null,
+        };
+
+        delete payload.deletedImages;
 
         const room = await Habitacion.create(payload);
         if (io) io.emit("habitaciones:created", room);
@@ -540,7 +844,7 @@ function createHabitacionesRouter(io) {
   );
 
   /**
-   * PUT /api/habitaciones/:id (whitelist)
+   * PUT /api/habitaciones/:id (whitelist) + ✅ cleanup deletedImages
    */
   router.put(
     "/:id",
@@ -558,24 +862,33 @@ function createHabitacionesRouter(io) {
           });
         }
 
-        const allowed = ((b) => ({
-          codigo: b.codigo,
-          hotelCode: b.hotelCode,
-          roomNumber: b.roomNumber,
-          title: b.title,
-          roomType: b.roomType,
-          location: b.location,
-          img: b.img,
-          price: b.price,
-          rating: b.rating,
-          amenities: b.amenities,
-          badge: b.badge,
-          featured: b.featured,
-          size: b.size,
-          inventoryStatus: b.inventoryStatus,
-        }))(req.body || {});
+        const b = req.body || {};
+        const allowed = {};
+
+        if (b.codigo !== undefined) allowed.codigo = b.codigo;
+        if (b.hotelCode !== undefined) allowed.hotelCode = b.hotelCode;
+        if (b.roomNumber !== undefined) allowed.roomNumber = b.roomNumber;
+        if (b.title !== undefined) allowed.title = b.title;
+        if (b.roomType !== undefined) allowed.roomType = b.roomType;
+        if (b.location !== undefined) allowed.location = b.location;
+
+        if (b.img !== undefined) allowed.img = b.img;
+        if (b.images !== undefined) allowed.images = b.images;
+
+        if (b.price !== undefined) allowed.price = b.price;
+        if (b.rating !== undefined) allowed.rating = b.rating;
+        if (b.amenities !== undefined) allowed.amenities = b.amenities;
+        if (b.badge !== undefined) allowed.badge = b.badge;
+        if (b.featured !== undefined) allowed.featured = b.featured;
+        if (b.size !== undefined) allowed.size = b.size;
+        if (b.inventoryStatus !== undefined) allowed.inventoryStatus = b.inventoryStatus;
 
         const offer = normalizeOfferPayload(req.body);
+
+        const existingUrls = new Set(normalizeRoomImages(room));
+        const deletedImages = Array.isArray(b.deletedImages)
+          ? b.deletedImages.map(cleanUrl).filter(Boolean)
+          : [];
 
         const merged = { ...room.toObject(), ...allowed, offer };
 
@@ -588,6 +901,21 @@ function createHabitacionesRouter(io) {
 
         room.set(merged);
         await room.save();
+
+        if (deletedImages.length) {
+          for (const u of deletedImages) {
+            if (!existingUrls.has(cleanUrl(u))) continue;
+            try {
+              await safeUnlinkHabitacionByUrl(u);
+            } catch (e) {
+              console.warn(
+                "[PUT /habitaciones/:id] No se pudo borrar imagen:",
+                u,
+                e?.message || e
+              );
+            }
+          }
+        }
 
         if (io) io.emit("habitaciones:updated", room);
         res.json(room);
@@ -610,14 +938,20 @@ function createHabitacionesRouter(io) {
         const { id } = req.params;
 
         if (!mongoose.Types.ObjectId.isValid(id)) {
-          return res.status(400).json({ error: "INVALID_ID", message: "ID de habitación inválido." });
+          return res.status(400).json({
+            error: "INVALID_ID",
+            message: "ID de habitación inválido.",
+          });
         }
 
         const room = await Habitacion.findById(id);
         if (!room) return res.status(404).json({ error: "NOT_FOUND" });
 
         if (room.isDeleted) {
-          return res.status(409).json({ error: "ALREADY_TRASHED", message: "Esta habitación ya está en papelera." });
+          return res.status(409).json({
+            error: "ALREADY_TRASHED",
+            message: "Esta habitación ya está en papelera.",
+          });
         }
 
         const todayStr = todayMeridaStr();
@@ -626,7 +960,8 @@ function createHabitacionesRouter(io) {
         if (pendingCount > 0) {
           return res.status(409).json({
             error: "HAS_PENDING_RESERVATIONS",
-            message: "No puedes enviar esta habitación a papelera: tiene reservas pendientes (futuras o activas).",
+            message:
+              "No puedes enviar esta habitación a papelera: tiene reservas pendientes (futuras o activas).",
             pendingCount,
           });
         }
@@ -639,7 +974,10 @@ function createHabitacionesRouter(io) {
         res.json({ message: "Enviada a papelera", room });
       } catch (err) {
         console.error("[PATCH /habitaciones/:id/trash] Error:", err);
-        res.status(500).json({ error: "INTERNAL_ERROR", details: err?.message || String(err) });
+        res.status(500).json({
+          error: "INTERNAL_ERROR",
+          details: err?.message || String(err),
+        });
       }
     }
   );
@@ -689,6 +1027,19 @@ function createHabitacionesRouter(io) {
           });
         }
 
+        const imgs = normalizeRoomImages(room);
+        for (const u of imgs) {
+          try {
+            await safeUnlinkHabitacionByUrl(u);
+          } catch (e) {
+            console.warn(
+              "[DELETE /habitaciones/:id/permanent] No se pudo borrar imagen:",
+              u,
+              e?.message || e
+            );
+          }
+        }
+
         await Habitacion.findByIdAndDelete(req.params.id);
 
         if (io) io.emit("habitaciones:deleted_permanent", { _id: req.params.id });
@@ -712,7 +1063,10 @@ function createHabitacionesRouter(io) {
         const { id } = req.params;
 
         if (!mongoose.Types.ObjectId.isValid(id)) {
-          return res.status(400).json({ error: "INVALID_ID", message: "ID de habitación inválido." });
+          return res.status(400).json({
+            error: "INVALID_ID",
+            message: "ID de habitación inválido.",
+          });
         }
 
         const room = await Habitacion.findById(id);
@@ -725,7 +1079,8 @@ function createHabitacionesRouter(io) {
           if (pendingCount > 0) {
             return res.status(409).json({
               error: "HAS_PENDING_RESERVATIONS",
-              message: "No puedes enviar esta habitación a papelera: tiene reservas pendientes (futuras o activas).",
+              message:
+                "No puedes enviar esta habitación a papelera: tiene reservas pendientes (futuras o activas).",
               pendingCount,
             });
           }
@@ -740,10 +1095,37 @@ function createHabitacionesRouter(io) {
         res.json({ message: "Enviada a papelera" });
       } catch (err) {
         console.error("[DELETE /habitaciones/:id] Error:", err);
-        res.status(500).json({ error: "INTERNAL_ERROR", details: err?.message || String(err) });
+        res.status(500).json({
+          error: "INTERNAL_ERROR",
+          details: err?.message || String(err),
+        });
       }
     }
   );
+
+  // ✅ handler de errores de multer
+  router.use((err, _req, res, next) => {
+    if (!err) return next();
+
+    if (err.code === "LIMIT_FILE_SIZE") {
+      return res.status(413).json({
+        error: "FILE_TOO_LARGE",
+        message: "La imagen es demasiado pesada (máx 6MB).",
+      });
+    }
+    if (err.message === "INVALID_IMAGE_TYPE") {
+      return res.status(400).json({
+        error: "INVALID_IMAGE_TYPE",
+        message: "Tipo de archivo no permitido. Sube JPG/PNG/WEBP/GIF.",
+      });
+    }
+
+    console.error("[habitaciones.routes] Unhandled error:", err);
+    return res.status(500).json({
+      error: "INTERNAL_ERROR",
+      message: "Error inesperado.",
+    });
+  });
 
   return router;
 }

@@ -11,6 +11,7 @@ import {
   message,
   Modal,
   Form,
+  Popconfirm,
 } from "antd";
 import {
   ExclamationCircleOutlined,
@@ -27,6 +28,7 @@ import CartPanel from "../components/shop/CartPanel";
 import AdminPanel from "../components/shop/AdminPanel";
 import CategoryModal from "../components/shop/CategoryModal";
 import ProductModal from "../components/shop/ProductModal";
+import SedeModal from "../components/shop/SedeModal";
 
 const { Text } = Typography;
 
@@ -34,28 +36,6 @@ const SECTION_TABS = [
   { key: "normal", label: "Tienda" },
   { key: "alcohol", label: "Alcohol" },
 ];
-
-const SITE_LABELS = {
-  casa_frida: "Casa Frida",
-  cabanas_fridas: "Cabañas Fridas",
-};
-
-const money = (n) =>
-  (Number(n) || 0).toLocaleString("es-MX", {
-    style: "currency",
-    currency: "MXN",
-  });
-
-function prettySite(raw) {
-  if (!raw) return "";
-  if (SITE_LABELS[raw]) return SITE_LABELS[raw];
-  return String(raw)
-    .replace(/_/g, " ")
-    .trim()
-    .split(/\s+/)
-    .map((w) => (w ? w[0].toUpperCase() + w.slice(1) : w))
-    .join(" ");
-}
 
 function getRoleKey(currentUser) {
   const r = currentUser?.role;
@@ -92,15 +72,22 @@ const MiniTiendaView = ({ isMobile, currentUser }) => {
 
   const [section, setSection] = useState("normal");
 
-  const [site, setSite] = useState("");
-  const [sites, setSites] = useState([]);
+  // ---- SEDES ----
+  const [sedes, setSedes] = useState([]);
   const [sitesLoading, setSitesLoading] = useState(false);
+  const [site, setSite] = useState(""); // sede.key
 
+  // ---- data shop ----
   const [loading, setLoading] = useState(false);
   const [catsLoading, setCatsLoading] = useState(false);
 
   const [categories, setCategories] = useState([]);
-  const [categoryId, setCategoryId] = useState("");
+  const [categoryIdBySection, setCategoryIdBySection] = useState({
+    normal: "",
+    alcohol: "",
+  });
+
+  const categoryId = categoryIdBySection[section] || "";
 
   const [products, setProducts] = useState([]);
   const [searchDraft, setSearchDraft] = useState("");
@@ -109,10 +96,20 @@ const MiniTiendaView = ({ isMobile, currentUser }) => {
   const [cartOpen, setCartOpen] = useState(false);
   const [adminOpen, setAdminOpen] = useState(false);
 
-  const [cart, setCart] = useState([]);
+  // ✅ carrito por sección
+  const [cartBySection, setCartBySection] = useState({
+    normal: [],
+    alcohol: [],
+  });
 
+  // ---- modales ----
   const [catModalOpen, setCatModalOpen] = useState(false);
   const [prodModalOpen, setProdModalOpen] = useState(false);
+
+  // ✅ Modal Gestión de sedes (nuevo SedeModal)
+  const [sedeModalOpen, setSedeModalOpen] = useState(false);
+  const [creatingSede, setCreatingSede] = useState(false);
+
   const [editingProduct, setEditingProduct] = useState(null);
   const [editingCategory, setEditingCategory] = useState(null);
 
@@ -126,26 +123,40 @@ const MiniTiendaView = ({ isMobile, currentUser }) => {
   const [catForm] = Form.useForm();
   const [prodForm] = Form.useForm();
 
+  // ✅ form del modal de sedes (solo name)
+  const [sedeForm] = Form.useForm();
+
   const bootRef = useRef(false);
 
-  const cartCount = useMemo(
-    () => cart.reduce((a, x) => a + x.qty, 0),
-    [cart]
-  );
-  const cartTotal = useMemo(
-    () => cart.reduce((a, x) => a + x.qty * x.unitPrice, 0),
-    [cart]
-  );
+  const sedesByKey = useMemo(() => {
+    const m = new Map();
+    for (const s of sedes) m.set(String(s.key), s);
+    return m;
+  }, [sedes]);
+
+  const selectedSede = site ? sedesByKey.get(String(site)) : null;
+  const siteLabel = selectedSede?.name || "";
+
+  const cartCount = useMemo(() => {
+    const all = [
+      ...(cartBySection.normal || []),
+      ...(cartBySection.alcohol || []),
+    ];
+    return all.reduce((a, x) => a + x.qty, 0);
+  }, [cartBySection]);
 
   const selectedCategory = useMemo(
     () => categories.find((c) => String(c._id) === String(categoryId)),
     [categories, categoryId]
   );
 
-  const siteOptions = useMemo(
-    () => sites.map((s) => ({ label: prettySite(s), value: s })),
-    [sites]
-  );
+  const siteOptions = useMemo(() => {
+    return sedes.map((s) => ({
+      label: s.isActive ? s.name : `${s.name} (inactiva)`,
+      value: s.key,
+      disabled: !s.isActive,
+    }));
+  }, [sedes]);
 
   const notifyNoAccess = (action = "realizar esta acción") => {
     msgApi.warning({
@@ -186,8 +197,7 @@ const MiniTiendaView = ({ isMobile, currentUser }) => {
                   content: (
                     <div style={{ marginTop: 8 }}>
                       <Text type="secondary" style={{ fontSize: 12 }}>
-                        Copia esto y envíalo a soporte/administración si es
-                        necesario:
+                        Copia esto y envíalo a soporte/administración si es necesario:
                       </Text>
                       <pre
                         style={{
@@ -226,15 +236,29 @@ const MiniTiendaView = ({ isMobile, currentUser }) => {
     });
 
   // ---------- LOADERS ----------
-  const loadSites = async ({ silent = false } = {}) => {
+  const loadSedes = async ({ silent = false } = {}) => {
     setSitesLoading(true);
     try {
-      const { data } = await axios.get("/api/shop/sites", {
+      const { data } = await axios.get("/api/shop/sedes", {
         withCredentials: true,
       });
-      const arr = Array.isArray(data?.items) ? data.items : [];
-      setSites(arr);
-      if (!site && arr.length) setSite(arr[0]);
+
+      const arr = Array.isArray(data)
+        ? data
+        : Array.isArray(data?.items)
+        ? data.items
+        : [];
+
+      setSedes(arr);
+
+      // ✅ si la sede actual ya no existe, selecciona una activa
+      const exists = site && arr.some((x) => String(x?.key) === String(site));
+      if (!exists) {
+        const firstActive = arr.find((x) => x?.isActive);
+        if (firstActive?.key) setSite(String(firstActive.key));
+        else if (arr[0]?.key) setSite(String(arr[0].key));
+      }
+
       if (!silent && bootRef.current) notifyOk("Sedes actualizadas.");
     } catch (e) {
       console.error(e);
@@ -251,15 +275,17 @@ const MiniTiendaView = ({ isMobile, currentUser }) => {
         withCredentials: true,
         params: { section: sec },
       });
+
       const arr = Array.isArray(data?.items) ? data.items : [];
       setCategories(arr);
 
-      if (arr.length) {
-        const exists = arr.some((c) => String(c._id) === String(categoryId));
-        if (!exists) setCategoryId(String(arr[0]._id));
-      } else {
-        setCategoryId("");
-      }
+      setCategoryIdBySection((prev) => {
+        const current = prev[sec] || "";
+        const exists =
+          current && arr.some((c) => String(c._id) === String(current));
+        const nextId = arr.length ? String(arr[0]._id) : "";
+        return { ...prev, [sec]: exists ? current : nextId };
+      });
 
       if (!silent && bootRef.current) notifyOk("Categorías actualizadas.");
     } catch (e) {
@@ -297,7 +323,7 @@ const MiniTiendaView = ({ isMobile, currentUser }) => {
   // ---------- BOOT ----------
   useEffect(() => {
     if (!canView) return;
-    loadSites({ silent: true });
+    loadSedes({ silent: true });
     loadCategories(section, { silent: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [canView]);
@@ -322,15 +348,30 @@ const MiniTiendaView = ({ isMobile, currentUser }) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [site, section, categoryId, search]);
 
-  // ---------- CART ----------
+  // ---------- CART (por sección) ----------
+  const getCart = (sec) => cartBySection?.[sec] || [];
+
+  const setCart = (sec, updater) => {
+    setCartBySection((prev) => {
+      const curr = prev?.[sec] || [];
+      const nextSec = typeof updater === "function" ? updater(curr) : updater;
+      return { ...prev, [sec]: nextSec };
+    });
+  };
+
+  const hasAnyCart = () =>
+    getCart("normal").length > 0 || getCart("alcohol").length > 0;
+
   const addToCart = (p) => {
+    const sec = String(p?.section || section || "normal");
+
     if (canPOS) {
       if ((p?.stock || 0) <= 0) {
         msgApi.warning("Este producto está agotado.");
         return;
       }
 
-      setCart((prev) => {
+      setCart(sec, (prev) => {
         const i = prev.findIndex((x) => x.productId === p._id);
         if (i >= 0) {
           const next = [...prev];
@@ -358,19 +399,18 @@ const MiniTiendaView = ({ isMobile, currentUser }) => {
       setCartOpen(true);
       msgApi.open({
         type: "success",
-        content: "Agregado al carrito.",
-        duration: 1.3,
+        content: `Agregado al carrito (${sec}).`,
+        duration: 1.2,
       });
       return;
     }
 
     if (canManage) return openEditProduct(p);
-
     notifyNoAccess("vender desde la tienda");
   };
 
-  const inc = (productId) => {
-    setCart((prev) =>
+  const inc = (sec, productId) => {
+    setCart(sec, (prev) =>
       prev.map((x) =>
         x.productId === productId
           ? { ...x, qty: Math.min(x.qty + 1, x.stock) }
@@ -379,27 +419,30 @@ const MiniTiendaView = ({ isMobile, currentUser }) => {
     );
   };
 
-  const dec = (productId) => {
-    setCart((prev) =>
+  const dec = (sec, productId) => {
+    setCart(sec, (prev) =>
       prev
-        .map((x) =>
-          x.productId === productId ? { ...x, qty: x.qty - 1 } : x
-        )
+        .map((x) => (x.productId === productId ? { ...x, qty: x.qty - 1 } : x))
         .filter((x) => x.qty > 0)
     );
   };
 
-  const removeLine = (productId) => {
-    setCart((prev) => prev.filter((x) => x.productId !== productId));
+  const removeLine = (sec, productId) => {
+    setCart(sec, (prev) => prev.filter((x) => x.productId !== productId));
   };
 
-  const clearCart = () => {
-    setCart([]);
-    msgApi.info("Carrito vaciado.");
+  const clearSectionCart = (sec) => {
+    setCart(sec, []);
+    msgApi.info(`Carrito vaciado (${sec}).`);
+  };
+
+  const clearAllCarts = () => {
+    setCartBySection({ normal: [], alcohol: [] });
+    msgApi.info("Carritos vaciados.");
   };
 
   const confirmIfCartDirty = ({ title, content, onOk }) => {
-    if (!cart.length) return onOk();
+    if (!hasAnyCart()) return onOk();
     Modal.confirm({
       title,
       icon: <ExclamationCircleOutlined />,
@@ -408,7 +451,7 @@ const MiniTiendaView = ({ isMobile, currentUser }) => {
       cancelText: "Cancelar",
       okButtonProps: { danger: true },
       onOk: () => {
-        setCart([]);
+        clearAllCarts();
         setCartOpen(false);
         onOk();
       },
@@ -419,61 +462,52 @@ const MiniTiendaView = ({ isMobile, currentUser }) => {
     confirmIfCartDirty({
       title: "Cambiar sede",
       content:
-        "Para evitar confusiones, el carrito se vaciará al cambiar la sede. ¿Continuar?",
+        "Para evitar confusiones, se vaciarán los carritos (Tienda y Alcohol) al cambiar la sede. ¿Continuar?",
       onOk: () => setSite(next),
     });
   };
 
-  // 🔹 AHORA ya NO vaciamos el carrito al cambiar de sección
   const handleChangeSection = (next) => {
     setSection(next);
     setSearchDraft("");
     setSearch("");
-    if (cart.length) {
-      msgApi.info(
-        "Cambiaste de sección, el carrito conserva los productos ya agregados."
-      );
-    }
   };
 
-  const checkout = async () => {
+  const checkoutSection = async (sec) => {
+    const cart = getCart(sec);
     if (!cart.length) return;
+
     if (!site) return msgApi.error("Selecciona una sede para continuar.");
     if (!canPOS) return notifyNoAccess("confirmar ventas");
 
     msgApi.loading({
-      content: "Registrando la venta…",
-      key: "checkout",
+      content: `Registrando la venta (${sec})…`,
+      key: `checkout-${sec}`,
       duration: 0,
     });
+
     try {
       const payload = {
         site,
-        section,
-        items: cart.map((x) => ({
-          productId: x.productId,
-          qty: x.qty,
-        })),
+        section: sec,
+        items: cart.map((x) => ({ productId: x.productId, qty: x.qty })),
         paymentMethod: "interno",
         note: "",
       };
 
-      await axios.post("/api/shop/sales", payload, {
-        withCredentials: true,
-      });
+      await axios.post("/api/shop/sales", payload, { withCredentials: true });
 
       msgApi.success({
-        content: "Venta registrada correctamente ✅",
-        key: "checkout",
+        content: `Venta registrada (${sec}) ✅`,
+        key: `checkout-${sec}`,
         duration: 2,
       });
 
-      setCart([]);
-      setCartOpen(false);
-      loadProducts({ silent: true });
+      setCart(sec, []);
+      if (sec === section) loadProducts({ silent: true });
     } catch (e) {
       console.error(e);
-      msgApi.destroy("checkout");
+      msgApi.destroy(`checkout-${sec}`);
       notifyError(e, "No pudimos completar la venta.");
     }
   };
@@ -523,16 +557,13 @@ const MiniTiendaView = ({ isMobile, currentUser }) => {
       }
 
       msgApi.success({
-        content: editingCategory
-          ? "Categoría actualizada ✅"
-          : "Categoría creada ✅",
+        content: editingCategory ? "Categoría actualizada ✅" : "Categoría creada ✅",
         key: "catSave",
         duration: 2,
       });
 
       setCatModalOpen(false);
       setEditingCategory(null);
-
       await loadCategories(section, { silent: true });
     } catch (e) {
       if (e?.errorFields) return;
@@ -571,8 +602,7 @@ const MiniTiendaView = ({ isMobile, currentUser }) => {
   const openCreateProduct = () => {
     if (!canManage) return notifyNoAccess("gestionar productos");
     if (!site) return msgApi.warning("Selecciona una sede primero.");
-    if (!categoryId)
-      return msgApi.warning("Selecciona una categoría primero.");
+    if (!categoryId) return msgApi.warning("Selecciona una categoría primero.");
 
     setEditingProduct(null);
     prodForm.resetFields();
@@ -580,7 +610,7 @@ const MiniTiendaView = ({ isMobile, currentUser }) => {
       name: "",
       section,
       site,
-      categoryId,
+      categoryId: String(categoryId),
       unitPrice: 0,
       stock: 0,
       minStock: 0,
@@ -598,7 +628,7 @@ const MiniTiendaView = ({ isMobile, currentUser }) => {
       name: p.name,
       section: p.section,
       site: p.site,
-      categoryId: p.categoryId,
+      categoryId: String(p.categoryId?._id || p.categoryId),
       unitPrice: Number(p.unitPrice || 0),
       stock: Number(p.stock || 0),
       minStock: Number(p.minStock || 0),
@@ -641,9 +671,7 @@ const MiniTiendaView = ({ isMobile, currentUser }) => {
       }
 
       msgApi.success({
-        content: editingProduct
-          ? "Producto actualizado ✅"
-          : "Producto creado ✅",
+        content: editingProduct ? "Producto actualizado ✅" : "Producto creado ✅",
         key: "prodSave",
         duration: 2,
       });
@@ -682,6 +710,138 @@ const MiniTiendaView = ({ isMobile, currentUser }) => {
       notifyError(e, "No pudimos enviar el producto a papelera.");
     }
   };
+
+  // ---------- GESTIÓN: SEDES (nuevo modal) ----------
+  const openSedesModal = () => {
+    if (!canManage) return notifyNoAccess("gestionar sedes");
+    sedeForm.resetFields();
+    setSedeModalOpen(true);
+    loadSedes({ silent: true });
+  };
+
+  const handleCreateSede = async (values) => {
+    if (!canManage) return notifyNoAccess("crear sedes");
+    try {
+      const name = String(values?.name || "").trim();
+      if (!name) return;
+
+      setCreatingSede(true);
+
+      msgApi.loading({
+        content: "Creando sede…",
+        key: "sedeCreate",
+        duration: 0,
+      });
+
+      await axios.post(
+        "/api/shop/sedes",
+        { name },
+        { withCredentials: true }
+      );
+
+      msgApi.success({
+        content: "Sede creada ✅",
+        key: "sedeCreate",
+        duration: 2,
+      });
+
+      sedeForm.resetFields();
+      await loadSedes({ silent: true });
+    } catch (e) {
+      console.error(e);
+      msgApi.destroy("sedeCreate");
+      notifyError(e, "No pudimos crear la sede.");
+    } finally {
+      setCreatingSede(false);
+    }
+  };
+
+  const toggleSedeActive = async (s) => {
+    if (!canManage) return;
+    if (!s?._id) {
+      return msgApi.warning(
+        "Sede legacy: crea sedes reales para poder activar/desactivar."
+      );
+    }
+
+    msgApi.loading({
+      content: "Actualizando sede…",
+      key: "sedeToggle",
+      duration: 0,
+    });
+
+    try {
+      await axios.patch(
+        `/api/shop/sedes/${s._id}`,
+        { isActive: !(s.isActive !== false) },
+        { withCredentials: true }
+      );
+
+      msgApi.success({
+        content: "Sede actualizada ✅",
+        key: "sedeToggle",
+        duration: 2,
+      });
+
+      await loadSedes({ silent: true });
+    } catch (e) {
+      console.error(e);
+      msgApi.destroy("sedeToggle");
+      notifyError(e, "No pudimos actualizar la sede.");
+    }
+  };
+
+  const sedesColumns = useMemo(
+    () => [
+      {
+        title: "Nombre",
+        dataIndex: "name",
+        key: "name",
+        render: (name) => <Text style={{ fontSize: 12 }}>{name || "—"}</Text>,
+      },
+
+      {
+        title: "Estado",
+        dataIndex: "isActive",
+        key: "isActive",
+        width: 120,
+        render: (isActive) => (
+          <Tag
+            color={isActive ? "green" : "default"}
+            style={{ borderRadius: 999 }}
+          >
+            {isActive ? "Activa" : "Inactiva"}
+          </Tag>
+        ),
+      },
+      {
+        title: "Acciones",
+        key: "acciones",
+        width: 180,
+        render: (_, s) => {
+          const active = s?.isActive !== false;
+          return (
+            <Popconfirm
+              title={active ? "Desactivar sede" : "Activar sede"}
+              description={
+                active
+                  ? "La sede dejará de mostrarse para ventas."
+                  : "La sede volverá a estar disponible."
+              }
+              okText={active ? "Desactivar" : "Activar"}
+              cancelText="Cancelar"
+              onConfirm={() => toggleSedeActive(s)}
+            >
+              <Button size="small" loading={sitesLoading}>
+                {active ? "Desactivar" : "Activar"}
+              </Button>
+            </Popconfirm>
+          );
+        },
+      },
+    ],
+    [sitesLoading] // toggleSedeActive usa closures, pero no cambia
+  );
 
   // ---------- GESTIÓN (panel): PAPELERA + HISTORIAL ----------
   const openAdminPanel = () => {
@@ -785,7 +945,7 @@ const MiniTiendaView = ({ isMobile, currentUser }) => {
       const [mov, sales] = await Promise.all([
         axios.get("/api/shop/stock-movements", {
           withCredentials: true,
-          params: { site, section, limit: 60 },
+          params: { site, limit: 60 },
         }),
         axios.get("/api/shop/sales", {
           withCredentials: true,
@@ -805,6 +965,7 @@ const MiniTiendaView = ({ isMobile, currentUser }) => {
 
   useEffect(() => {
     if (!adminOpen) return;
+    loadSedes({ silent: true });
     loadTrash();
     loadHistory();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -827,19 +988,14 @@ const MiniTiendaView = ({ isMobile, currentUser }) => {
   const gridKey = `${site}-${section}-${categoryId}-${search}`;
 
   return (
-    <div
-      style={{
-        minHeight: "100%",
-        background: headerBg,
-      }}
-    >
+    <div style={{ minHeight: "100%", background: headerBg }}>
       {msgCtx}
 
       <MiniTiendaHeader
         isMobile={isMobile}
         canManage={canManage}
         site={site}
-        siteLabel={prettySite(site)}
+        siteLabel={siteLabel || (site ? site : "—")}
         section={section}
         siteOptions={siteOptions}
         sitesLoading={sitesLoading}
@@ -848,9 +1004,7 @@ const MiniTiendaView = ({ isMobile, currentUser }) => {
         loadingProducts={loading}
         onReloadProducts={() => loadProducts({ silent: false })}
         adminOpen={adminOpen}
-        onToggleAdmin={() =>
-          adminOpen ? setAdminOpen(false) : openAdminPanel()
-        }
+        onToggleAdmin={() => (adminOpen ? setAdminOpen(false) : openAdminPanel())}
         cartOpen={cartOpen}
         cartCount={cartCount}
         onToggleCart={() => {
@@ -863,23 +1017,31 @@ const MiniTiendaView = ({ isMobile, currentUser }) => {
       <CartPanel
         open={cartOpen}
         isMobile={isMobile}
-        siteLabel={prettySite(site)}
-        cart={cart}
-        cartTotal={cartTotal}
+        siteLabel={siteLabel || (site ? site : "—")}
+        activeSection={section}
+        cartBySection={cartBySection}
         canPOS={canPOS}
         onClose={() => setCartOpen(false)}
-        onClearCart={clearCart}
+        onClearSection={clearSectionCart}
         onInc={inc}
         onDec={dec}
         onRemoveLine={removeLine}
-        onCheckout={checkout}
+        onCheckoutSection={checkoutSection}
       />
 
       <AdminPanel
         open={adminOpen}
         isMobile={isMobile}
-        siteLabel={prettySite(site)}
+        siteLabel={siteLabel || ""}
         section={section}
+        // 👇 compat: si tu AdminPanel viejo aún muestra sedes tab, no truena
+        sedes={sedes}
+        sedesLoading={sitesLoading}
+        onOpenCreateSede={openSedesModal}
+        onOpenEditSede={openSedesModal}
+        onToggleSedeActive={toggleSedeActive}
+        // 👇 si tu AdminPanel nuevo trae botón "Sedes"
+        onOpenSedes={openSedesModal}
         trashLoading={trashLoading}
         historyLoading={historyLoading}
         trashCategories={trashCategories}
@@ -888,11 +1050,14 @@ const MiniTiendaView = ({ isMobile, currentUser }) => {
         salesLogs={salesLogs}
         onClose={() => setAdminOpen(false)}
         onReloadAll={() => {
+          loadSedes({ silent: true });
           loadTrash();
           loadHistory();
         }}
         onRestoreCategory={restoreCategory}
         onRestoreProduct={restoreProduct}
+        onOpenCreateCategory={openCreateCategory}
+        onOpenCreateProduct={openCreateProduct}
       />
 
       <Card
@@ -933,12 +1098,28 @@ const MiniTiendaView = ({ isMobile, currentUser }) => {
 
         <Divider style={{ margin: "10px 0 12px" }} />
 
+        <Space wrap style={{ width: "100%", justifyContent: "space-between" }}>
+          <Text style={{ fontSize: 11, color: neutrals.textMuted }}>
+            Sede:{" "}
+            <strong style={{ color: neutrals.textMain }}>
+              {siteLabel || "—"}
+            </strong>
+          </Text>
+        </Space>
+
+        <Divider style={{ margin: "12px 0" }} />
+
         <CategoryBar
           categories={categories}
           selectedCategory={selectedCategory}
           catsLoading={catsLoading}
           canManage={canManage}
-          onSelectCategory={(cat) => setCategoryId(String(cat._id))}
+          onSelectCategory={(cat) =>
+            setCategoryIdBySection((prev) => ({
+              ...prev,
+              [section]: String(cat._id),
+            }))
+          }
           onEditCategory={openEditCategory}
           onDeleteCategory={deleteCategory}
         />
@@ -979,6 +1160,22 @@ const MiniTiendaView = ({ isMobile, currentUser }) => {
           setEditingProduct(null);
         }}
         onOk={saveProduct}
+      />
+
+      {/* ✅ NUEVO: Gestión de sedes (Form inline + Table) */}
+      <SedeModal
+        open={sedeModalOpen}
+        form={sedeForm}
+        sedes={sedes}
+        sedesLoading={sitesLoading}
+        creatingSede={creatingSede}
+        sedesColumns={sedesColumns}
+        onReload={() => loadSedes({ silent: true })}
+        onCreateSede={handleCreateSede}
+        onCancel={() => {
+          setSedeModalOpen(false);
+          sedeForm.resetFields();
+        }}
       />
     </div>
   );

@@ -1,4 +1,3 @@
-// src/components/shop/ProductsGrid.jsx
 import React, { useState } from "react";
 import {
   Row,
@@ -81,10 +80,7 @@ function ProductsGrid({
 
     setAddingId(p._id);
     onAddToCart(p);
-    // mini feedback visual: loading corto usando solo AntD
-    setTimeout(() => {
-      setAddingId(null);
-    }, 220);
+    setTimeout(() => setAddingId(null), 220);
   };
 
   return (
@@ -150,7 +146,6 @@ function ProductsGrid({
               }}
             >
               <Flex vertical gap={isMobile ? 8 : 10} style={{ height: "100%" }}>
-                {/* Header: layout diferente para móvil vs desktop */}
                 {isMobile ? (
                   <Flex align="flex-start" gap={8}>
                     {p.imageUrl ? (
@@ -317,7 +312,6 @@ function ProductsGrid({
                   </Flex>
                 )}
 
-                {/* Stock + estado */}
                 <Flex align="center" justify="space-between">
                   <span
                     style={{
@@ -329,15 +323,11 @@ function ProductsGrid({
                       textOverflow: "ellipsis",
                     }}
                   >
-                    Stock:{" "}
-                    <b style={{ color: neutrals.textMain }}>{p.stock}</b>
+                    Stock: <b style={{ color: neutrals.textMain }}>{p.stock}</b>
                   </span>
 
                   {out ? (
-                    <Tag
-                      color="red"
-                      style={{ borderRadius: 999, margin: 0, fontSize: 10 }}
-                    >
+                    <Tag color="red" style={{ borderRadius: 999, margin: 0, fontSize: 10 }}>
                       Agotado
                     </Tag>
                   ) : low ? (
@@ -349,19 +339,14 @@ function ProductsGrid({
                       Bajo
                     </Tag>
                   ) : (
-                    <Tag
-                      color="green"
-                      style={{ borderRadius: 999, margin: 0, fontSize: 10 }}
-                    >
+                    <Tag color="green" style={{ borderRadius: 999, margin: 0, fontSize: 10 }}>
                       OK
                     </Tag>
                   )}
                 </Flex>
 
-                {/* Empuja el botón hacia abajo para alinear en la grid */}
                 <div style={{ flex: 1 }} />
 
-                {/* Botón principal: ahora 100% Ant Design (hover + wave) */}
                 <Tooltip title={canPOS ? "Agregar al carrito" : "Editar producto"}>
                   <Button
                     type={out ? "default" : "primary"}
@@ -371,19 +356,13 @@ function ProductsGrid({
                     disabled={(!canPOS && !canManage) || out}
                     loading={addingId === p._id && canPOS}
                     icon={canPOS ? <PlusOutlined /> : <EditOutlined />}
-                    style={{
-                      fontWeight: 900,
-                    }}
+                    style={{ fontWeight: 900 }}
                     onClick={(e) => {
                       e.stopPropagation();
                       handleAddClick(p);
                     }}
                   >
-                    {out
-                      ? "Sin stock"
-                      : canPOS
-                      ? "Agregar"
-                      : "Editar"}
+                    {out ? "Sin stock" : canPOS ? "Agregar" : "Editar"}
                   </Button>
                 </Tooltip>
               </Flex>

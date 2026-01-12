@@ -1,10 +1,114 @@
 // src/components/habitaciones/helpers.js
 import { beachColors, neutrals } from "../../theme/beachTheme";
 
-export const SEDES = [
-  { label: "Casa Frida", value: "casa_frida" },
-  { label: "Cabañas Frida", value: "cabanas_fridas" },
+/**
+ * Normaliza el nombre de una sede a una clave interna segura.
+ * Ej:
+ * "Casa Frida" -> "casa_frida"
+ * "Cabañas Frida" -> "cabanas_frida"
+ * "cabanas-frida" -> "cabanas_frida"
+ */
+export const normalizeSedeKey = (name) => {
+  return (
+    String(name || "")
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-z0-9]+/g, "_")
+      .replace(/^_+|_+$/g, "") || "sede"
+  );
+};
+
+// ✅ Alias para compatibilidad con datos viejos (NO es lista hardcodeada de sedes)
+const SEDE_ALIASES = {
+  cabanas_fridas: "cabanas_frida",
+};
+
+// ✅ Normaliza y aplica alias
+export const normalizeHotelCode = (code) => {
+  const k = normalizeSedeKey(code);
+  return SEDE_ALIASES[k] || k || "sede";
+};
+
+/**
+ * ✅ Catálogo dinámico (inyectado desde DB)
+ * Espera objetos tipo: { key, name, isActive, color? }
+ */
+let SEDES_CATALOG = []; // <- ya NO usamos SEDES hardcodeadas
+
+export const setSedesCatalog = (list) => {
+  const arr = Array.isArray(list) ? list : [];
+  SEDES_CATALOG = arr
+    .map((s) => {
+      const key = s?.key ? normalizeHotelCode(s.key) : normalizeSedeKey(s?.name);
+      const name = String(s?.name || "").trim();
+      const isActive = s?.isActive !== false;
+      const color = typeof s?.color === "string" ? s.color.trim() : "";
+      return { key, name, isActive, color };
+    })
+    .filter((x) => !!x.key);
+};
+
+const humanizeKey = (k) => {
+  const s = String(k || "")
+    .trim()
+    .replace(/[-_]+/g, " ")
+    .replace(/\s+/g, " ");
+  if (!s) return "-";
+  return s.replace(/\b\w/g, (m) => m.toUpperCase());
+};
+
+const getSedeFromCatalog = (hotelCode, catalog = SEDES_CATALOG) => {
+  const key = normalizeHotelCode(hotelCode);
+  return (Array.isArray(catalog) ? catalog : []).find((s) => s.key === key) || null;
+};
+
+// 🎨 Paleta para sedes dinámicas (no hardcodea sedes, solo colores)
+const SEDE_COLOR_POOL = [
+  beachColors.oceanBlue,
+  beachColors.turquoise,
+  beachColors.teal,
+  beachColors.sunset,
+  beachColors.coral,
+  "#a78bfa",
+  "#60a5fa",
+  "#34d399",
 ];
+
+const hashStr = (str) => {
+  const s = String(str || "");
+  let h = 0;
+  for (let i = 0; i < s.length; i += 1) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+  return h;
+};
+
+export const getSedeLabel = (hotelCode, catalog) => {
+  const key = normalizeHotelCode(hotelCode);
+  const found = getSedeFromCatalog(key, catalog);
+  if (found?.name) return found.name;
+  return humanizeKey(key || hotelCode);
+};
+
+export const getSedeMeta = (hotelCode, catalog) => {
+  const key = normalizeHotelCode(hotelCode);
+  const found = getSedeFromCatalog(key, catalog);
+
+  const label = found?.name ? found.name : humanizeKey(key || hotelCode);
+
+  // Si la DB trae color lo respetamos; si no, lo asignamos estable por hash
+  let color = "#e5e7eb";
+  if (found?.color) {
+    color = found.color;
+  } else if (key) {
+    const idx = hashStr(key) % SEDE_COLOR_POOL.length;
+    color = SEDE_COLOR_POOL[idx] || "#e5e7eb";
+  }
+
+  return { label, color, textColor: "#0f172a", isActive: found?.isActive !== false };
+};
+
+// ✅ Mantengo export para compatibilidad: ya NO hay sedes hardcodeadas aquí
+export const SEDES = []; // (deprecated) usa /api/sedes + setSedesCatalog()
 
 export const CAPACITY_OPTIONS = [
   { label: "1 adulto", value: 1 },
@@ -48,11 +152,7 @@ export const isTrashed = (room) => room?.isDeleted === true;
 export const getEstadoMeta = (estado) => {
   switch (estado) {
     case "Activa":
-      return {
-        label: "Activa",
-        color: beachColors.teal,
-        textColor: "#064e3b",
-      };
+      return { label: "Activa", color: beachColors.teal, textColor: "#064e3b" };
     case "Mantenimiento":
       return {
         label: "Mantenimiento",
@@ -66,32 +166,10 @@ export const getEstadoMeta = (estado) => {
         textColor: "#7f1d1d",
       };
     case "Bloqueada":
-      return {
-        label: "Bloqueada",
-        color: "#9ca3af",
-        textColor: "#111827",
-      };
+      return { label: "Bloqueada", color: "#9ca3af", textColor: "#111827" };
     default:
-      return {
-        label: estado || "-",
-        color: "#e5e7eb",
-        textColor: "#111827",
-      };
+      return { label: estado || "-", color: "#e5e7eb", textColor: "#111827" };
   }
-};
-
-export const getSedeLabel = (hotelCode) => {
-  const found = SEDES.find((s) => s.value === hotelCode);
-  return found ? found.label : hotelCode || "-";
-};
-
-export const getSedeMeta = (hotelCode) => {
-  const label = getSedeLabel(hotelCode);
-  const color =
-    hotelCode === "casa_frida"
-      ? beachColors.oceanBlue
-      : beachColors.turquoise;
-  return { label, color, textColor: "#0f172a" };
 };
 
 export const hasPromo = (hab) => {
@@ -133,23 +211,3 @@ export const getReservaMeta = (room) => {
 
 export const neutralsTheme = neutrals;
 export const beachTheme = beachColors;
-
-/**
- * Normaliza el nombre de una sede a una clave interna segura.
- * Ej:
- * "Casa Frida" -> "casa_frida"
- * "Cabañas Frida" -> "cabanas_frida"
- */
-export const normalizeSedeKey = (name) => {
-  return (
-    String(name || "")
-      .toLowerCase()
-      // elimina tildes/acentos
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "")
-      // todo lo que no sea a-z0-9 -> "_"
-      .replace(/[^a-z0-9]+/g, "_")
-      // quita guiones bajos al inicio/fin
-      .replace(/^_+|_+$/g, "") || "sede"
-  );
-};

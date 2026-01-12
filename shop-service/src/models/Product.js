@@ -1,3 +1,4 @@
+// shop-service/src/models/Product.js
 const mongoose = require("mongoose");
 
 const ProductSchema = new mongoose.Schema(
@@ -5,14 +6,20 @@ const ProductSchema = new mongoose.Schema(
     name: { type: String, required: true, trim: true },
     section: { type: String, enum: ["normal", "alcohol"], required: true },
 
-    categoryId: { type: mongoose.Schema.Types.ObjectId, ref: "ShopCategory", required: true },
+    categoryId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "ShopCategory",
+      required: true,
+    },
 
-    // "sede del hot": ej casa_frida, cabanas_fridas
-    site: { type: String, required: true, trim: true },
+    // 🔥 DB: site (legacy) — API/UI: sedeKey (alias)
+    site: { type: String, required: true, trim: true, alias: "sedeKey" },
+
+    // opcional (si quieres link fuerte a Sede)
+    sedeId: { type: mongoose.Schema.Types.ObjectId, ref: "Sede", default: null, index: true },
 
     unitPrice: { type: Number, required: true, min: 0 },
     stock: { type: Number, required: true, min: 0 },
-
     minStock: { type: Number, default: 0, min: 0 },
 
     imageUrl: { type: String, default: "" },

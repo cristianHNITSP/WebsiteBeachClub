@@ -1,16 +1,9 @@
-// src/components/shop/CategoryModal.jsx
 import React from "react";
 import { Modal, Form, Input, Select, Typography } from "antd";
 
 const { Text } = Typography;
 
-function CategoryModal({
-  open,
-  editingCategory,
-  form,
-  onCancel,
-  onOk,
-}) {
+function CategoryModal({ open, editingCategory, form, onCancel, onOk }) {
   return (
     <Modal
       title={editingCategory ? "Editar categoría" : "Nueva categoría"}

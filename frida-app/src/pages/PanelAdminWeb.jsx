@@ -1,6 +1,6 @@
 // src/pages/PanelAdminWeb.jsx
-import React, { useState, useEffect } from "react";
-import { Layout, Card, Tabs, Space, Typography, Grid } from "antd";
+import { useState, useEffect } from "react";
+import { Layout, Card, Tabs, Space, Typography, Grid, message } from "antd";
 import {
   HomeOutlined,
   CalendarOutlined,
@@ -51,6 +51,8 @@ const PanelAdminWeb = ({ currentUser, onCurrentUserUpdated }) => {
 
   const [activeTab, setActiveTab] = useState(getInitialTab);
 
+  const [messageApi, contextHolder] = message.useMessage();
+
   const handleTabChange = (key) => {
     setActiveTab(key);
     if (typeof window !== "undefined") {
@@ -68,6 +70,17 @@ const PanelAdminWeb = ({ currentUser, onCurrentUserUpdated }) => {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+  try {
+    const name = window.sessionStorage.getItem("hb_login_success");
+    if (name !== null) {
+      window.sessionStorage.removeItem("hb_login_success");
+      messageApi.success(`Bienvenido, ${name || "usuario"} 👋`);
+    }
+  } catch {}
+}, [messageApi]);
+
 
   /* ==========================
      PERMISOS DEL USUARIO

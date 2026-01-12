@@ -1,4 +1,3 @@
-// src/components/shop/MiniTiendaHeader.jsx
 import React from "react";
 import {
   Card,
@@ -50,15 +49,10 @@ function MiniTiendaHeader({
     overflow: "hidden",
   };
 
-  const sectionLabel =
-    section === "normal" ? "Snacks y bebidas" : "Alcohol";
+  const sectionLabel = section === "normal" ? "Snacks y bebidas" : "Alcohol";
 
   return (
-    <Card
-      bordered={false}
-      style={headerStyle}
-      bodyStyle={{ padding: isMobile ? 14 : 18 }}
-    >
+    <Card bordered={false} style={headerStyle} bodyStyle={{ padding: isMobile ? 14 : 18 }}>
       <Row gutter={[12, 12]} align="middle" justify="space-between">
         <Col>
           <Space align="center" size={10}>
@@ -136,6 +130,8 @@ function MiniTiendaHeader({
               style={{ minWidth: isMobile ? 160 : 220, flex: "0 0 auto" }}
               options={siteOptions}
               loading={sitesLoading}
+              optionFilterProp="label"
+              showSearch
             />
 
             <Input.Search

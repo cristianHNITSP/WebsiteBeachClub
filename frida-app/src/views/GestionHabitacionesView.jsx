@@ -17,9 +17,9 @@ import dayjs from "dayjs";
 import { ReloadOutlined, PlusOutlined } from "@ant-design/icons";
 import {
   hasPromo,
-  SEDES,
   normalizeSedeKey,
   getSedeMeta,
+  setSedesCatalog,
 } from "../components/habitaciones/helpers";
 import HabitacionesHeader from "../components/habitaciones/HabitacionesHeader";
 import HabitacionesFilters from "../components/habitaciones/HabitacionesFilters";
@@ -30,6 +30,22 @@ import HabitacionFormModal from "../components/habitaciones/HabitacionFormModal"
 axios.defaults.withCredentials = true;
 
 const { Text } = Typography;
+
+const cleanUrl = (u) => String(u || "").trim();
+
+const normalizeImages = (record) => {
+  const arr = Array.isArray(record?.images)
+    ? record.images.map(cleanUrl).filter(Boolean)
+    : [];
+  if (arr.length) return arr;
+  const legacy = cleanUrl(record?.img);
+  return legacy ? [legacy] : [];
+};
+
+const normalizeDeletedImages = (v) => {
+  const arr = Array.isArray(v) ? v : [];
+  return arr.map(cleanUrl).filter(Boolean);
+};
 
 const GestionHabitacionesView = ({ isMobile, currentUser }) => {
   const [habitaciones, setHabitaciones] = useState([]);
@@ -52,17 +68,20 @@ const GestionHabitacionesView = ({ isMobile, currentUser }) => {
   const [editando, setEditando] = useState(null);
   const [form] = Form.useForm();
 
+  const [saving, setSaving] = useState(false);
+
   const [messageApi, contextHolder] = message.useMessage();
   const [deletingRoomId, setDeletingRoomId] = useState(null);
 
-  // ✅ Sedes (gestión + opciones dinámicas)
+  // ✅ Sedes (DB)
   const [sedes, setSedes] = useState([]);
   const [sedesLoading, setSedesLoading] = useState(false);
   const [sedesModalOpen, setSedesModalOpen] = useState(false);
   const [creatingSede, setCreatingSede] = useState(false);
   const [sedeForm] = Form.useForm();
 
-  const [sedeOptions, setSedeOptions] = useState(SEDES); // fallback legacy
+  // ✅ opciones dinámicas (sin hardcode)
+  const [sedeOptions, setSedeOptions] = useState([]);
 
   const canManageRooms = useMemo(
     () =>
@@ -87,11 +106,11 @@ const GestionHabitacionesView = ({ isMobile, currentUser }) => {
       const opts = list.map((s) => ({
         value: s.key || normalizeSedeKey(s.name),
         label: s.name || s.key || "Sede",
-        disabled: s.isActive === false, // 👈 marca como inactiva
+        disabled: s.isActive === false,
       }));
       setSedeOptions(opts);
     } else {
-      setSedeOptions(SEDES);
+      setSedeOptions([]); // ✅ sin hardcode
     }
   };
 
@@ -101,16 +120,24 @@ const GestionHabitacionesView = ({ isMobile, currentUser }) => {
       const res = await axios.get("/api/sedes", { withCredentials: true });
       const data = Array.isArray(res.data) ? res.data : [];
       setSedes(data);
+
+      // ✅ Inyecta catálogo global para helpers (labels/meta en toda la UI)
+      setSedesCatalog(data);
+
       syncSedeOptionsFromList(data);
     } catch (err) {
       console.error(err);
-      // Si falla, usamos sedes legacy
-      setSedeOptions(SEDES);
+
+      // ✅ sin hardcode, solo queda vacío (y la UI humaniza el hotelCode)
+      setSedes([]);
+      setSedesCatalog([]);
+      setSedeOptions([]);
+
       messageApi.open({
         key: "sedes-load",
         type: "warning",
         content:
-          "No se pudieron cargar las sedes desde el servidor. Se usarán las sedes por defecto.",
+          "No se pudieron cargar las sedes desde el servidor. Se mostrarán las claves como texto.",
         duration: 3,
       });
     } finally {
@@ -118,12 +145,11 @@ const GestionHabitacionesView = ({ isMobile, currentUser }) => {
     }
   };
 
+  // ✅ Carga sedes para que labels/meta salgan desde DB (aunque sea read-only)
   useEffect(() => {
-    if (canManageRooms) {
-      fetchSedes();
-    }
+    if (currentUser) fetchSedes();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [canManageRooms]);
+  }, [currentUser]);
 
   const buildQueryParams = (page) => ({
     page,
@@ -193,12 +219,14 @@ const GestionHabitacionesView = ({ isMobile, currentUser }) => {
 
   const abrirCrear = () => {
     if (!canManageRooms)
-      return messageApi.warning(
-        "No tienes permisos para crear habitaciones."
-      );
+      return messageApi.warning("No tienes permisos para crear habitaciones.");
+
     setEditando(null);
     form.resetFields();
     form.setFieldsValue({
+      images: [],
+      img: "",
+      deletedImages: [],
       offerIsSpecial: false,
       offerDiscountPercent: null,
       offerDescription: "",
@@ -208,13 +236,13 @@ const GestionHabitacionesView = ({ isMobile, currentUser }) => {
 
   const abrirEditar = (registro) => {
     if (!canManageRooms)
-      return messageApi.warning(
-        "No tienes permisos para editar habitaciones."
-      );
+      return messageApi.warning("No tienes permisos para editar habitaciones.");
     if (registro?.isDeleted)
       return messageApi.warning(
         "Esta habitación está en papelera. Restaúrala para editar."
       );
+
+    const imgs = normalizeImages(registro);
 
     setEditando(registro);
     form.setFieldsValue({
@@ -222,7 +250,9 @@ const GestionHabitacionesView = ({ isMobile, currentUser }) => {
       roomNumber: registro.roomNumber,
       title: registro.title,
       location: registro.location,
-      img: registro.img,
+      images: imgs,
+      img: imgs[0] || "",
+      deletedImages: [],
       hotelCode: registro.hotelCode,
       roomType: registro.roomType,
       size: registro.size,
@@ -244,6 +274,7 @@ const GestionHabitacionesView = ({ isMobile, currentUser }) => {
   const cerrarModal = () => {
     setModalVisible(false);
     setEditando(null);
+    setSaving(false);
     form.resetFields();
   };
 
@@ -266,19 +297,18 @@ const GestionHabitacionesView = ({ isMobile, currentUser }) => {
       .validateFields()
       .then(async (values) => {
         try {
+          setSaving(true);
+
           const {
             offerIsSpecial,
             offerDiscountPercent,
             offerDescription,
+            deletedImages,
             ...baseValues
           } = values;
 
           const selectedSedeKey = baseValues.hotelCode;
 
-          // 👇 Reglas:
-          // - Crear en sede inactiva -> prohibido
-          // - Editar y cambiar a sede inactiva -> prohibido
-          // - Editar manteniendo misma sede (aunque esté inactiva) -> permitido
           if (isSedeInactive(selectedSedeKey)) {
             if (!editando) {
               messageApi.error(
@@ -297,17 +327,8 @@ const GestionHabitacionesView = ({ isMobile, currentUser }) => {
           let discount = offerIsSpecial ? Number(offerDiscountPercent) : null;
           let offer;
 
-          if (
-            !offerIsSpecial ||
-            !discount ||
-            discount <= 0 ||
-            discount >= 100
-          ) {
-            offer = {
-              isSpecial: false,
-              description: "",
-              discountPercent: null,
-            };
+          if (!offerIsSpecial || !discount || discount <= 0 || discount >= 100) {
+            offer = { isSpecial: false, description: "", discountPercent: null };
           } else {
             offer = {
               isSpecial: true,
@@ -316,14 +337,22 @@ const GestionHabitacionesView = ({ isMobile, currentUser }) => {
             };
           }
 
-          const payload = { ...baseValues, offer };
+          const images = Array.isArray(baseValues.images)
+            ? baseValues.images.map(cleanUrl).filter(Boolean)
+            : [];
+
+          const payload = {
+            ...baseValues,
+            images,
+            img: images[0] || cleanUrl(baseValues.img) || "",
+            offer,
+            deletedImages: normalizeDeletedImages(deletedImages),
+          };
 
           messageApi.open({
             key: "saving-room",
             type: "loading",
-            content: editando
-              ? "Guardando cambios..."
-              : "Creando nueva habitación...",
+            content: editando ? "Guardando cambios..." : "Creando nueva habitación...",
             duration: 0,
           });
 
@@ -359,10 +388,11 @@ const GestionHabitacionesView = ({ isMobile, currentUser }) => {
             content:
               err?.response?.status === 401
                 ? "No autorizado. Revisa tu sesión o permisos."
-                : err?.response?.data?.message ||
-                  "Error al guardar la habitación.",
+                : err?.response?.data?.message || "Error al guardar la habitación.",
             duration: 3,
           });
+        } finally {
+          setSaving(false);
         }
       })
       .catch(() => {});
@@ -370,9 +400,7 @@ const GestionHabitacionesView = ({ isMobile, currentUser }) => {
 
   const enviarAPapelera = async (id) => {
     if (!canManageRooms)
-      return messageApi.warning(
-        "No tienes permisos para eliminar habitaciones."
-      );
+      return messageApi.warning("No tienes permisos para eliminar habitaciones.");
     try {
       setDeletingRoomId(id);
       messageApi.open({
@@ -381,11 +409,7 @@ const GestionHabitacionesView = ({ isMobile, currentUser }) => {
         content: "Enviando a papelera...",
         duration: 0,
       });
-      await axios.patch(
-        `/api/habitaciones/${id}/trash`,
-        {},
-        { withCredentials: true }
-      );
+      await axios.patch(`/api/habitaciones/${id}/trash`, {}, { withCredentials: true });
       messageApi.open({
         key: `trash-${id}`,
         type: "success",
@@ -401,8 +425,7 @@ const GestionHabitacionesView = ({ isMobile, currentUser }) => {
         content:
           err?.response?.status === 401
             ? "No autorizado. Revisa tu sesión o permisos."
-            : err?.response?.data?.message ||
-              "No se pudo enviar a papelera.",
+            : err?.response?.data?.message || "No se pudo enviar a papelera.",
         duration: 3,
       });
     } finally {
@@ -411,8 +434,7 @@ const GestionHabitacionesView = ({ isMobile, currentUser }) => {
   };
 
   const restaurarHabitacion = async (id) => {
-    if (!canManageRooms)
-      return messageApi.warning("No tienes permisos para restaurar.");
+    if (!canManageRooms) return messageApi.warning("No tienes permisos para restaurar.");
     try {
       setDeletingRoomId(id);
       messageApi.open({
@@ -421,11 +443,7 @@ const GestionHabitacionesView = ({ isMobile, currentUser }) => {
         content: "Restaurando...",
         duration: 0,
       });
-      await axios.patch(
-        `/api/habitaciones/${id}/restore`,
-        {},
-        { withCredentials: true }
-      );
+      await axios.patch(`/api/habitaciones/${id}/restore`, {}, { withCredentials: true });
       messageApi.open({
         key: `restore-${id}`,
         type: "success",
@@ -448,9 +466,7 @@ const GestionHabitacionesView = ({ isMobile, currentUser }) => {
 
   const eliminarHabitacionPermanent = async (id) => {
     if (!canManageRooms)
-      return messageApi.warning(
-        "No tienes permisos para eliminar permanentemente."
-      );
+      return messageApi.warning("No tienes permisos para eliminar permanentemente.");
     try {
       setDeletingRoomId(id);
       messageApi.open({
@@ -459,9 +475,7 @@ const GestionHabitacionesView = ({ isMobile, currentUser }) => {
         content: "Eliminando permanentemente...",
         duration: 0,
       });
-      await axios.delete(`/api/habitaciones/${id}/permanent`, {
-        withCredentials: true,
-      });
+      await axios.delete(`/api/habitaciones/${id}/permanent`, { withCredentials: true });
       messageApi.open({
         key: `permanent-${id}`,
         type: "success",
@@ -474,9 +488,7 @@ const GestionHabitacionesView = ({ isMobile, currentUser }) => {
       messageApi.open({
         key: `permanent-${id}`,
         type: "error",
-        content:
-          err?.response?.data?.message ||
-          "No se pudo eliminar permanentemente.",
+        content: err?.response?.data?.message || "No se pudo eliminar permanentemente.",
         duration: 3,
       });
     } finally {
@@ -492,16 +504,11 @@ const GestionHabitacionesView = ({ isMobile, currentUser }) => {
   ).length;
   const totalFuera = habitaciones.filter(
     (h) =>
-      (h.inventoryStatus === "Fuera de servicio" ||
-        h.inventoryStatus === "Bloqueada") &&
+      (h.inventoryStatus === "Fuera de servicio" || h.inventoryStatus === "Bloqueada") &&
       !h.isDeleted
   ).length;
-  const totalConPromo = habitaciones.filter(
-    (h) => hasPromo(h) && !h.isDeleted
-  ).length;
-  const totalConFavoritos = habitaciones.filter(
-    (h) => (h.favoritesCount || 0) > 0 && !h.isDeleted
-  ).length;
+  const totalConPromo = habitaciones.filter((h) => hasPromo(h) && !h.isDeleted).length;
+  const totalConFavoritos = habitaciones.filter((h) => (h.favoritesCount || 0) > 0 && !h.isDeleted).length;
 
   const limpiarFiltros = () => {
     setBusqueda("");
@@ -512,7 +519,7 @@ const GestionHabitacionesView = ({ isMobile, currentUser }) => {
     setFiltroPapelera("excluir");
   };
 
-  /* ===================== MODAL: RESERVAS FUTURAS (paginado por índice) ===================== */
+  /* ===================== MODAL: RESERVAS FUTURAS ===================== */
   const [reservasModal, setReservasModal] = useState({
     open: false,
     room: null,
@@ -539,10 +546,7 @@ const GestionHabitacionesView = ({ isMobile, currentUser }) => {
         ...p,
         loading: false,
         items: Array.isArray(api.items) ? api.items : [],
-        total:
-          typeof api.total === "number"
-            ? api.total
-            : (api.items || []).length,
+        total: typeof api.total === "number" ? api.total : (api.items || []).length,
         page: typeof api.page === "number" ? api.page : page,
       }));
     } catch (err) {
@@ -586,9 +590,7 @@ const GestionHabitacionesView = ({ isMobile, currentUser }) => {
         key: "fechas",
         width: 220,
         render: (_, r) => {
-          const s = r?.startDate
-            ? dayjs(r.startDate).format("DD/MM/YYYY")
-            : "—";
+          const s = r?.startDate ? dayjs(r.startDate).format("DD/MM/YYYY") : "—";
           const e = r?.endDate ? dayjs(r.endDate).format("DD/MM/YYYY") : s;
           return (
             <Space direction="vertical" size={0}>
@@ -596,10 +598,7 @@ const GestionHabitacionesView = ({ isMobile, currentUser }) => {
                 {s} → {e}
               </Text>
               <Text style={{ fontSize: 10, color: "#6b7280" }}>
-                Creada:{" "}
-                {r?.createdAt
-                  ? dayjs(r.createdAt).format("DD/MM/YYYY HH:mm")
-                  : "—"}
+                Creada: {r?.createdAt ? dayjs(r.createdAt).format("DD/MM/YYYY HH:mm") : "—"}
               </Text>
             </Space>
           );
@@ -610,12 +609,8 @@ const GestionHabitacionesView = ({ isMobile, currentUser }) => {
         key: "detalle",
         render: (_, r) => (
           <Space direction="vertical" size={0}>
-            <Text style={{ fontSize: 12, fontWeight: 600 }}>
-              {r?.label || "Reserva"}
-            </Text>
-            <Text style={{ fontSize: 10, color: "#6b7280" }}>
-              {r?.notes ? r.notes : "—"}
-            </Text>
+            <Text style={{ fontSize: 12, fontWeight: 600 }}>{r?.label || "Reserva"}</Text>
+            <Text style={{ fontSize: 10, color: "#6b7280" }}>{r?.notes ? r.notes : "—"}</Text>
           </Space>
         ),
       },
@@ -649,7 +644,11 @@ const GestionHabitacionesView = ({ isMobile, currentUser }) => {
                 Reserva
               </Tag>
             );
-          return <Space size={6} wrap>{tags}</Space>;
+          return (
+            <Space size={6} wrap>
+              {tags}
+            </Space>
+          );
         },
       },
       {
@@ -665,15 +664,9 @@ const GestionHabitacionesView = ({ isMobile, currentUser }) => {
               ? fromTotalAmount
               : fromBilling;
 
-          if (!Number.isFinite(t) || t <= 0) {
-            return <Text style={{ color: "#6b7280" }}>—</Text>;
-          }
+          if (!Number.isFinite(t) || t <= 0) return <Text style={{ color: "#6b7280" }}>—</Text>;
 
-          return (
-            <Text style={{ fontWeight: 700 }}>
-              ${t.toLocaleString("es-MX")}
-            </Text>
-          );
+          return <Text style={{ fontWeight: 700 }}>${t.toLocaleString("es-MX")}</Text>;
         },
       },
     ],
@@ -683,19 +676,14 @@ const GestionHabitacionesView = ({ isMobile, currentUser }) => {
   /* ===================== MODAL: GESTIÓN DE SEDES ===================== */
 
   const handleOpenSedes = () => {
-    if (!canManageRooms) {
-      return messageApi.warning(
-        "No tienes permisos para gestionar sedes."
-      );
-    }
+    if (!canManageRooms)
+      return messageApi.warning("No tienes permisos para gestionar sedes.");
     setSedesModalOpen(true);
     fetchSedes();
   };
 
   const handleCreateSede = () => {
-    if (!canManageRooms) {
-      return messageApi.warning("No tienes permisos para crear sedes.");
-    }
+    if (!canManageRooms) return messageApi.warning("No tienes permisos para crear sedes.");
 
     sedeForm
       .validateFields()
@@ -706,11 +694,7 @@ const GestionHabitacionesView = ({ isMobile, currentUser }) => {
           const name = String(values.name || "").trim();
           const key = normalizeSedeKey(name);
 
-          await axios.post(
-            "/api/sedes",
-            { key, name },
-            { withCredentials: true }
-          );
+          await axios.post("/api/sedes", { key, name }, { withCredentials: true });
 
           messageApi.success("Sede creada correctamente.");
           sedeForm.resetFields();
@@ -720,9 +704,7 @@ const GestionHabitacionesView = ({ isMobile, currentUser }) => {
           if (err?.response?.status === 409) {
             messageApi.error("Ya existe una sede con ese nombre o clave.");
           } else {
-            messageApi.error(
-              "No se pudo crear la sede. Intenta de nuevo."
-            );
+            messageApi.error("No se pudo crear la sede. Intenta de nuevo.");
           }
         } finally {
           setCreatingSede(false);
@@ -732,11 +714,8 @@ const GestionHabitacionesView = ({ isMobile, currentUser }) => {
   };
 
   const handleToggleSedeStatus = async (sede) => {
-    if (!canManageRooms) {
-      return messageApi.warning(
-        "No tienes permisos para actualizar sedes."
-      );
-    }
+    if (!canManageRooms)
+      return messageApi.warning("No tienes permisos para actualizar sedes.");
 
     try {
       setSedesLoading(true);
@@ -757,25 +736,20 @@ const GestionHabitacionesView = ({ isMobile, currentUser }) => {
             "No puedes desactivar esta sede porque tiene habitaciones activas."
         );
       } else {
-        messageApi.error(
-          data?.message || "No se pudo actualizar el estado de la sede."
-        );
+        messageApi.error(data?.message || "No se pudo actualizar el estado de la sede.");
       }
     } finally {
       setSedesLoading(false);
     }
   };
 
-  // Tabla de sedes sin clave interna (solo nombre y estado)
   const sedesColumns = useMemo(
     () => [
       {
         title: "Nombre",
         dataIndex: "name",
         key: "name",
-        render: (name) => (
-          <Text style={{ fontSize: 12 }}>{name || "—"}</Text>
-        ),
+        render: (name) => <Text style={{ fontSize: 12 }}>{name || "—"}</Text>,
       },
       {
         title: "Estado",
@@ -783,10 +757,7 @@ const GestionHabitacionesView = ({ isMobile, currentUser }) => {
         key: "isActive",
         width: 120,
         render: (isActive) => (
-          <Tag
-            color={isActive ? "green" : "default"}
-            style={{ borderRadius: 999 }}
-          >
+          <Tag color={isActive ? "green" : "default"} style={{ borderRadius: 999 }}>
             {isActive ? "Activa" : "Inactiva"}
           </Tag>
         ),
@@ -796,11 +767,7 @@ const GestionHabitacionesView = ({ isMobile, currentUser }) => {
         key: "acciones",
         width: 140,
         render: (_, s) => (
-          <Button
-            size="small"
-            onClick={() => handleToggleSedeStatus(s)}
-            loading={sedesLoading}
-          >
+          <Button size="small" onClick={() => handleToggleSedeStatus(s)} loading={sedesLoading}>
             {s.isActive ? "Desactivar" : "Activar"}
           </Button>
         ),
@@ -809,10 +776,9 @@ const GestionHabitacionesView = ({ isMobile, currentUser }) => {
     [sedesLoading]
   );
 
-  // Helper para mostrar la sede “bonita” en el título del modal de reservas futuras
   const getRoomSedeLabel = (room) => {
     if (!room?.hotelCode) return "";
-    const meta = getSedeMeta(room.hotelCode);
+    const meta = getSedeMeta(room.hotelCode); // <- usa catálogo inyectado
     return meta.label || room.hotelCode;
   };
 
@@ -878,7 +844,6 @@ const GestionHabitacionesView = ({ isMobile, currentUser }) => {
           onDeletePermanent={eliminarHabitacionPermanent}
           deletingRoomId={deletingRoomId}
           onViewFutureReservations={abrirReservasFuturas}
-          // sedesMeta={...} // si luego quieres pasar meta desde el backend
         />
       </Card>
 
@@ -889,8 +854,8 @@ const GestionHabitacionesView = ({ isMobile, currentUser }) => {
         form={form}
         onCancel={cerrarModal}
         onOk={guardarHabitacion}
-        saving={false}
-        sedesOptions={sedeOptions} // 👈 ya vienen con disabled si isActive === false
+        saving={saving}
+        sedesOptions={sedeOptions}
       />
 
       {/* MODAL: Reservas futuras por habitación */}
@@ -900,15 +865,11 @@ const GestionHabitacionesView = ({ isMobile, currentUser }) => {
           <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
             <Text style={{ fontSize: 14, fontWeight: 700 }}>
               Reservas futuras · Hab{" "}
-              {reservasModal.room?.codigo ||
-                reservasModal.room?.roomNumber ||
-                "—"}
+              {reservasModal.room?.codigo || reservasModal.room?.roomNumber || "—"}
             </Text>
             <Text style={{ fontSize: 11, color: "#6b7280" }}>
               {reservasModal.room?.title || "—"}
-              {reservasModal.room?.hotelCode && (
-                <> · {getRoomSedeLabel(reservasModal.room)}</>
-              )}
+              {reservasModal.room?.hotelCode && <> · {getRoomSedeLabel(reservasModal.room)}</>}
             </Text>
           </div>
         }
@@ -917,9 +878,7 @@ const GestionHabitacionesView = ({ isMobile, currentUser }) => {
           <Button
             key="refresh"
             icon={<ReloadOutlined />}
-            onClick={() =>
-              loadReservasFuturas({ page: reservasModal.page })
-            }
+            onClick={() => loadReservasFuturas({ page: reservasModal.page })}
             loading={reservasModal.loading}
           >
             Recargar
@@ -933,16 +892,13 @@ const GestionHabitacionesView = ({ isMobile, currentUser }) => {
       >
         <div style={{ marginBottom: 10 }}>
           <Text style={{ fontSize: 11, color: "#6b7280" }}>
-            Se carga por índice (página). Total:{" "}
-            <b>{reservasModal.total}</b>
+            Se carga por índice (página). Total: <b>{reservasModal.total}</b>
           </Text>
         </div>
 
         <Table
           size="small"
-          rowKey={(r) =>
-            String(r?._id || r?.id || `${r?.startDate}-${r?.endDate}`)
-          }
+          rowKey={(r) => String(r?._id || r?.id || `${r?.startDate}-${r?.endDate}`)}
           columns={reservasColumns}
           dataSource={reservasModal.items}
           loading={reservasModal.loading}
@@ -967,36 +923,19 @@ const GestionHabitacionesView = ({ isMobile, currentUser }) => {
       >
         <Space direction="vertical" style={{ width: "100%" }} size={12}>
           <Text style={{ fontSize: 11, color: "#6b7280" }}>
-            Aquí puedes crear nuevas sedes y activar / desactivar las
-            existentes. La clave interna se genera automáticamente a partir
-            del nombre y se maneja de forma interna.
+            Aquí puedes crear nuevas sedes y activar / desactivar las existentes.
           </Text>
 
-          <Form
-            form={sedeForm}
-            layout="inline"
-            size="small"
-            onFinish={handleCreateSede}
-          >
+          <Form form={sedeForm} layout="inline" size="small" onFinish={handleCreateSede}>
             <Form.Item
               label="Nombre de la sede"
               name="name"
-              rules={[
-                {
-                  required: true,
-                  message: "Ingresa el nombre visible de la sede",
-                },
-              ]}
+              rules={[{ required: true, message: "Ingresa el nombre visible de la sede" }]}
             >
               <Input placeholder="Casa Frida" />
             </Form.Item>
             <Form.Item>
-              <Button
-                type="primary"
-                htmlType="submit"
-                icon={<PlusOutlined />}
-                loading={creatingSede}
-              >
+              <Button type="primary" htmlType="submit" icon={<PlusOutlined />} loading={creatingSede}>
                 Agregar sede
               </Button>
             </Form.Item>

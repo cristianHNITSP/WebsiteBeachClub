@@ -164,6 +164,8 @@ const RouterApp = () => {
 
         {/* Grupo: /panel.web */}
         <Route path="/panel.web">
+
+          <Route index element={<Navigate to="login.panel.web" replace />} />
           {/* Login del panel */}
           <Route path="login.panel.web" element={<LoginRoute />} />
 

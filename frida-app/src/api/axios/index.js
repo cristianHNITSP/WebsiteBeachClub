@@ -1,3 +1,4 @@
+// src/api/axios.js
 import axios from "axios";
 
 const baseURL = import.meta.env.VITE_API_BASE || "";
@@ -5,50 +6,155 @@ const baseURL = import.meta.env.VITE_API_BASE || "";
 const axiosInstance = axios.create({
   baseURL,
   withCredentials: true,
+  timeout: 15000,
 });
 
-const DEBUG_RESERVAS = String(import.meta.env.VITE_DEBUG_RESERVAS) === "true";
+// ====== Single-flight GET (evita multi requests si spamean refresh) ======
+const inflightGets = new Map();
 
-if (DEBUG_RESERVAS) {
-  axiosInstance.interceptors.request.use((config) => {
-    const reqId = Math.random().toString(16).slice(2);
-    config.headers = config.headers || {};
-    config.headers["x-debug-reqid"] = reqId;
-    config.metadata = { reqId, t0: performance.now() };
+/**
+ * GET deduplicado: si ya hay un GET idéntico en vuelo, regresa la misma promesa.
+ * Útil para "refresh" spameado o CheckSession.
+ */
+export function getOnce(url, config = {}) {
+  const paramsKey = config?.params ? JSON.stringify(config.params) : "";
+  const key = `GET:${url}?${paramsKey}`;
 
-    console.groupCollapsed(`%c[HTTP ->] ${String(config.method).toUpperCase()} ${config.url}`, "color:#2563eb;font-weight:600");
-    console.log("reqId:", reqId);
-    console.log("params:", config.params);
-    console.log("data:", config.data);
-    console.log("headers:", config.headers);
-    console.groupEnd();
+  if (inflightGets.has(key)) return inflightGets.get(key);
 
-    return config;
-  });
+  const p = axiosInstance.get(url, config).finally(() => inflightGets.delete(key));
 
-  axiosInstance.interceptors.response.use(
-    (res) => {
-      const md = res.config.metadata || {};
-      const ms = md.t0 ? Math.round(performance.now() - md.t0) : "?";
-      console.groupCollapsed(`%c[HTTP <-] ${res.status} ${res.config.url} (${ms}ms)`, "color:#16a34a;font-weight:600");
-      console.log("reqId:", md.reqId);
-      console.log("data:", res.data);
-      console.groupEnd();
-      return res;
-    },
-    (err) => {
-      const cfg = err.config || {};
-      const md = cfg.metadata || {};
-      const ms = md.t0 ? Math.round(performance.now() - md.t0) : "?";
-      console.groupCollapsed(`%c[HTTP !!] ${(cfg.method || "??").toUpperCase()} ${cfg.url} (${ms}ms)`, "color:#dc2626;font-weight:600");
-      console.log("reqId:", md.reqId);
-      console.log("status:", err?.response?.status);
-      console.log("response:", err?.response?.data);
-      console.log("message:", err?.message);
-      console.groupEnd();
-      return Promise.reject(err);
-    }
-  );
+  inflightGets.set(key, p);
+  return p;
+}
+
+// ====== Helpers de auth ======
+const EXPIRED_CODES = new Set(["TOKEN_EXPIRED"]); // solo este debe mostrar "expiró"
+const SIGNED_OUT_CODES = new Set(["NO_TOKEN", "INVALID_TOKEN"]); // logout/manual/sin sesión
+
+export function getAuthReason(err) {
+  const status = err?.response?.status;
+  const code = String(err?.response?.data?.error || err?.response?.data?.code || "");
+
+  if (status === 401 && EXPIRED_CODES.has(code)) return "expired";
+  if (status === 401 && SIGNED_OUT_CODES.has(code)) return "signed_out";
+  return null;
+}
+
+export function isSessionExpiredError(err) {
+  return getAuthReason(err) === "expired";
+}
+
+export function isAuthRequiredError(err) {
+  return getAuthReason(err) === "signed_out";
+}
+
+/**
+ * Normaliza errores backend -> mensaje friendly para usuario final.
+ * Devuelve: { type, title, description, toast, retryAfterSec }
+ */
+export function normalizeAuthError(err) {
+  const status = err?.response?.status;
+  const data = err?.response?.data || {};
+  const code = data?.error || data?.code;
+
+  const reason = getAuthReason(err);
+
+  // Sin respuesta (offline, CORS, server caído)
+  if (!err?.response) {
+    return {
+      type: "error",
+      title: "No pudimos conectar",
+      description:
+        "No se pudo contactar con el servidor. Revisa tu conexión e inténtalo de nuevo.",
+      toast: "No se pudo conectar con el servidor.",
+    };
+  }
+
+  // Rate limit (backend)
+  if (status === 429 || String(code) === "RATE_LIMIT") {
+    const ra = Number(err?.response?.headers?.["retry-after"]);
+    const retryAfterSec = Number.isFinite(ra) ? ra : undefined;
+
+    return {
+      type: "warning",
+      title: "Demasiados intentos",
+      description: retryAfterSec
+        ? `Hiciste muchos intentos seguidos. Intenta de nuevo en ${retryAfterSec}s.`
+        : "Hiciste muchos intentos seguidos. Espera un momento e inténtalo de nuevo.",
+      toast: "Espera un momento e inténtalo de nuevo.",
+      retryAfterSec,
+    };
+  }
+
+  // Sesión expirada (solo TOKEN_EXPIRED)
+  if (reason === "expired") {
+    return {
+      type: "warning",
+      title: "Sesión expirada",
+      description: "Tu sesión expiró. Inicia sesión nuevamente para continuar.",
+      toast: "Tu sesión expiró. Vuelve a iniciar sesión.",
+    };
+  }
+
+  // No autenticado / sesión cerrada (NO_TOKEN / INVALID_TOKEN)
+  // Importante: esto NO es "expirada"
+  if (reason === "signed_out") {
+    return {
+      type: "info",
+      title: "Sesión no activa",
+      description: "Tu sesión ya no está activa. Inicia sesión para continuar.",
+      toast: "Inicia sesión para continuar.",
+    };
+  }
+
+  // Casos típicos del login
+  if (String(code) === "USER_INACTIVE") {
+    return {
+      type: "warning",
+      title: "Acceso restringido",
+      description:
+        "Tu usuario está inactivo. Contacta al administrador para reactivar tu acceso.",
+      toast: "Tu usuario está inactivo.",
+    };
+  }
+
+  if (String(code) === "INVALID_CREDENTIALS") {
+    return {
+      type: "error",
+      title: "Credenciales incorrectas",
+      description:
+        "Usuario o contraseña incorrectos. Verifica e inténtalo de nuevo.",
+      toast: "Usuario o contraseña incorrectos.",
+    };
+  }
+
+  if (String(code) === "VALIDATION_ERROR") {
+    return {
+      type: "error",
+      title: "Datos inválidos",
+      description: "Revisa el correo y la contraseña.",
+      toast: "Revisa los datos del formulario.",
+    };
+  }
+
+  // Errores 5xx
+  if (status >= 500) {
+    return {
+      type: "error",
+      title: "Servidor no disponible",
+      description: "Ocurrió un problema en el servidor. Intenta más tarde.",
+      toast: "Error del servidor. Intenta más tarde.",
+    };
+  }
+
+  // Fallback seguro (NO mostrar texto crudo backend)
+  return {
+    type: "error",
+    title: "No se pudo completar la acción",
+    description: "Intenta nuevamente en unos momentos.",
+    toast: "Ocurrió un error. Intenta de nuevo.",
+  };
 }
 
 export default axiosInstance;

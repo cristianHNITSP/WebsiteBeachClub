@@ -1,4 +1,3 @@
-// src/components/shop/ProductModal.jsx
 import React from "react";
 import {
   Modal,
@@ -71,7 +70,11 @@ function ProductModal({
               name="site"
               rules={[{ required: true, message: "Sede requerida" }]}
             >
-              <Select options={siteOptions} />
+              <Select
+                options={siteOptions}
+                showSearch
+                optionFilterProp="label"
+              />
             </Form.Item>
           </Col>
           <Col span={12}>
@@ -83,7 +86,7 @@ function ProductModal({
               <Select
                 options={categories.map((c) => ({
                   label: c.name,
-                  value: c._id,
+                  value: String(c._id),
                 }))}
                 showSearch
                 optionFilterProp="label"
@@ -132,8 +135,7 @@ function ProductModal({
         </Row>
 
         <Text type="secondary" style={{ fontSize: 12 }}>
-          Si algo falla, usa “Ver detalles” en el mensaje de error para
-          compartirlo con soporte.
+          Si algo falla, usa “Ver detalles” en el mensaje de error para compartirlo con soporte.
         </Text>
       </Form>
     </Modal>

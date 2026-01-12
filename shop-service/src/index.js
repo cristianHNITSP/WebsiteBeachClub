@@ -9,8 +9,8 @@ const { connectDB } = require("./config/db");
 const categoriesRoutes = require("./routes/categories.routes");
 const productsRoutes = require("./routes/products.routes");
 const salesRoutes = require("./routes/sales.routes");
-const sitesRoutes = require("./routes/sites.routes");
-const stockMovementsRoutes = require("./routes/stockMovements");
+const sedesRoutes = require("./routes/sedes.routes");
+const stockMovementsRoutes = require("./routes/stockMovements.routes");
 const dashboardRoutes = require("./routes/dashboard.routes");
 
 const app = express();
@@ -20,10 +20,9 @@ app.use(cookieParser());
 
 // 🌍 CORS abierto (DEV)
 const corsOptions = {
-  origin: true, // refleja origin entrante
+  origin: true,
   credentials: true,
 };
-
 app.use(cors(corsOptions));
 app.options("*", cors(corsOptions));
 
@@ -35,8 +34,8 @@ app.use("/api/shop/categories", categoriesRoutes);
 app.use("/api/shop/products", productsRoutes);
 app.use("/api/shop/sales", salesRoutes);
 app.use("/api/shop/stock-movements", stockMovementsRoutes);
-app.use("/api/shop/sites", sitesRoutes);
-app.use("/api/shop/dashboard", dashboardRoutes); 
+app.use("/api/shop/sedes", sedesRoutes);
+app.use("/api/shop/dashboard", dashboardRoutes);
 
 const port = Number(process.env.PORT || 4003);
 

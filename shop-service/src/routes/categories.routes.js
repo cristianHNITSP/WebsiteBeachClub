@@ -1,4 +1,4 @@
-// routes/categories.js
+// shop-service/src/routes/categories.routes.js
 const express = require("express");
 const Category = require("../models/Category");
 const auth = require("../middlewares/auth.middleware");

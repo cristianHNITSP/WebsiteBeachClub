@@ -1,4 +1,4 @@
-// routes/stockMovements.js
+// shop-service/src/routes/stockMovements.routes.js
 const express = require("express");
 const StockMovement = require("../models/StockMovement");
 const auth = require("../middlewares/auth.middleware");
@@ -6,13 +6,14 @@ const { requirePermissions } = require("../middlewares/permissions.middleware");
 
 const router = express.Router();
 
-// GET /api/shop/stock-movements?site=&section=&from=&to=&page=&limit=
+// GET /api/shop/stock-movements?sedeKey=&section=&from=&to=&page=&limit=
 router.get("/", auth, requirePermissions(["view_shop"]), async (req, res) => {
-  const { site, section, from, to, page = 1, limit = 50 } = req.query;
+  const sedeKey = req.query.sedeKey ?? req.query.sede ?? req.query.site;
+  const { section, from, to, page = 1, limit = 50 } = req.query;
 
   const q = {};
-  if (site) q.site = String(site);
-  if (section) q.section = String(section); // solo si tu StockMovement guarda section (si no, quítalo)
+  if (sedeKey) q.site = String(sedeKey);
+  if (section) q.section = String(section);
 
   if (from || to) {
     q.createdAt = {};

@@ -1,3 +1,4 @@
+// shop-service/src/models/Sale.js
 const mongoose = require("mongoose");
 
 const SaleItemSchema = new mongoose.Schema(
@@ -13,7 +14,9 @@ const SaleItemSchema = new mongoose.Schema(
 
 const SaleSchema = new mongoose.Schema(
   {
-    site: { type: String, required: true, trim: true },
+    // DB: site — API: sedeKey (alias)
+    site: { type: String, required: true, trim: true, alias: "sedeKey" },
+
     section: { type: String, enum: ["normal", "alcohol"], required: true },
 
     items: { type: [SaleItemSchema], default: [] },

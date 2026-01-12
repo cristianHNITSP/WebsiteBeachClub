@@ -1,44 +1,47 @@
+// src/index.js
 require("dotenv").config();
 const express = require("express");
 const cookieParser = require("cookie-parser");
 const cors = require("cors");
 const http = require("http");
 const { Server } = require("socket.io");
+const path = require("path"); // 
 
 const { connectDB } = require("./config/db");
 const createHabitacionesRouter = require("./routes/habitaciones.routes");
 const reservasRoutes = require("./routes/reservas.routes");
 const heroSlideRoutes = require("./routes/heroSlide.routes");
 const publicReservasRouter = require("./routes/public.reservas.router");
-const sedesRoutes = require('./routes/sedes.routes');
+const sedesRoutes = require("./routes/sedes.routes");
 
 const Habitacion = require("./models/Habitacion");
 const { bindHabitacionesSocket } = require("./ws/habitaciones.socket");
 
 const app = express();
 
+// ✅ importante si estás detrás de Nginx/Proxy (para req.protocol correcto)
+app.set("trust proxy", 1);
+
 app.use(express.json());
 app.use(cookieParser());
 
 // 🌍 CORS para HTTP
 const corsOptions = {
-  origin: (origin, callback) => callback(null, true), // dev: permitir todo
+  origin: (origin, callback) => callback(null, true),
   credentials: true,
 };
 
 app.use(cors(corsOptions));
 app.options("*", cors(corsOptions));
 
-/**
- * ✅ MODELO SIMPLE (RESUMEN)
- * - Chat NO modifica estados.
- * - Lo único persistente de reserva es:
- *      isReserved = true/false
- * - El staff actualiza:
- *      - inventoryStatus (Activa/Mantenimiento/Fuera/etc.)
- *      - isReserved (Reservada/No reservada)
- * - WebSocket solo sincroniza cambios en tiempo real.
- */
+// ✅ SERVIR UPLOADS (esto hace que /uploads/habitaciones/xxx.jpg funcione)
+app.use(
+  "/uploads",
+  express.static(path.join(__dirname, "uploads"), {
+    maxAge: "7d",
+    etag: true,
+  })
+);
 
 // 🔌 Servidor HTTP + Socket.IO
 const server = http.createServer(app);
@@ -56,7 +59,6 @@ io.on("connection", async (socket) => {
   console.log("🧩 Cliente WebSocket conectado:", socket.id);
 
   try {
-    // Enviar SOLO las primeras 5 habitaciones al conectar (preview)
     const rooms = await Habitacion.find().sort({ createdAt: -1 }).limit(5);
     socket.emit("habitaciones:init", rooms);
   } catch (err) {
@@ -70,15 +72,15 @@ io.on("connection", async (socket) => {
     console.log("❌ Cliente WebSocket desconectado:", socket.id);
   });
 });
-// ✅ binder WS
+
 bindHabitacionesSocket(io);
 
 // 🔗 Rutas HTTP
 app.use("/api/habitaciones", createHabitacionesRouter(io));
 app.use("/api/reservas", reservasRoutes);
 app.use("/api/hero-slides", heroSlideRoutes);
-app.use("/api/public", publicReservasRouter);  
-app.use('/api/sedes', sedesRoutes);
+app.use("/api/public", publicReservasRouter);
+app.use("/api/sedes", sedesRoutes);
 
 app.get("/", (req, res) => {
   res.send("🏨 reservas-service (habitaciones + reservas) OK con Socket.IO");
