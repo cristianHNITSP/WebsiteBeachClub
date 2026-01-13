@@ -576,7 +576,7 @@ const InicioSesionPanel = () => {
                     >
                       <Input
                         size="large"
-                        placeholder="usuario@tuequipo.com"
+                        placeholder="usuario@beachclub.com"
                         prefix={
                           <MailOutlined
                             style={{ color: beachColors.oceanBlue }}
@@ -623,20 +623,6 @@ const InicioSesionPanel = () => {
                       >
                         Recordar correo en este dispositivo
                       </Checkbox>
-
-                      <Button
-                        type="link"
-                        size="small"
-                        disabled={loading}
-                        style={{ padding: 0 }}
-                        onClick={() => {
-                          messageApi.info(
-                            "Si olvidaste tu contraseña, contacta al administrador del sistema."
-                          );
-                        }}
-                      >
-                        Olvidé mi contraseña
-                      </Button>
                     </Flex>
 
                     <Button

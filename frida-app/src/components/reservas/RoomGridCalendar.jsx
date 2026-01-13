@@ -1,17 +1,6 @@
-// src/components/reservas/RoomGridCalendar.jsx
+// frida-app/src/components/reservas/RoomGridCalendar.jsx
 import { useMemo, useState } from "react";
-import {
-  Button,
-  Card,
-  DatePicker,
-  Space,
-  Table,
-  Tag,
-  Typography,
-  Popover,
-  theme,
-} from "antd";
-import { CalendarOutlined, HomeOutlined, MoreOutlined } from "@ant-design/icons";
+import { Card, DatePicker, Space, Table, Tag, Typography, theme } from "antd";
 import dayjs from "dayjs";
 import "dayjs/locale/es";
 import { beachColors, neutrals } from "../../theme/beachTheme";
@@ -21,9 +10,10 @@ import {
   getHotelLabel,
   getHotelShort,
   metaEvento,
-  recortar,
 } from "./reservasHelpers";
 import { TooltipContenidoEvento } from "./TooltipEvento";
+import RoomRowMeta from "./ui/RoomRowMeta";
+import DaySpanChip from "./ui/DaySpanChip";
 
 dayjs.locale("es");
 
@@ -44,16 +34,12 @@ const buildRoomLanes = (events) => {
       ev.startDate || ev.checkinAt || ev.createdAt || dayjs().format(DATE_FMT);
     const end =
       ev.endDate || ev.checkoutAt || ev.startDate || ev.checkinAt || start;
-    return {
-      start: dayjs(start),
-      end: dayjs(end),
-    };
+    return { start: dayjs(start), end: dayjs(end) };
   };
 
   const lanes = [];
-
   for (const ev of sorted) {
-    const { start, end } = toRange(ev);
+    const { start } = toRange(ev);
     let placed = false;
 
     for (const lane of lanes) {
@@ -67,12 +53,18 @@ const buildRoomLanes = (events) => {
       }
     }
 
-    if (!placed) {
-      lanes.push([ev]);
-    }
+    if (!placed) lanes.push([ev]);
   }
 
   return lanes;
+};
+
+/* ===================== KEY PARSER (FOCUS / HOVER) ===================== */
+const parseChipKey = (k) => {
+  if (!k) return null;
+  const m = String(k).match(/^classic:(.*):(\d+):(\d{4}-\d{2}-\d{2})$/);
+  if (!m) return null;
+  return { roomKey: m[1], laneIndex: Number(m[2] || 0), dateStr: m[3] };
 };
 
 /* ===================== GRID POR HABITACIÓN (ANT TABLE) ===================== */
@@ -99,13 +91,10 @@ const RoomGridCalendar = ({
   const [collapsedOverflowByRoom, setCollapsedOverflowByRoom] = useState({});
   const { token } = theme.useToken();
 
-  const month = useMemo(
-    () => selectedDate.startOf("month"),
-    [selectedDate]
-  );
+  const month = useMemo(() => selectedDate.startOf("month"), [selectedDate]);
 
-  const FIRST_COL_WIDTH = compacto ? 190 : 220;
-  const cellHeight = compacto ? 30 : 36;
+  const FIRST_COL_WIDTH = compacto ? 170 : 190;
+  const cellHeight = compacto ? 30 : 38;
   const cellWidth = compacto ? 56 : 72;
 
   const days = useMemo(() => {
@@ -158,10 +147,13 @@ const RoomGridCalendar = ({
           key,
           hotel,
           room,
-          label: `${getHotelShort(hotel) ? getHotelShort(hotel) + " · " : ""}Hab ${room}`,
+          label: `${
+            getHotelShort(hotel) ? getHotelShort(hotel) + " · " : ""
+          }Hab ${room}`,
         });
       }
     }
+
     const arr = Array.from(map.values());
     arr.sort((a, b) => {
       if (a.hotel === b.hotel) {
@@ -172,11 +164,13 @@ const RoomGridCalendar = ({
       }
       return getHotelLabel(a.hotel).localeCompare(getHotelLabel(b.hotel));
     });
+
     return arr;
   }, [filteredEvents, filtroHotel]);
 
   const dataSource = useMemo(() => {
     const grouped = new Map();
+
     for (const roomMeta of rooms) {
       const hotelKey = roomMeta.hotel || "x";
       if (!grouped.has(hotelKey)) {
@@ -188,6 +182,7 @@ const RoomGridCalendar = ({
           children: [],
         });
       }
+
       const parent = grouped.get(hotelKey);
       parent.roomCount += 1;
 
@@ -213,10 +208,15 @@ const RoomGridCalendar = ({
         });
       });
     }
+
     return Array.from(grouped.values());
   }, [rooms, eventsByRoom, collapsedOverflowByRoom]);
 
   const monthLabel = month.format("MMMM YYYY");
+
+  // ✅ Focus actual: si hay popover abierto, manda; si no, manda hover
+  const focusKey = openPopoverKey || hoveredChipKey;
+  const focusInfo = useMemo(() => parseChipKey(focusKey), [focusKey]);
 
   const bodyPopoverStyle = {
     background: token.colorBgElevated,
@@ -229,16 +229,9 @@ const RoomGridCalendar = ({
   const columns = useMemo(() => {
     const cols = [];
 
-    // Columna de habitación / grupo hotel
     cols.push({
       title: (
-        <span
-          style={{
-            fontSize: 10.5,
-            fontWeight: 600,
-            color: neutrals.textMuted,
-          }}
-        >
+        <span style={{ fontSize: 10.5, fontWeight: 600, color: neutrals.textMuted }}>
           Habitación
         </span>
       ),
@@ -249,42 +242,14 @@ const RoomGridCalendar = ({
       render: (_, row) => {
         if (row.groupType === "hotel") {
           return (
-            <div
-              style={{
-                padding: "3px 6px",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                gap: 8,
-              }}
-            >
-              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                <HomeOutlined
-                  style={{ fontSize: 13, color: beachColors.deepBlue }}
-                />
-                <span
-                  style={{
-                    fontWeight: 600,
-                    color: neutrals.textMain,
-                    fontSize: 12,
-                  }}
-                >
-                  {getHotelLabel(row.hotel)}
-                </span>
-              </div>
-              <Tag
-                color="blue"
-                style={{
-                  borderRadius: 999,
-                  fontSize: 9,
-                  paddingInline: 8,
-                  marginInlineEnd: 0,
-                  lineHeight: "16px",
-                }}
-              >
-                {row.roomCount} hab.
-              </Tag>
-            </div>
+            <RoomRowMeta
+              variant="hotel"
+              hotelLabel={getHotelLabel(row.hotel)}
+              roomCount={row.roomCount}
+              beachColors={beachColors}
+              neutrals={neutrals}
+              token={token}
+            />
           );
         }
 
@@ -293,99 +258,33 @@ const RoomGridCalendar = ({
 
         if (laneIndex > 0) {
           return (
-            <div
-              style={{
-                padding: "3px 6px",
-                display: "flex",
-                alignItems: "center",
-                gap: 6,
-                fontSize: 9,
-                color: neutrals.textMuted,
-              }}
-            >
-              <span
-                style={{
-                  width: 6,
-                  height: 6,
-                  borderRadius: "999px",
-                  background: token.colorBorderSecondary,
-                  flexShrink: 0,
-                }}
-              />
-              <span>Reserva adicional</span>
-            </div>
+            <RoomRowMeta
+              variant="extra"
+              beachColors={beachColors}
+              neutrals={neutrals}
+              token={token}
+            />
           );
         }
 
         return (
-          <div
-            style={{
-              padding: "3px 6px",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              gap: 6,
-            }}
-          >
-            <div
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                gap: 0,
-                minWidth: 0,
-              }}
-            >
-              <span
-                style={{
-                  fontWeight: 600,
-                  color: neutrals.textMain,
-                  fontSize: 11,
-                }}
-              >
-                {roomMeta.label}
-              </span>
-              <span style={{ fontSize: 9.5, color: neutrals.textMuted }}>
-                {getHotelLabel(roomMeta.hotel)}
-              </span>
-            </div>
-
-            {hasOverflow && totalLanes > 1 && (
-              <Button
-                size="small"
-                type="text"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setCollapsedOverflowByRoom((prev) => ({
-                    ...prev,
-                    [roomMeta.key]: !prev[roomMeta.key],
-                  }));
-                }}
-                style={{
-                  borderRadius: 999,
-                  height: 22,
-                  paddingInline: 6,
-                  fontSize: 10,
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 4,
-                }}
-              >
-                <span
-                  style={{
-                    display: "inline-block",
-                    transform: isCollapsed ? "rotate(90deg)" : "rotate(-90deg)",
-                    transition: "transform 0.18s ease",
-                  }}
-                >
-                  <MoreOutlined />
-                </span>
-                <span>
-                  {isCollapsed ? "+" : ""}
-                  {totalLanes - 1}
-                </span>
-              </Button>
-            )}
-          </div>
+          <RoomRowMeta
+            variant="room"
+            roomLabel={roomMeta.label}
+            roomSubLabel={getHotelLabel(roomMeta.hotel)}
+            beachColors={beachColors}
+            neutrals={neutrals}
+            token={token}
+            showOverflowToggle={hasOverflow && totalLanes > 1}
+            overflowCount={Math.max(0, totalLanes - 1)}
+            overflowCollapsed={isCollapsed}
+            onToggleOverflow={() =>
+              setCollapsedOverflowByRoom((prev) => ({
+                ...prev,
+                [roomMeta.key]: !prev[roomMeta.key],
+              }))
+            }
+          />
         );
       },
       onCell: (row) => ({
@@ -398,7 +297,6 @@ const RoomGridCalendar = ({
       }),
     });
 
-    // Columnas por día
     days.forEach((d) => {
       const dateStr = d.format(DATE_FMT);
       const isWeekend = d.day() === 0 || d.day() === 6;
@@ -406,15 +304,7 @@ const RoomGridCalendar = ({
 
       cols.push({
         title: () => (
-          <div
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              gap: 0,
-              alignItems: "center",
-              paddingBlock: 0,
-            }}
-          >
+          <div style={{ display: "flex", flexDirection: "column", gap: 0, alignItems: "center" }}>
             <span
               style={{
                 fontWeight: 700,
@@ -439,7 +329,7 @@ const RoomGridCalendar = ({
                   marginTop: 1,
                   width: 4,
                   height: 4,
-                  borderRadius: "999px",
+                  borderRadius: 999,
                   background: token.colorPrimary,
                 }}
               />
@@ -449,6 +339,7 @@ const RoomGridCalendar = ({
         key: dateStr,
         dataIndex: dateStr,
         width: cellWidth,
+
         onCell: (row) => {
           if (row.groupType === "hotel") {
             return {
@@ -461,17 +352,13 @@ const RoomGridCalendar = ({
 
           const events = row.events || [];
           const startEvent = events.find((e) => e.startDate === dateStr);
-          const coverEvent = events.find((e) =>
-            eventoCubreFecha(e, dateStr)
-          );
+          const coverEvent = events.find((e) => eventoCubreFecha(e, dateStr));
 
           if (!startEvent && coverEvent) return { colSpan: 0 };
 
           if (startEvent) {
             const start = dayjs(startEvent.startDate);
-            const end = startEvent.endDate
-              ? dayjs(startEvent.endDate)
-              : start;
+            const end = startEvent.endDate ? dayjs(startEvent.endDate) : start;
             const spanDays = Math.max(1, end.diff(start, "day") + 1);
 
             return {
@@ -488,30 +375,22 @@ const RoomGridCalendar = ({
           return {
             style: {
               padding: 0,
-              background: isWeekend
-                ? token.colorErrorBg
-                : token.colorBgContainer,
+              background: isWeekend ? token.colorErrorBg : token.colorBgContainer,
               borderBottom: `1px solid ${token.colorSplit}`,
             },
           };
         },
+
         render: (_, row) => {
           if (row.groupType === "hotel") {
             return (
-              <div
-                style={{
-                  height: cellHeight,
-                  background: token.colorBgLayout,
-                }}
-              />
+              <div style={{ height: cellHeight, background: token.colorBgLayout }} />
             );
           }
 
           const events = row.events || [];
           const startEvent = events.find((e) => e.startDate === dateStr);
-          const coverEvent = events.find((e) =>
-            eventoCubreFecha(e, dateStr)
-          );
+          const coverEvent = events.find((e) => eventoCubreFecha(e, dateStr));
 
           if (!startEvent && coverEvent) return null;
 
@@ -520,9 +399,7 @@ const RoomGridCalendar = ({
               <div
                 style={{
                   height: cellHeight,
-                  background: isWeekend
-                    ? token.colorErrorBg
-                    : token.colorBgContainer,
+                  background: isWeekend ? token.colorErrorBg : token.colorBgContainer,
                 }}
               />
             );
@@ -530,30 +407,38 @@ const RoomGridCalendar = ({
 
           const ev = startEvent;
           const meta = metaEvento(ev);
-          const rawLabel = ev.label || meta.labelLargo;
 
           const instanceKey = `classic:${row.roomMeta.key}:${row.laneIndex || 0}:${dateStr}`;
           const isHovered = hoveredChipKey === instanceKey;
 
-          const texto = isHovered
-            ? rawLabel
-            : recortar(rawLabel, compacto ? 18 : 30);
+          const sameLaneFocused =
+            focusInfo &&
+            focusInfo.roomKey === row.roomMeta.key &&
+            focusInfo.laneIndex === (row.laneIndex || 0);
 
-          const etiquetaCorta = `${meta.labelCorto} · Hab ${
-            ev.room
-          }${ev.paidAt ? " · $" : ""}`;
+          if (sameLaneFocused && focusKey !== instanceKey) return null;
 
           return (
-            <div
-              style={{
-                height: cellHeight,
-                padding: 0,
-                background: token.colorBgContainer,
-                overflow: isHovered ? "visible" : "hidden",
-              }}
-            >
-              <Popover
-                content={
+            <div style={{ height: cellHeight, padding: 0 }}>
+              <DaySpanChip
+                ev={ev}
+                meta={meta}
+                compacto={compacto}
+                token={token}
+                neutrals={neutrals}
+                beachColors={beachColors}
+                instanceKey={instanceKey}
+                isHovered={isHovered}
+                onHoverChange={(next) =>
+                  setHoveredChipKey((cur) => {
+                    if (next) return instanceKey;
+                    return cur === instanceKey ? null : cur;
+                  })
+                }
+                open={openPopoverKey === instanceKey}
+                onOpenChange={(open) => onPopoverToggle?.(instanceKey, open)}
+                popoverBodyStyle={bodyPopoverStyle}
+                popoverContent={
                   <TooltipContenidoEvento
                     evento={ev}
                     onCheckin={onCheckin}
@@ -569,97 +454,7 @@ const RoomGridCalendar = ({
                     onLockPopover={onPopoverLock}
                   />
                 }
-                color={token.colorBgElevated}
-                styles={{ body: bodyPopoverStyle }}
-                trigger="click"
-                open={openPopoverKey === instanceKey}
-                onOpenChange={(open) =>
-                  onPopoverToggle?.(instanceKey, open)
-                }
-              >
-                <div
-                  onMouseEnter={() => setHoveredChipKey(instanceKey)}
-                  onMouseLeave={() =>
-                    setHoveredChipKey((k) =>
-                      k === instanceKey ? null : k
-                    )
-                  }
-                  style={{
-                    width: isHovered ? "max-content" : "100%",
-                    minWidth: "100%",
-                    maxWidth: isHovered ? 520 : "100%",
-                    height: "100%",
-                    display: "grid",
-                    gridTemplateColumns: ev.paidAt
-                      ? "auto auto minmax(0, 1fr) auto"
-                      : "auto auto minmax(0, 1fr)",
-                    alignItems: "center",
-                    columnGap: 6,
-                    padding: "2px 6px",
-                    borderRadius: 999,
-                    background:
-                      "linear-gradient(90deg, rgba(56,189,248,0.12), rgba(16,185,129,0.16))",
-                    borderLeft: `4px solid ${meta.color}`,
-                    fontSize: compacto ? 9.25 : 10,
-                    lineHeight: "14px",
-                    whiteSpace: "nowrap",
-                    color: neutrals.textMain,
-                    boxShadow: isHovered
-                      ? token.boxShadowSecondary
-                      : token.boxShadowTertiary,
-                    cursor: "pointer",
-                    userSelect: "none",
-                    WebkitTapHighlightColor: "transparent",
-                    position: "relative",
-                    zIndex: isHovered ? 2 : 1,
-                    transform: isHovered
-                      ? "translateY(-1px) scale(1.015)"
-                      : "translateY(0) scale(1)",
-                    transition:
-                      "max-width 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease, padding 0.18s ease",
-                    overflow: isHovered ? "visible" : "hidden",
-                  }}
-                >
-                  <span
-                    style={{
-                      width: 6,
-                      height: 6,
-                      borderRadius: "999px",
-                      backgroundColor: meta.color,
-                    }}
-                  />
-                  <span
-                    style={{
-                      fontWeight: 700,
-                      whiteSpace: "nowrap",
-                    }}
-                  >
-                    {etiquetaCorta}
-                  </span>
-                  <span
-                    style={{
-                      minWidth: 0,
-                      whiteSpace: "nowrap",
-                      overflow: isHovered ? "visible" : "hidden",
-                      textOverflow: isHovered ? "clip" : "ellipsis",
-                    }}
-                  >
-                    {texto}
-                  </span>
-                  {ev.paidAt && (
-                    <span
-                      style={{
-                        fontSize: 10,
-                        color: beachColors.teal,
-                        fontWeight: 800,
-                        whiteSpace: "nowrap",
-                      }}
-                    >
-                      $
-                    </span>
-                  )}
-                </div>
-              </Popover>
+              />
             </div>
           );
         },
@@ -689,6 +484,8 @@ const RoomGridCalendar = ({
     pending,
     hoveredChipKey,
     collapsedOverflowByRoom,
+    focusInfo,
+    focusKey,
   ]);
 
   return (
@@ -715,13 +512,7 @@ const RoomGridCalendar = ({
         }}
       >
         <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
-          <Text
-            style={{
-              fontWeight: 700,
-              color: beachColors.deepBlue,
-              fontSize: 13,
-            }}
-          >
+          <Text style={{ fontWeight: 700, color: beachColors.deepBlue, fontSize: 13 }}>
             {monthLabel}
           </Text>
         </div>
@@ -737,9 +528,7 @@ const RoomGridCalendar = ({
             }}
             format="DD/MM/YYYY"
             allowClear={false}
-            style={{
-              borderRadius: 999,
-            }}
+            style={{ borderRadius: 999 }}
           />
           {isSelectedToday && (
             <Tag
@@ -772,12 +561,7 @@ const RoomGridCalendar = ({
         sticky
         tableLayout="fixed"
         rowKey="key"
-        expandable={{
-          defaultExpandAllRows: true,
-        }}
-        style={{
-          borderRadius: "0 0 14px 14px",
-        }}
+        expandable={{ defaultExpandAllRows: true }}
       />
     </Card>
   );

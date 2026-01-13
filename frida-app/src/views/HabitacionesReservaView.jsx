@@ -159,13 +159,13 @@ const HabitacionesReservaView = ({ isMobile: forzarMobile }) => {
     });
   };
 
-  // 🔁 contador para forzar recarga de CambiosFechasTab
+  //contador para forzar recarga de CambiosFechasTab
   const [dateChangesReloadKey, setDateChangesReloadKey] = useState(0);
   const notifyDateChange = useCallback(() => {
     setDateChangesReloadKey((k) => k + 1);
   }, []);
 
-  // 🔁 contador para forzar recarga de PapeleraTab
+  //contador para forzar recarga de PapeleraTab
   const [trashReloadKey, setTrashReloadKey] = useState(0);
   const notifyTrashChange = useCallback(() => {
     setTrashReloadKey((k) => k + 1);
