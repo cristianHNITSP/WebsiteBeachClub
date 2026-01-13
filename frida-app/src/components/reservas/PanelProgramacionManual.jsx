@@ -12,6 +12,9 @@ import {
   Checkbox,
 } from "antd";
 import { ReloadOutlined } from "@ant-design/icons";
+
+import dayjs from "dayjs";
+
 import { beachColors, neutrals } from "../../theme/beachTheme";
 import {
   DATE_FMT,
@@ -25,6 +28,7 @@ import {
 const { Text } = Typography;
 const { Option } = Select;
 const { RangePicker } = DatePicker;
+const toDay = (v) => (v ? dayjs(v).startOf("day") : null);
 
 const RESERVAS_ENDPOINT = "/api/reservas";
 const RESERVAS_HABS_ENDPOINT = "/api/reservas/habitaciones";
@@ -303,17 +307,91 @@ const PanelProgramacionManual = ({
             </Select>
           </Form.Item>
 
-          <Form.Item
-            name="rango"
-            rules={[{ required: true, message: "Selecciona entrada y salida." }]}
-            style={{ marginRight: esMobile ? 0 : 6, marginBottom: 6 }}
-          >
-            <RangePicker
+<Form.Item
+  name="rango"
+  rules={[
+    { required: true, message: "Selecciona entrada y salida." },
+    {
+      validator: (_, value) => {
+        const arr = Array.isArray(value) ? value : [];
+        const a = arr[0] ? dayjs(arr[0]) : null;
+        const b = arr[1] ? dayjs(arr[1]) : null;
+        if (!a || !b) return Promise.reject(new Error("Selecciona entrada y salida."));
+        if (b.isBefore(a, "day"))
+          return Promise.reject(new Error("La salida no puede ser antes de la entrada."));
+        return Promise.resolve();
+      },
+    },
+  ]}
+  style={{ marginRight: esMobile ? 0 : 6, marginBottom: 6 }}
+>
+  {esMobile ? (
+    <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+      {/* ENTRADA */}
+      <Form.Item noStyle shouldUpdate>
+        {({ getFieldValue, setFieldsValue }) => {
+          const rango = getFieldValue("rango");
+          const start = rango?.[0] ? toDay(rango[0]) : null;
+          const end = rango?.[1] ? toDay(rango[1]) : null;
+
+          return (
+            <DatePicker
               size="small"
               format="DD/MM/YYYY"
-              style={{ width: esMobile ? "100%" : 230 }}
+              placeholder="Entrada"
+              value={start}
+              style={{ flex: 1, minWidth: 160 }}
+              inputReadOnly
+              onChange={(v) => {
+                const ns = v ? v.startOf("day") : null;
+                // si ya había salida y queda antes, la ajustamos
+                const ne = end && ns && end.isBefore(ns, "day") ? ns : end;
+                setFieldsValue({ rango: [ns, ne] });
+              }}
             />
-          </Form.Item>
+          );
+        }}
+      </Form.Item>
+
+      {/* SALIDA */}
+      <Form.Item noStyle shouldUpdate>
+        {({ getFieldValue, setFieldsValue }) => {
+          const rango = getFieldValue("rango");
+          const start = rango?.[0] ? toDay(rango[0]) : null;
+          const end = rango?.[1] ? toDay(rango[1]) : null;
+
+          return (
+            <DatePicker
+              size="small"
+              format="DD/MM/YYYY"
+              placeholder="Salida"
+              value={end}
+              style={{ flex: 1, minWidth: 160 }}
+              inputReadOnly
+              disabledDate={(d) => {
+                if (!d || !start) return false;
+                return d.startOf("day").isBefore(start, "day");
+              }}
+              onChange={(v) => {
+                const ne = v ? v.startOf("day") : null;
+                setFieldsValue({ rango: [start, ne] });
+              }}
+            />
+          );
+        }}
+      </Form.Item>
+    </div>
+  ) : (
+    <RangePicker
+      size="small"
+      format="DD/MM/YYYY"
+      style={{ width: 230 }}
+      placement="bottomLeft"
+      // recomendado para evitar bugs en contenedores con overflow/transform
+      getPopupContainer={() => document.body}
+    />
+  )}
+</Form.Item>
 
           <Form.Item
             name="habitacion"

@@ -16,6 +16,8 @@ import {
   ReloadOutlined,
   UndoOutlined,
   RestOutlined,
+  RightOutlined,
+  DownOutlined,
 } from "@ant-design/icons";
 import dayjs from "dayjs";
 import { neutrals } from "../../../theme/beachTheme";
@@ -33,14 +35,67 @@ const { Text } = Typography;
 
 const RESERVAS_TRASH_ENDPOINT = "/api/reservas/trash";
 const RESERVAS_ENDPOINT = "/api/reservas";
+const toDay = (v) => (v ? dayjs(v).startOf("day") : null);
 
-const PapeleraTab = ({
-  filtroHotel,
-  esMobile,
-  onRestored,
-  reloadKey,
-  messageApi,
-}) => {
+function ResponsiveRange({ value, onChange, esMobile }) {
+  const start = value?.[0] ? toDay(value[0]) : null;
+  const end = value?.[1] ? toDay(value[1]) : null;
+
+  if (!esMobile) {
+    return (
+      <RangePicker
+        value={value}
+        onChange={(v) => onChange(v || [])}
+        format="DD/MM/YYYY"
+        size="small"
+        style={{ width: 260, maxWidth: "100%" }}
+        placement="bottomLeft"
+        getPopupContainer={() => document.body}
+      />
+    );
+  }
+
+  return (
+    <div style={{ display: "flex", gap: 8, flexWrap: "wrap", width: "100%" }}>
+      <DatePicker
+        size="small"
+        format="DD/MM/YYYY"
+        placeholder="Desde"
+        value={start}
+        style={{ flex: 1, minWidth: 150 }}
+        inputReadOnly
+        onChange={(v) => {
+          const ns = v ? v.startOf("day") : null;
+          const ne =
+            ns && end && end.isBefore(ns, "day") ? ns : end || null;
+          const next = [ns, ne].filter(Boolean);
+          onChange(next);
+        }}
+      />
+
+      <DatePicker
+        size="small"
+        format="DD/MM/YYYY"
+        placeholder="Hasta"
+        value={end}
+        style={{ flex: 1, minWidth: 150 }}
+        inputReadOnly
+        disabledDate={(d) => {
+          if (!d || !start) return false;
+          return d.startOf("day").isBefore(start, "day");
+        }}
+        onChange={(v) => {
+          const ne = v ? v.startOf("day") : null;
+          const ns = start || ne;
+          const next = [ns, ne].filter(Boolean);
+          onChange(next);
+        }}
+      />
+    </div>
+  );
+}
+
+const PapeleraTab = ({ filtroHotel, esMobile, onRestored, reloadKey, messageApi }) => {
   const [localMessageApi, localContextHolder] = message.useMessage();
   const api = messageApi || localMessageApi;
 
@@ -53,6 +108,29 @@ const PapeleraTab = ({
     dayjs().endOf("month").add(2, "month"),
   ]);
 
+  // ✅ control manual del expand en móvil (botón “Acciones”)
+  const [expandedKeys, setExpandedKeys] = useState([]);
+
+  const rowKeyFn = useCallback(
+    (r) => String(r?._id || r?.id || `${r?.deletedAt}-${r?.room}-${r?.startDate}`),
+    []
+  );
+
+  const isExpanded = useCallback(
+    (r) => expandedKeys.includes(rowKeyFn(r)),
+    [expandedKeys, rowKeyFn]
+  );
+
+  const toggleExpanded = useCallback(
+    (r) => {
+      const k = rowKeyFn(r);
+      setExpandedKeys((prev) =>
+        prev.includes(k) ? prev.filter((x) => x !== k) : [...prev, k]
+      );
+    },
+    [rowKeyFn]
+  );
+
   const loadTrash = useCallback(async () => {
     setLoading(true);
     const key = "load_trash";
@@ -60,10 +138,12 @@ const PapeleraTab = ({
 
     const params = {};
     if (filtroHotel !== "all") params.hotel = filtroHotel;
+
     if (range?.[0] && range?.[1]) {
-      params.from = range[0].startOf("day").format(DATE_FMT);
-      params.to = range[1].startOf("day").format(DATE_FMT);
+      params.from = dayjs(range[0]).startOf("day").format(DATE_FMT);
+      params.to = dayjs(range[1]).endOf("day").format(DATE_FMT);
     }
+
     if (q?.trim()) params.q = q.trim();
 
     try {
@@ -84,26 +164,19 @@ const PapeleraTab = ({
       } catch (e2) {
         console.error("[trash] no se pudo cargar:", e1, e2);
         setRows([]);
-        api.error({
-          content: "No pudimos cargar la papelera.",
-          key,
-        });
+        api.error({ content: "No pudimos cargar la papelera.", key });
       }
     } finally {
       setLoading(false);
     }
   }, [filtroHotel, range, q, api]);
 
-  // Carga inicial
   useEffect(() => {
     loadTrash();
   }, [loadTrash]);
 
-  // 🔁 Recargar cuando el padre cambie reloadKey (por ejemplo al mandar algo a trash)
   useEffect(() => {
-    if (reloadKey > 0) {
-      loadTrash();
-    }
+    if (reloadKey > 0) loadTrash();
   }, [reloadKey, loadTrash]);
 
   const restoreReserva = useCallback(
@@ -121,18 +194,12 @@ const PapeleraTab = ({
           await axios.patch(`${RESERVAS_ENDPOINT}/${sid}/untrash`);
         }
 
-        api.success({
-          content: "Reserva restaurada y devuelta al calendario.",
-          key,
-        });
+        api.success({ content: "Reserva restaurada y devuelta al calendario.", key });
         setRows((prev) => prev.filter((r) => getEventId(r) !== sid));
         onRestored?.();
       } catch (e) {
         console.error(e);
-        api.error({
-          content: "No se pudo restaurar la reserva.",
-          key,
-        });
+        api.error({ content: "No se pudo restaurar la reserva.", key });
       }
     },
     [api, onRestored]
@@ -144,40 +211,29 @@ const PapeleraTab = ({
       if (!sid) return;
 
       const key = `hard_${sid}`;
-      api.loading({
-        content: "Eliminando reserva…",
-        key,
-        duration: 0,
-      });
+      api.loading({ content: "Eliminando reserva…", key, duration: 0 });
 
       try {
-        await axios.delete(`${RESERVAS_ENDPOINT}/${sid}`, {
-          params: { hard: "true" },
-        });
+        await axios.delete(`${RESERVAS_ENDPOINT}/${sid}`, { params: { hard: "true" } });
 
-        api.success({
-          content: "Reserva eliminada definitivamente.",
-          key,
-        });
+        api.success({ content: "Reserva eliminada definitivamente.", key });
         setRows((prev) => prev.filter((r) => getEventId(r) !== sid));
       } catch (e) {
         console.error(e);
-        api.error({
-          content: "No se pudo eliminar la reserva de forma definitiva.",
-          key,
-        });
+        api.error({ content: "No se pudo eliminar la reserva de forma definitiva.", key });
       }
     },
     [api]
   );
 
-  const columns = useMemo(
+  const desktopColumns = useMemo(
     () => [
       {
         title: "Eliminada",
         dataIndex: "deletedAt",
         key: "deletedAt",
-        width: 160,
+        width: 170,
+        ellipsis: true,
         render: (v, r) =>
           v
             ? dayjs(v).format("DD/MM/YYYY HH:mm")
@@ -189,7 +245,7 @@ const PapeleraTab = ({
         title: "Sede / Hab",
         key: "room",
         render: (_, r) => (
-          <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 240 }}>
             <span style={{ fontWeight: 600, color: neutrals.textMain }}>
               {getHotelLabel(r.hotel)} · Hab {r.room}
             </span>
@@ -202,7 +258,8 @@ const PapeleraTab = ({
       {
         title: "Fechas",
         key: "range",
-        width: 190,
+        width: 200,
+        responsive: ["md"],
         render: (_, r) => (
           <span style={{ color: neutrals.textMuted }}>
             {r?.startDate ? fmtRange(r.startDate, r.endDate) : "—"}
@@ -212,20 +269,14 @@ const PapeleraTab = ({
       {
         title: "Total",
         key: "total",
-        width: 140,
+        width: 150,
+        responsive: ["md"],
         render: (_, r) => {
           const b = r?.billing;
-          if (!b)
-            return <span style={{ color: neutrals.textMuted }}>—</span>;
-          const invalid =
-            Number(b?.total) <= 0 || Number(b?.pricePerDay) <= 0;
+          if (!b) return <span style={{ color: neutrals.textMuted }}>—</span>;
+          const invalid = Number(b?.total) <= 0 || Number(b?.pricePerDay) <= 0;
           return (
-            <span
-              style={{
-                fontWeight: 700,
-                color: invalid ? neutrals.textMuted : neutrals.textMain,
-              }}
-            >
+            <span style={{ fontWeight: 700, color: invalid ? neutrals.textMuted : neutrals.textMain }}>
               {invalid ? "—" : moneyMXN(b.total)}
             </span>
           );
@@ -234,7 +285,8 @@ const PapeleraTab = ({
       {
         title: "Estado",
         key: "estado",
-        width: 160,
+        width: 170,
+        responsive: ["md"],
         render: (_, r) => (
           <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
             {r?.paidAt ? (
@@ -261,11 +313,11 @@ const PapeleraTab = ({
       {
         title: "Acciones",
         key: "actions",
-        width: 220,
+        width: 240,
         render: (_, r) => {
           const id = getEventId(r);
           return (
-            <div style={{ display: "flex", gap: 8 }}>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
               <Popconfirm
                 title="¿Restaurar reserva?"
                 description="Volverá a aparecer en el calendario. Si las fechas ya están ocupadas, el sistema lo rechazará."
@@ -298,6 +350,138 @@ const PapeleraTab = ({
     [restoreReserva, hardDeleteReserva]
   );
 
+  const mobileColumns = useMemo(
+    () => [
+      {
+        title: "Reserva",
+        key: "main",
+        render: (_, r) => {
+          const b = r?.billing;
+          const invalid = !b || Number(b?.total) <= 0 || Number(b?.pricePerDay) <= 0;
+
+          return (
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontWeight: 800, color: neutrals.textMain, lineHeight: 1.2 }}>
+                    {getHotelLabel(r.hotel)} · Hab {r.room}
+                  </div>
+                  <div style={{ fontSize: 11, color: neutrals.textMuted }}>
+                    {recortar(r.label || "—", 70)}
+                  </div>
+                </div>
+
+                <div style={{ textAlign: "right" }}>
+                  <div style={{ fontWeight: 800, color: invalid ? neutrals.textMuted : neutrals.textMain }}>
+                    {invalid ? "—" : moneyMXN(b.total)}
+                  </div>
+                  <div style={{ fontSize: 11, color: neutrals.textMuted }}>
+                    {r?.startDate ? fmtRange(r.startDate, r.endDate) : "—"}
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                {r?.paidAt ? (
+                  <Tag color="green" style={{ borderRadius: 999 }}>
+                    $ Pagada
+                  </Tag>
+                ) : (
+                  <Tag color="gold" style={{ borderRadius: 999 }}>
+                    Pendiente
+                  </Tag>
+                )}
+                {r?.checkinAt ? (
+                  <Tag color="green" style={{ borderRadius: 999 }}>
+                    Check-in
+                  </Tag>
+                ) : (
+                  <Tag color="blue" style={{ borderRadius: 999 }}>
+                    Reserva
+                  </Tag>
+                )}
+              </div>
+
+              <div style={{ fontSize: 11, color: neutrals.textMuted }}>
+                Eliminada:{" "}
+                {r?.deletedAt
+                  ? dayjs(r.deletedAt).format("DD/MM/YYYY HH:mm")
+                  : r?.updatedAt
+                  ? dayjs(r.updatedAt).format("DD/MM/YYYY HH:mm")
+                  : "—"}
+              </div>
+            </div>
+          );
+        },
+      },
+      {
+        title: "",
+        key: "more",
+        width: 92,
+        align: "right",
+        render: (_, r) => {
+          const open = isExpanded(r);
+          return (
+            <Button
+              size="small"
+              type="text"
+              onClick={() => toggleExpanded(r)}
+              icon={open ? <DownOutlined /> : <RightOutlined />}
+              style={{ color: neutrals.textMuted, paddingInline: 6 }}
+            >
+              {open ? "Ocultar" : "Acciones"}
+            </Button>
+          );
+        },
+      },
+    ],
+    [isExpanded, toggleExpanded]
+  );
+
+  const expandable = useMemo(() => {
+    if (!esMobile) return undefined;
+
+    return {
+      expandedRowKeys: expandedKeys,
+      onExpandedRowsChange: (keys) => setExpandedKeys(keys.map(String)),
+      expandRowByClick: false,
+      showExpandColumn: false,
+      expandedRowRender: (r) => {
+        const id = getEventId(r);
+        return (
+          <div style={{ padding: "8px 6px 2px 6px" }}>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <Popconfirm
+                title="¿Restaurar reserva?"
+                description="Volverá a aparecer en el calendario. Si las fechas ya están ocupadas, el sistema lo rechazará."
+                okText="Restaurar"
+                cancelText="Cancelar"
+                onConfirm={() => restoreReserva(id)}
+              >
+                <Button size="small" icon={<UndoOutlined />}>
+                  Restaurar
+                </Button>
+              </Popconfirm>
+
+              <Popconfirm
+                title="¿Eliminar definitivamente?"
+                description="Esta acción no se puede deshacer."
+                okText="Eliminar"
+                cancelText="Cancelar"
+                okButtonProps={{ danger: true }}
+                onConfirm={() => hardDeleteReserva(id)}
+              >
+                <Button size="small" danger icon={<RestOutlined />}>
+                  Borrar
+                </Button>
+              </Popconfirm>
+            </div>
+          </div>
+        );
+      },
+    };
+  }, [esMobile, expandedKeys, restoreReserva, hardDeleteReserva]);
+
   return (
     <>
       {!messageApi && localContextHolder}
@@ -320,57 +504,40 @@ const PapeleraTab = ({
             marginBottom: 10,
           }}
         >
-          <div
-            style={{
-              display: "flex",
-              gap: 10,
-              alignItems: "center",
-              flexWrap: "wrap",
-            }}
-          >
+          <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", flex: 1 }}>
             <Tag color="volcano" style={{ borderRadius: 999 }}>
               <InboxOutlined /> Papelera
             </Tag>
 
-            <RangePicker
-              value={range}
-              onChange={(v) => setRange(v || [])}
-              format="DD/MM/YYYY"
-              size="small"
-              style={{ width: esMobile ? "100%" : 260 }}
-            />
+            <div style={{ flex: 1, minWidth: esMobile ? "100%" : 260 }}>
+              <ResponsiveRange value={range} onChange={setRange} esMobile={esMobile} />
+            </div>
 
             <Input
               size="small"
               placeholder="Buscar (habitación / nombre / nota)"
               value={q}
               onChange={(e) => setQ(e.target.value)}
-              style={{ width: esMobile ? "100%" : 260 }}
+              style={{ width: esMobile ? "100%" : 260, maxWidth: "100%" }}
               allowClear
             />
           </div>
 
-          <Button
-            size="small"
-            icon={<ReloadOutlined />}
-            onClick={loadTrash}
-            loading={loading}
-          >
+          <Button size="small" icon={<ReloadOutlined />} onClick={loadTrash} loading={loading}>
             Recargar
           </Button>
         </div>
 
         <Table
-          rowKey={(r) =>
-            String(
-              r?._id || r?.id || `${r?.deletedAt}-${r?.room}-${r?.startDate}`
-            )
-          }
-          columns={columns}
+          rowKey={rowKeyFn}
+          columns={esMobile ? mobileColumns : desktopColumns}
           dataSource={rows}
           loading={loading}
-          pagination={{ pageSize: 8, showSizeChanger: false }}
+          pagination={{ pageSize: 8, showSizeChanger: false, simple: esMobile }}
           size="small"
+          tableLayout="fixed"
+          scroll={esMobile ? undefined : { x: "max-content" }}
+          expandable={expandable}
         />
       </div>
     </>
