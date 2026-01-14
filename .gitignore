@@ -119,3 +119,7 @@ playwright-report/
 test-results/
 cypress/videos/
 cypress/screenshots/
+
+# Uploads (NO subir a git)
+reservas-service/src/uploads/
+reservas-service/src/uploads/**
