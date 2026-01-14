@@ -80,7 +80,7 @@ app.use("/api/habitaciones", createHabitacionesRouter(io));
 app.use("/api/reservas", reservasRoutes);
 app.use("/api/hero-slides", heroSlideRoutes);
 app.use("/api/public", publicReservasRouter);
-app.use("/api/sedes", sedesRoutes);
+app.use("/api/reservas/sedes", sedesRoutes);
 
 app.get("/", (req, res) => {
   res.send("🏨 reservas-service (habitaciones + reservas) OK con Socket.IO");
