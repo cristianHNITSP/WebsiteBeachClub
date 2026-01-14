@@ -19,28 +19,20 @@ export const normalizeSedeKey = (name) => {
   );
 };
 
-// ✅ Alias para compatibilidad con datos viejos (NO es lista hardcodeada de sedes)
-const SEDE_ALIASES = {
-  cabanas_fridas: "cabanas_frida",
-};
-
-// ✅ Normaliza y aplica alias
-export const normalizeHotelCode = (code) => {
-  const k = normalizeSedeKey(code);
-  return SEDE_ALIASES[k] || k || "sede";
-};
+// ✅ Estricto: ya NO hay legacy aliases
+export const normalizeHotelCode = (code) => normalizeSedeKey(code);
 
 /**
  * ✅ Catálogo dinámico (inyectado desde DB)
  * Espera objetos tipo: { key, name, isActive, color? }
  */
-let SEDES_CATALOG = []; // <- ya NO usamos SEDES hardcodeadas
+let SEDES_CATALOG = [];
 
 export const setSedesCatalog = (list) => {
   const arr = Array.isArray(list) ? list : [];
   SEDES_CATALOG = arr
     .map((s) => {
-      const key = s?.key ? normalizeHotelCode(s.key) : normalizeSedeKey(s?.name);
+      const key = normalizeHotelCode(s?.key || normalizeSedeKey(s?.name));
       const name = String(s?.name || "").trim();
       const isActive = s?.isActive !== false;
       const color = typeof s?.color === "string" ? s.color.trim() : "";
@@ -49,21 +41,18 @@ export const setSedesCatalog = (list) => {
     .filter((x) => !!x.key);
 };
 
-const humanizeKey = (k) => {
-  const s = String(k || "")
-    .trim()
-    .replace(/[-_]+/g, " ")
-    .replace(/\s+/g, " ");
-  if (!s) return "-";
-  return s.replace(/\b\w/g, (m) => m.toUpperCase());
-};
-
 const getSedeFromCatalog = (hotelCode, catalog = SEDES_CATALOG) => {
   const key = normalizeHotelCode(hotelCode);
   return (Array.isArray(catalog) ? catalog : []).find((s) => s.key === key) || null;
 };
 
-// 🎨 Paleta para sedes dinámicas (no hardcodea sedes, solo colores)
+// ✅ saber si hay catálogo real
+const hasCatalog = (catalog) => {
+  const c = Array.isArray(catalog) ? catalog : SEDES_CATALOG;
+  return Array.isArray(c) && c.length > 0;
+};
+
+// 🎨 Paleta (solo colores, no sedes)
 const SEDE_COLOR_POOL = [
   beachColors.oceanBlue,
   beachColors.turquoise,
@@ -83,32 +72,50 @@ const hashStr = (str) => {
 };
 
 export const getSedeLabel = (hotelCode, catalog) => {
-  const key = normalizeHotelCode(hotelCode);
-  const found = getSedeFromCatalog(key, catalog);
+  const found = getSedeFromCatalog(hotelCode, catalog);
   if (found?.name) return found.name;
-  return humanizeKey(key || hotelCode);
+
+  // ✅ si no hay sedes en DB, no inventar nada
+  if (!hasCatalog(catalog)) return "Sin sede";
+
+  // ✅ estricto: si no existe en catálogo, también "Sin sede"
+  return "Sin sede";
 };
 
 export const getSedeMeta = (hotelCode, catalog) => {
-  const key = normalizeHotelCode(hotelCode);
-  const found = getSedeFromCatalog(key, catalog);
+  const found = getSedeFromCatalog(hotelCode, catalog);
 
-  const label = found?.name ? found.name : humanizeKey(key || hotelCode);
+  // ✅ si no hay sedes o no existe esa sede en catálogo, no inventar nada
+  if (!found) {
+    return {
+      label: "Sin sede",
+      color: "#e5e7eb",
+      textColor: "#111827",
+      isActive: false,
+    };
+  }
 
-  // Si la DB trae color lo respetamos; si no, lo asignamos estable por hash
+  const label = found.name || "Sede";
+
   let color = "#e5e7eb";
-  if (found?.color) {
+  if (found.color) {
     color = found.color;
-  } else if (key) {
+  } else {
+    const key = found.key;
     const idx = hashStr(key) % SEDE_COLOR_POOL.length;
     color = SEDE_COLOR_POOL[idx] || "#e5e7eb";
   }
 
-  return { label, color, textColor: "#0f172a", isActive: found?.isActive !== false };
+  return {
+    label,
+    color,
+    textColor: "#0f172a",
+    isActive: found.isActive !== false,
+  };
 };
 
-// ✅ Mantengo export para compatibilidad: ya NO hay sedes hardcodeadas aquí
-export const SEDES = []; // (deprecated) usa /api/sedes + setSedesCatalog()
+// ✅ Mantengo export para compatibilidad interna (pero vacío)
+export const SEDES = [];
 
 export const CAPACITY_OPTIONS = [
   { label: "1 adulto", value: 1 },
@@ -177,7 +184,6 @@ export const hasPromo = (hab) => {
   return hab?.offer?.isSpecial && typeof discount === "number" && discount > 0;
 };
 
-// ✅ meta simple (sin availability)
 export const getReservaMeta = (room) => {
   if (isTrashed(room)) {
     return {
