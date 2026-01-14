@@ -8,10 +8,14 @@ const multer = require("multer");
 
 const Habitacion = require("../models/Habitacion");
 const Reserva = require("../models/Reserva");
+
+// ✅ IMPORTA TU MODELO REAL DE SEDES (ajusta la ruta/nombre si difiere)
+const Sede = require("../models/Sede");
+
 const authMiddleware = require("../middlewares/auth.middleware");
 const { requirePermissions } = require("../middlewares/require.Permissions");
 
-/* ===================== ✅ Normalización hotelCode + aliases (compat) ===================== */
+/* ===================== ✅ Normalización hotelCode (STRICT, sin legacy) ===================== */
 const normalizeSedeKey = (name) => {
   return (
     String(name || "")
@@ -19,41 +23,34 @@ const normalizeSedeKey = (name) => {
       .normalize("NFD")
       .replace(/[\u0300-\u036f]/g, "")
       .replace(/[^a-z0-9]+/g, "_")
-      .replace(/^_+|_+$/g, "") || "sede"
+      .replace(/^_+|_+$/g, "") || ""
   );
 };
 
-// Alias viejo -> canonical (NO es hardcode de sedes, es compat)
-const SEDE_ALIASES = {
-  cabanas_fridas: "cabanas_frida",
+// ✅ Estricto: NO aliases, NO fallback "sede"
+const normalizeHotelCode = (code) => normalizeSedeKey(code);
+
+/* ===================== ✅ Sedes: validación estricta contra DB ===================== */
+const getSedeKeysSet = async () => {
+  const sedes = await Sede.find({}).select("key name isActive").lean();
+  const keys = new Set(
+    (sedes || [])
+      .map((s) => normalizeHotelCode(s?.key || s?.name))
+      .filter(Boolean)
+  );
+  return keys;
 };
 
-// reverse: canonical -> [aliases...]
-const SEDE_ALIAS_REVERSE = Object.entries(SEDE_ALIASES).reduce((acc, [from, to]) => {
-  acc[to] = acc[to] || [];
-  acc[to].push(from);
-  return acc;
-}, {});
+const assertSedeExists = async (hotelCodeRaw) => {
+  const code = normalizeHotelCode(hotelCodeRaw);
+  if (!code) return { ok: false, code: "", reason: "EMPTY" };
 
-const normalizeHotelCode = (code) => {
-  const k = normalizeSedeKey(code);
-  return SEDE_ALIASES[k] || k || "sede";
-};
+  const keys = await getSedeKeysSet();
+  if (keys.size === 0) return { ok: false, code, reason: "NO_SEDES" };
 
-const expandHotelCodeFilter = (hotelCode) => {
-  const raw = normalizeSedeKey(hotelCode);
-  const canonical = normalizeHotelCode(raw);
-  const list = [canonical];
+  if (!keys.has(code)) return { ok: false, code, reason: "NOT_FOUND" };
 
-  // si canonical tiene aliases antiguos, incluirlos para que encuentres docs viejos
-  const rev = SEDE_ALIAS_REVERSE[canonical] || [];
-  for (const a of rev) list.push(a);
-
-  // si el usuario mandó un raw distinto, incluirlo también por seguridad
-  if (raw && raw !== canonical) list.push(raw);
-
-  // unique
-  return [...new Set(list.filter(Boolean))];
+  return { ok: true, code, reason: "OK" };
 };
 
 /* =============== Favoritos: seguimos usando IP hash (solo favoritos) =============== */
@@ -193,11 +190,10 @@ function buildHabitacionesFilterFromQuery(query, { forPublic = false } = {}) {
     } else and.push({ isDeleted: { $ne: true } }); // default excluir
   }
 
-  // ✅ hotelCode (compat con aliases viejos)
+  // ✅ hotelCode STRICT (sin aliases)
   if (hotelCode && hotelCode !== "todas") {
-    const codes = expandHotelCodeFilter(hotelCode);
-    if (codes.length === 1) and.push({ hotelCode: codes[0] });
-    else and.push({ hotelCode: { $in: codes } });
+    const code = normalizeHotelCode(hotelCode);
+    if (code) and.push({ hotelCode: code });
   }
 
   if (inventoryStatus && inventoryStatus !== "todas")
@@ -278,7 +274,7 @@ function buildHabitacionesFilterFromQuery(query, { forPublic = false } = {}) {
   return and.length ? { $and: and } : {};
 }
 
-/* ==== Disponibilidad helpers (compat) ==== */
+/* ==== Disponibilidad helpers ==== */
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const isDateStr = (s) => typeof s === "string" && DATE_RE.test(s);
 
@@ -636,6 +632,21 @@ function createHabitacionesRouter(io) {
       const limit = Math.min(Math.max(limitRaw || 6, 1), 6);
       const skip = (page - 1) * limit;
 
+      // ✅ si filtran por sede: si NO existe en DB o NO hay sedes => no enviar nada
+      if (req.query.hotelCode && req.query.hotelCode !== "todas") {
+        const v = await assertSedeExists(req.query.hotelCode);
+        if (!v.ok) {
+          return res.json({
+            items: [],
+            total: 0,
+            page,
+            limit,
+            totalPages: 0,
+            hasMore: false,
+          });
+        }
+      }
+
       const filter = buildHabitacionesFilterFromQuery(req.query, {
         forPublic: true,
       });
@@ -721,6 +732,21 @@ function createHabitacionesRouter(io) {
         const page = Math.max(pageRaw || 1, 1);
         const limit = Math.min(Math.max(limitRaw || 5, 1), 50);
         const skip = (page - 1) * limit;
+
+        // ✅ si filtran por sede: si NO existe en DB o NO hay sedes => no enviar nada
+        if (req.query.hotelCode && req.query.hotelCode !== "todas") {
+          const v = await assertSedeExists(req.query.hotelCode);
+          if (!v.ok) {
+            return res.json({
+              items: [],
+              total: 0,
+              page,
+              limit,
+              totalPages: 0,
+              hasMore: false,
+            });
+          }
+        }
 
         const filter = buildHabitacionesFilterFromQuery(req.query, {
           forPublic: false,
@@ -808,9 +834,21 @@ function createHabitacionesRouter(io) {
     requirePermissions(["manage_rooms"]),
     async (req, res) => {
       try {
+        // ✅ validar sede estricta contra DB (si no hay sedes, NO permitir crear)
+        const v = await assertSedeExists(req.body?.hotelCode);
+        if (!v.ok) {
+          const msg =
+            v.reason === "NO_SEDES"
+              ? "No hay sedes registradas. Crea una sede primero."
+              : "La sede seleccionada no existe.";
+          return res.status(400).json({ error: "INVALID_SEDE", message: msg });
+        }
+
         const offer = normalizeOfferPayload(req.body);
+
         const payload = {
           ...req.body,
+          hotelCode: v.code, // ✅ normalizado + validado
           offer,
           isDeleted: false,
           deletedAt: null,
@@ -866,7 +904,20 @@ function createHabitacionesRouter(io) {
         const allowed = {};
 
         if (b.codigo !== undefined) allowed.codigo = b.codigo;
-        if (b.hotelCode !== undefined) allowed.hotelCode = b.hotelCode;
+
+        // ✅ hotelCode estricta: si la mandan, debe existir en sedes
+        if (b.hotelCode !== undefined) {
+          const v = await assertSedeExists(b.hotelCode);
+          if (!v.ok) {
+            const msg =
+              v.reason === "NO_SEDES"
+                ? "No hay sedes registradas. Crea una sede primero."
+                : "La sede seleccionada no existe.";
+            return res.status(400).json({ error: "INVALID_SEDE", message: msg });
+          }
+          allowed.hotelCode = v.code;
+        }
+
         if (b.roomNumber !== undefined) allowed.roomNumber = b.roomNumber;
         if (b.title !== undefined) allowed.title = b.title;
         if (b.roomType !== undefined) allowed.roomType = b.roomType;

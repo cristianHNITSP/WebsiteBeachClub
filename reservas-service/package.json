@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "nodemon src/index.js",
     "start": "node src/index.js",
-    "seed": "node src/seed/seed-data.js"
+    "seed": "node src/seed/seed-sedes.js"
   },
   "dependencies": {
     "cookie-parser": "^1.4.6",
