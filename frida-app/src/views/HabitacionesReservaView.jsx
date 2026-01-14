@@ -54,7 +54,7 @@ const { RangePicker } = DatePicker;
 
 /* ===================== ENDPOINTS ===================== */
 const RESERVAS_ENDPOINT = "/api/reservas";
-const SEDES_ENDPOINT = "/api/sedes";
+const SEDES_ENDPOINT = "/api/reservas/sedes";
 
 /* ===================== VISTA PRINCIPAL ===================== */
 const HabitacionesReservaView = ({ isMobile: forzarMobile }) => {

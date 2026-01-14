@@ -128,7 +128,7 @@ const GestionHabitacionesView = ({ isMobile, currentUser }) => {
   const fetchSedes = async () => {
     try {
       setSedesLoading(true);
-      const res = await axios.get("/api/sedes", { withCredentials: true });
+      const res = await axios.get("/api/reservas/sedes", { withCredentials: true });
       const data = Array.isArray(res.data) ? res.data : [];
       setSedes(data);
 
@@ -755,7 +755,7 @@ const GestionHabitacionesView = ({ isMobile, currentUser }) => {
           const key = normalizeSedeKey(name);
 
           await axios.post(
-            "/api/sedes",
+            "/api/reservas/sedes",
             { key, name },
             { withCredentials: true }
           );
@@ -782,7 +782,7 @@ const GestionHabitacionesView = ({ isMobile, currentUser }) => {
     try {
       setSedesLoading(true);
       await axios.patch(
-        `/api/sedes/${sede._id}/status`,
+        `/api/reservas/sedes/${sede._id}/status`,
         { isActive: !sede.isActive },
         { withCredentials: true }
       );
@@ -805,7 +805,7 @@ const GestionHabitacionesView = ({ isMobile, currentUser }) => {
     }
   };
 
-  // ✅ NUEVO: eliminar sede permanentemente (backend: DELETE /api/sedes/:id/permanent)
+  // ✅ NUEVO: eliminar sede permanentemente (backend: DELETE /api/reservas/sedes/:id/permanent)
   const handleDeleteSedePermanent = async (sede) => {
     if (!canManageRooms)
       return messageApi.warning("No tienes permisos para eliminar sedes.");
@@ -819,7 +819,7 @@ const GestionHabitacionesView = ({ isMobile, currentUser }) => {
         duration: 0,
       });
 
-      await axios.delete(`/api/sedes/${sede._id}/permanent`, {
+      await axios.delete(`/api/reservas/sedes/${sede._id}/permanent`, {
         withCredentials: true,
       });
 
