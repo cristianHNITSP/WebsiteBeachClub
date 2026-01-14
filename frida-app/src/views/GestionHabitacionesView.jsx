@@ -128,7 +128,9 @@ const GestionHabitacionesView = ({ isMobile, currentUser }) => {
   const fetchSedes = async () => {
     try {
       setSedesLoading(true);
-      const res = await axios.get("/api/reservas/sedes", { withCredentials: true });
+      const res = await axios.get("/api/reservas/sedes", {
+        withCredentials: true,
+      });
       const data = Array.isArray(res.data) ? res.data : [];
       setSedes(data);
 
@@ -207,7 +209,8 @@ const GestionHabitacionesView = ({ isMobile, currentUser }) => {
       messageApi.open({
         key: "loading-rooms",
         type: "error",
-        content: "No se pudieron cargar las habitaciones. Intenta de nuevo más tarde.",
+        content:
+          "No se pudieron cargar las habitaciones. Intenta de nuevo más tarde.",
         duration: 3,
       });
     } finally {
@@ -298,8 +301,7 @@ const GestionHabitacionesView = ({ isMobile, currentUser }) => {
 
     const target = normalizeHotelCode(sedeKey);
     const found = sedes.find(
-      (s) =>
-        normalizeHotelCode(s?.key || normalizeSedeKey(s?.name)) === target
+      (s) => normalizeHotelCode(s?.key || normalizeSedeKey(s?.name)) === target
     );
 
     return !!found && found.isActive === false;
@@ -307,7 +309,9 @@ const GestionHabitacionesView = ({ isMobile, currentUser }) => {
 
   const guardarHabitacion = () => {
     if (!canManageRooms)
-      return messageApi.warning("No tienes permisos para modificar habitaciones.");
+      return messageApi.warning(
+        "No tienes permisos para modificar habitaciones."
+      );
 
     form
       .validateFields()
@@ -327,14 +331,18 @@ const GestionHabitacionesView = ({ isMobile, currentUser }) => {
 
           if (isSedeInactive(selectedSedeKey)) {
             if (!editando) {
-              messageApi.error("No puedes crear habitaciones en una sede inactiva.");
+              messageApi.error(
+                "No puedes crear habitaciones en una sede inactiva."
+              );
               return;
             }
             if (
               editando &&
               selectedSedeKey !== normalizeHotelCode(editando.hotelCode)
             ) {
-              messageApi.error("No puedes mover esta habitación a una sede inactiva.");
+              messageApi.error(
+                "No puedes mover esta habitación a una sede inactiva."
+              );
               return;
             }
           }
@@ -342,8 +350,17 @@ const GestionHabitacionesView = ({ isMobile, currentUser }) => {
           let discount = offerIsSpecial ? Number(offerDiscountPercent) : null;
           let offer;
 
-          if (!offerIsSpecial || !discount || discount <= 0 || discount >= 100) {
-            offer = { isSpecial: false, description: "", discountPercent: null };
+          if (
+            !offerIsSpecial ||
+            !discount ||
+            discount <= 0 ||
+            discount >= 100
+          ) {
+            offer = {
+              isSpecial: false,
+              description: "",
+              discountPercent: null,
+            };
           } else {
             offer = {
               isSpecial: true,
@@ -368,7 +385,9 @@ const GestionHabitacionesView = ({ isMobile, currentUser }) => {
           messageApi.open({
             key: "saving-room",
             type: "loading",
-            content: editando ? "Guardando cambios..." : "Creando nueva habitación...",
+            content: editando
+              ? "Guardando cambios..."
+              : "Creando nueva habitación...",
             duration: 0,
           });
 
@@ -404,7 +423,8 @@ const GestionHabitacionesView = ({ isMobile, currentUser }) => {
             content:
               err?.response?.status === 401
                 ? "No autorizado. Revisa tu sesión o permisos."
-                : err?.response?.data?.message || "Error al guardar la habitación.",
+                : err?.response?.data?.message ||
+                  "Error al guardar la habitación.",
             duration: 3,
           });
         } finally {
@@ -416,7 +436,9 @@ const GestionHabitacionesView = ({ isMobile, currentUser }) => {
 
   const enviarAPapelera = async (id) => {
     if (!canManageRooms)
-      return messageApi.warning("No tienes permisos para eliminar habitaciones.");
+      return messageApi.warning(
+        "No tienes permisos para eliminar habitaciones."
+      );
     try {
       setDeletingRoomId(id);
       messageApi.open({
@@ -583,9 +605,7 @@ const GestionHabitacionesView = ({ isMobile, currentUser }) => {
         loading: false,
         items: Array.isArray(api.items) ? api.items : [],
         total:
-          typeof api.total === "number"
-            ? api.total
-            : (api.items || []).length,
+          typeof api.total === "number" ? api.total : (api.items || []).length,
         page: typeof api.page === "number" ? api.page : page,
       }));
     } catch (err) {
@@ -798,7 +818,9 @@ const GestionHabitacionesView = ({ isMobile, currentUser }) => {
             "No puedes desactivar esta sede porque tiene habitaciones activas."
         );
       } else {
-        messageApi.error(data?.message || "No se pudo actualizar el estado de la sede.");
+        messageApi.error(
+          data?.message || "No se pudo actualizar el estado de la sede."
+        );
       }
     } finally {
       setSedesLoading(false);
@@ -868,7 +890,10 @@ const GestionHabitacionesView = ({ isMobile, currentUser }) => {
         key: "isActive",
         width: 120,
         render: (isActive) => (
-          <Tag color={isActive ? "green" : "default"} style={{ borderRadius: 999 }}>
+          <Tag
+            color={isActive ? "green" : "default"}
+            style={{ borderRadius: 999 }}
+          >
             {isActive ? "Activa" : "Inactiva"}
           </Tag>
         ),
@@ -1002,7 +1027,8 @@ const GestionHabitacionesView = ({ isMobile, currentUser }) => {
       >
         <Space direction="vertical" style={{ width: "100%" }} size={12}>
           <Text style={{ fontSize: 11, color: "#6b7280" }}>
-            Aquí puedes crear nuevas sedes, activar/desactivar y eliminar permanentemente.
+            Aquí puedes crear nuevas sedes, activar/desactivar y eliminar
+            permanentemente.
           </Text>
 
           <Form
@@ -1014,7 +1040,12 @@ const GestionHabitacionesView = ({ isMobile, currentUser }) => {
             <Form.Item
               label="Nombre de la sede"
               name="name"
-              rules={[{ required: true, message: "Ingresa el nombre visible de la sede" }]}
+              rules={[
+                {
+                  required: true,
+                  message: "Ingresa el nombre visible de la sede",
+                },
+              ]}
             >
               <Input placeholder="Casa Frida" />
             </Form.Item>
@@ -1051,9 +1082,65 @@ const GestionHabitacionesView = ({ isMobile, currentUser }) => {
         </Space>
       </Modal>
 
-      {/* NOTA: tu modal de reservas futuras no estaba incluido en el snippet;
-          asumo que ya lo tienes abajo en tu archivo. Si quieres, pégame esa parte
-          y te lo regreso 100% completo con el Modal y el Table de reservas. */}
+      {/* MODAL: Reservas futuras por habitación */}
+      <Modal
+        open={reservasModal.open}
+        title={
+          <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+            <Text style={{ fontSize: 14, fontWeight: 700 }}>
+              Reservas futuras · Hab{" "}
+              {reservasModal.room?.codigo ||
+                reservasModal.room?.roomNumber ||
+                "—"}
+            </Text>
+            <Text style={{ fontSize: 11, color: "#6b7280" }}>
+              {reservasModal.room?.title || "—"}
+              {reservasModal.room?.hotelCode && (
+                <> · {getRoomSedeLabel(reservasModal.room)}</>
+              )}
+            </Text>
+          </div>
+        }
+        onCancel={cerrarReservasFuturas}
+        footer={[
+          <Button
+            key="refresh"
+            icon={<ReloadOutlined />}
+            onClick={() => loadReservasFuturas({ page: reservasModal.page })}
+            loading={reservasModal.loading}
+          >
+            Recargar
+          </Button>,
+          <Button key="close" type="primary" onClick={cerrarReservasFuturas}>
+            Cerrar
+          </Button>,
+        ]}
+        width={980}
+        destroyOnClose
+      >
+        <div style={{ marginBottom: 10 }}>
+          <Text style={{ fontSize: 11, color: "#6b7280" }}>
+            Se carga por índice (página). Total: <b>{reservasModal.total}</b>
+          </Text>
+        </div>
+
+        <Table
+          size="small"
+          rowKey={(r) =>
+            String(r?._id || r?.id || `${r?.startDate}-${r?.endDate}`)
+          }
+          columns={reservasColumns}
+          dataSource={reservasModal.items}
+          loading={reservasModal.loading}
+          pagination={{
+            current: reservasModal.page,
+            pageSize: reservasModal.limit,
+            total: reservasModal.total,
+            showSizeChanger: false,
+            onChange: (page) => loadReservasFuturas({ page }),
+          }}
+        />
+      </Modal>
     </>
   );
 };
