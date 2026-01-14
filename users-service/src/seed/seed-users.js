@@ -1,4 +1,9 @@
 require("dotenv").config();
+
+if (process.env.SEED !== 'true') {
+  console.log('SEED not enabled — skipping users-service seed-users.js');
+  process.exit(0);
+}
 const mongoose = require("mongoose");
 const bcrypt = require("bcrypt");
 

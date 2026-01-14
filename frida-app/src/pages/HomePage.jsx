@@ -2,54 +2,11 @@ import { Segmented, Typography, message } from "antd";
 import HomeHero from "../components/website/home/HomeHero";
 import DestinationCard from "../components/website/home/DestinationCard";
 import FeaturedCard from "../components/website/home/FeaturedCard";
+import { SUCURSALES, HABITACIONES_DESTACADAS } from "../data/demoData";
 
 const { Title } = Typography;
 
-// ✅ HARDCOODED AQUÍ (sin data file)
-const SUCURSALES = [
-  {
-    key: "casa",
-    name: "Casa Frida",
-    subtitle: "Chelem",
-    img: "https://images.unsplash.com/photo-1520250497591-112f2f40a3f4?auto=format&fit=crop&w=1400&q=70",
-  },
-  {
-    key: "cabanas",
-    name: "Cabañas Frida",
-    subtitle: "Chuburná",
-    img: "https://images.unsplash.com/photo-1501117716987-c8e1ecb210ff?auto=format&fit=crop&w=1400&q=70",
-  },
-];
-
-const HABITACIONES_DESTACADAS = [
-  {
-    key: "feat-1",
-    title: "Suite frente al mar",
-    place: "Chelem",
-    rating: 4.8,
-    price: 1890,
-    img: "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=1400&q=70",
-    badge: { text: "Top", color: "teal" },
-  },
-  {
-    key: "feat-2",
-    title: "Cabaña familiar",
-    place: "Chuburná",
-    rating: 4.7,
-    price: 1590,
-    img: "https://images.unsplash.com/photo-1445019980597-93fa8acb246c?auto=format&fit=crop&w=1400&q=70",
-    badge: { text: "Familia", color: "sunset" },
-  },
-  {
-    key: "feat-3",
-    title: "Mejor precio",
-    place: "Chelem",
-    rating: 4.6,
-    price: 1290,
-    img: "https://images.unsplash.com/photo-1444201983204-c43cbd584d93?auto=format&fit=crop&w=1400&q=70",
-    badge: { text: "Deal", color: "coral" },
-  },
-];
+// Demo data is imported from ../data/demoData
 
 function HomePage({
   form,

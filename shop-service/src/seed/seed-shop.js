@@ -1,5 +1,10 @@
 // shop-service/src/seed/seed-shop.js
 require("dotenv").config();
+
+if (process.env.SEED !== 'true') {
+  console.log('SEED not enabled — skipping seed-shop.js');
+  process.exit(0);
+}
 const mongoose = require("mongoose");
 const { connectDB } = require("../config/db");
 
