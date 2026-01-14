@@ -120,6 +120,6 @@ test-results/
 cypress/videos/
 cypress/screenshots/
 
-# Uploads (NO subir a git)
+# Uploads del reservas-service (multer)
 reservas-service/src/uploads/
 reservas-service/src/uploads/**
