@@ -1,13 +1,6 @@
 const mongoose = require('mongoose');
 const Sede = require('../models/Sede');
 
-require('dotenv').config();
-
-if (process.env.SEED !== 'true') {
-  console.log('SEED not enabled — skipping users-service seed-sedes.js');
-  process.exit(0);
-}
-
 (async () => {
   await mongoose.connect(process.env.MONGO_URI);
 

@@ -12,13 +12,19 @@ import {
   Button,
   Typography,
   Input,
+  Popconfirm,
+  Tooltip,
 } from "antd";
 import dayjs from "dayjs";
-import { ReloadOutlined, PlusOutlined } from "@ant-design/icons";
+import {
+  ReloadOutlined,
+  PlusOutlined,
+  DeleteOutlined,
+} from "@ant-design/icons";
 import {
   hasPromo,
   normalizeSedeKey,
-  normalizeHotelCode, // ✅ estricto (solo normalizeSedeKey)
+  normalizeHotelCode, // ✅ estricto
   getSedeMeta,
   setSedesCatalog,
 } from "../components/habitaciones/helpers";
@@ -126,7 +132,7 @@ const GestionHabitacionesView = ({ isMobile, currentUser }) => {
       const data = Array.isArray(res.data) ? res.data : [];
       setSedes(data);
 
-      setSedesCatalog(data); // ✅ catálogo real (si está vacío, helpers devuelve “Sin sede”)
+      setSedesCatalog(data); // ✅ catálogo real
       syncSedeOptionsFromList(data);
     } catch (err) {
       console.error(err);
@@ -144,12 +150,16 @@ const GestionHabitacionesView = ({ isMobile, currentUser }) => {
     }
   };
 
+  // ✅ FIX: no “limpiar” después de fetch; solo cuando NO hay usuario
   useEffect(() => {
-    if (currentUser) fetchSedes();
+    if (currentUser) {
+      fetchSedes();
+    } else {
+      setSedes([]);
+      setSedeOptions([]);
+      setSedesCatalog([]);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-     setSedes([]);
-  setSedeOptions([]);
-  setSedesCatalog([]);
   }, [currentUser]);
 
   const buildQueryParams = (page) => ({
@@ -243,7 +253,9 @@ const GestionHabitacionesView = ({ isMobile, currentUser }) => {
     if (!canManageRooms)
       return messageApi.warning("No tienes permisos para editar habitaciones.");
     if (registro?.isDeleted)
-      return messageApi.warning("Esta habitación está en papelera. Restaúrala para editar.");
+      return messageApi.warning(
+        "Esta habitación está en papelera. Restaúrala para editar."
+      );
 
     const imgs = normalizeImages(registro);
 
@@ -281,13 +293,14 @@ const GestionHabitacionesView = ({ isMobile, currentUser }) => {
     form.resetFields();
   };
 
-  // ✅ estricto: compara normalizado y si no existe en sedes, NO bloquea (pero puedes hacerlo estricto si quieres)
   const isSedeInactive = (sedeKey) => {
     if (!sedeKey || !Array.isArray(sedes) || !sedes.length) return false;
 
     const target = normalizeHotelCode(sedeKey);
-
-    const found = sedes.find((s) => normalizeHotelCode(s?.key || normalizeSedeKey(s?.name)) === target);
+    const found = sedes.find(
+      (s) =>
+        normalizeHotelCode(s?.key || normalizeSedeKey(s?.name)) === target
+    );
 
     return !!found && found.isActive === false;
   };
@@ -317,7 +330,10 @@ const GestionHabitacionesView = ({ isMobile, currentUser }) => {
               messageApi.error("No puedes crear habitaciones en una sede inactiva.");
               return;
             }
-            if (editando && selectedSedeKey !== normalizeHotelCode(editando.hotelCode)) {
+            if (
+              editando &&
+              selectedSedeKey !== normalizeHotelCode(editando.hotelCode)
+            ) {
               messageApi.error("No puedes mover esta habitación a una sede inactiva.");
               return;
             }
@@ -409,7 +425,11 @@ const GestionHabitacionesView = ({ isMobile, currentUser }) => {
         content: "Enviando a papelera...",
         duration: 0,
       });
-      await axios.patch(`/api/habitaciones/${id}/trash`, {}, { withCredentials: true });
+      await axios.patch(
+        `/api/habitaciones/${id}/trash`,
+        {},
+        { withCredentials: true }
+      );
       messageApi.open({
         key: `trash-${id}`,
         type: "success",
@@ -434,7 +454,8 @@ const GestionHabitacionesView = ({ isMobile, currentUser }) => {
   };
 
   const restaurarHabitacion = async (id) => {
-    if (!canManageRooms) return messageApi.warning("No tienes permisos para restaurar.");
+    if (!canManageRooms)
+      return messageApi.warning("No tienes permisos para restaurar.");
     try {
       setDeletingRoomId(id);
       messageApi.open({
@@ -443,7 +464,11 @@ const GestionHabitacionesView = ({ isMobile, currentUser }) => {
         content: "Restaurando...",
         duration: 0,
       });
-      await axios.patch(`/api/habitaciones/${id}/restore`, {}, { withCredentials: true });
+      await axios.patch(
+        `/api/habitaciones/${id}/restore`,
+        {},
+        { withCredentials: true }
+      );
       messageApi.open({
         key: `restore-${id}`,
         type: "success",
@@ -466,7 +491,9 @@ const GestionHabitacionesView = ({ isMobile, currentUser }) => {
 
   const eliminarHabitacionPermanent = async (id) => {
     if (!canManageRooms)
-      return messageApi.warning("No tienes permisos para eliminar permanentemente.");
+      return messageApi.warning(
+        "No tienes permisos para eliminar permanentemente."
+      );
     try {
       setDeletingRoomId(id);
       messageApi.open({
@@ -475,7 +502,9 @@ const GestionHabitacionesView = ({ isMobile, currentUser }) => {
         content: "Eliminando permanentemente...",
         duration: 0,
       });
-      await axios.delete(`/api/habitaciones/${id}/permanent`, { withCredentials: true });
+      await axios.delete(`/api/habitaciones/${id}/permanent`, {
+        withCredentials: true,
+      });
       messageApi.open({
         key: `permanent-${id}`,
         type: "success",
@@ -488,7 +517,9 @@ const GestionHabitacionesView = ({ isMobile, currentUser }) => {
       messageApi.open({
         key: `permanent-${id}`,
         type: "error",
-        content: err?.response?.data?.message || "No se pudo eliminar permanentemente.",
+        content:
+          err?.response?.data?.message ||
+          "No se pudo eliminar permanentemente.",
         duration: 3,
       });
     } finally {
@@ -496,15 +527,24 @@ const GestionHabitacionesView = ({ isMobile, currentUser }) => {
     }
   };
 
-  const totalActivas = habitaciones.filter((h) => h.inventoryStatus === "Activa" && !h.isDeleted).length;
-  const totalMantenimiento = habitaciones.filter((h) => h.inventoryStatus === "Mantenimiento" && !h.isDeleted).length;
+  const totalActivas = habitaciones.filter(
+    (h) => h.inventoryStatus === "Activa" && !h.isDeleted
+  ).length;
+  const totalMantenimiento = habitaciones.filter(
+    (h) => h.inventoryStatus === "Mantenimiento" && !h.isDeleted
+  ).length;
   const totalFuera = habitaciones.filter(
     (h) =>
-      (h.inventoryStatus === "Fuera de servicio" || h.inventoryStatus === "Bloqueada") &&
+      (h.inventoryStatus === "Fuera de servicio" ||
+        h.inventoryStatus === "Bloqueada") &&
       !h.isDeleted
   ).length;
-  const totalConPromo = habitaciones.filter((h) => hasPromo(h) && !h.isDeleted).length;
-  const totalConFavoritos = habitaciones.filter((h) => (h.favoritesCount || 0) > 0 && !h.isDeleted).length;
+  const totalConPromo = habitaciones.filter(
+    (h) => hasPromo(h) && !h.isDeleted
+  ).length;
+  const totalConFavoritos = habitaciones.filter(
+    (h) => (h.favoritesCount || 0) > 0 && !h.isDeleted
+  ).length;
 
   const limpiarFiltros = () => {
     setBusqueda("");
@@ -542,7 +582,10 @@ const GestionHabitacionesView = ({ isMobile, currentUser }) => {
         ...p,
         loading: false,
         items: Array.isArray(api.items) ? api.items : [],
-        total: typeof api.total === "number" ? api.total : (api.items || []).length,
+        total:
+          typeof api.total === "number"
+            ? api.total
+            : (api.items || []).length,
         page: typeof api.page === "number" ? api.page : page,
       }));
     } catch (err) {
@@ -586,7 +629,9 @@ const GestionHabitacionesView = ({ isMobile, currentUser }) => {
         key: "fechas",
         width: 220,
         render: (_, r) => {
-          const s = r?.startDate ? dayjs(r.startDate).format("DD/MM/YYYY") : "—";
+          const s = r?.startDate
+            ? dayjs(r.startDate).format("DD/MM/YYYY")
+            : "—";
           const e = r?.endDate ? dayjs(r.endDate).format("DD/MM/YYYY") : s;
           return (
             <Space direction="vertical" size={0}>
@@ -594,7 +639,10 @@ const GestionHabitacionesView = ({ isMobile, currentUser }) => {
                 {s} → {e}
               </Text>
               <Text style={{ fontSize: 10, color: "#6b7280" }}>
-                Creada: {r?.createdAt ? dayjs(r.createdAt).format("DD/MM/YYYY HH:mm") : "—"}
+                Creada:{" "}
+                {r?.createdAt
+                  ? dayjs(r.createdAt).format("DD/MM/YYYY HH:mm")
+                  : "—"}
               </Text>
             </Space>
           );
@@ -605,8 +653,12 @@ const GestionHabitacionesView = ({ isMobile, currentUser }) => {
         key: "detalle",
         render: (_, r) => (
           <Space direction="vertical" size={0}>
-            <Text style={{ fontSize: 12, fontWeight: 600 }}>{r?.label || "Reserva"}</Text>
-            <Text style={{ fontSize: 10, color: "#6b7280" }}>{r?.notes ? r.notes : "—"}</Text>
+            <Text style={{ fontSize: 12, fontWeight: 600 }}>
+              {r?.label || "Reserva"}
+            </Text>
+            <Text style={{ fontSize: 10, color: "#6b7280" }}>
+              {r?.notes ? r.notes : "—"}
+            </Text>
           </Space>
         ),
       },
@@ -640,7 +692,11 @@ const GestionHabitacionesView = ({ isMobile, currentUser }) => {
                 Reserva
               </Tag>
             );
-          return <Space size={6} wrap>{tags}</Space>;
+          return (
+            <Space size={6} wrap>
+              {tags}
+            </Space>
+          );
         },
       },
       {
@@ -656,9 +712,14 @@ const GestionHabitacionesView = ({ isMobile, currentUser }) => {
               ? fromTotalAmount
               : fromBilling;
 
-          if (!Number.isFinite(t) || t <= 0) return <Text style={{ color: "#6b7280" }}>—</Text>;
+          if (!Number.isFinite(t) || t <= 0)
+            return <Text style={{ color: "#6b7280" }}>—</Text>;
 
-          return <Text style={{ fontWeight: 700 }}>${t.toLocaleString("es-MX")}</Text>;
+          return (
+            <Text style={{ fontWeight: 700 }}>
+              ${t.toLocaleString("es-MX")}
+            </Text>
+          );
         },
       },
     ],
@@ -668,18 +729,21 @@ const GestionHabitacionesView = ({ isMobile, currentUser }) => {
   /* ===================== MODAL: GESTIÓN DE SEDES ===================== */
 
   const handleOpenSedes = () => {
-    if (!canManageRooms) return messageApi.warning("No tienes permisos para gestionar sedes.");
+    if (!canManageRooms)
+      return messageApi.warning("No tienes permisos para gestionar sedes.");
 
-  setSedes([]);
-  setSedeOptions([]);
-  setSedesCatalog([]); // tu helper global
+    // Limpia catálogo local para evitar “fantasmas”
+    setSedes([]);
+    setSedeOptions([]);
+    setSedesCatalog([]);
 
     setSedesModalOpen(true);
     fetchSedes();
   };
 
   const handleCreateSede = () => {
-    if (!canManageRooms) return messageApi.warning("No tienes permisos para crear sedes.");
+    if (!canManageRooms)
+      return messageApi.warning("No tienes permisos para crear sedes.");
 
     sedeForm
       .validateFields()
@@ -690,14 +754,19 @@ const GestionHabitacionesView = ({ isMobile, currentUser }) => {
           const name = String(values.name || "").trim();
           const key = normalizeSedeKey(name);
 
-          await axios.post("/api/sedes", { key, name }, { withCredentials: true });
+          await axios.post(
+            "/api/sedes",
+            { key, name },
+            { withCredentials: true }
+          );
 
           messageApi.success("Sede creada correctamente.");
           sedeForm.resetFields();
           await fetchSedes();
         } catch (err) {
           console.error(err);
-          if (err?.response?.status === 409) messageApi.error("Ya existe una sede con ese nombre o clave.");
+          if (err?.response?.status === 409)
+            messageApi.error("Ya existe una sede con ese nombre o clave.");
           else messageApi.error("No se pudo crear la sede. Intenta de nuevo.");
         } finally {
           setCreatingSede(false);
@@ -707,7 +776,8 @@ const GestionHabitacionesView = ({ isMobile, currentUser }) => {
   };
 
   const handleToggleSedeStatus = async (sede) => {
-    if (!canManageRooms) return messageApi.warning("No tienes permisos para actualizar sedes.");
+    if (!canManageRooms)
+      return messageApi.warning("No tienes permisos para actualizar sedes.");
 
     try {
       setSedesLoading(true);
@@ -723,9 +793,61 @@ const GestionHabitacionesView = ({ isMobile, currentUser }) => {
       const status = err?.response?.status;
       const data = err?.response?.data;
       if (status === 409 && data?.error === "SEDE_HAS_ACTIVE_ROOMS") {
-        messageApi.error(data?.message || "No puedes desactivar esta sede porque tiene habitaciones activas.");
+        messageApi.error(
+          data?.message ||
+            "No puedes desactivar esta sede porque tiene habitaciones activas."
+        );
       } else {
         messageApi.error(data?.message || "No se pudo actualizar el estado de la sede.");
+      }
+    } finally {
+      setSedesLoading(false);
+    }
+  };
+
+  // ✅ NUEVO: eliminar sede permanentemente (backend: DELETE /api/sedes/:id/permanent)
+  const handleDeleteSedePermanent = async (sede) => {
+    if (!canManageRooms)
+      return messageApi.warning("No tienes permisos para eliminar sedes.");
+
+    try {
+      setSedesLoading(true);
+      messageApi.open({
+        key: "delete-sede",
+        type: "loading",
+        content: "Eliminando sede permanentemente...",
+        duration: 0,
+      });
+
+      await axios.delete(`/api/sedes/${sede._id}/permanent`, {
+        withCredentials: true,
+      });
+
+      messageApi.open({
+        key: "delete-sede",
+        type: "success",
+        content: "Sede eliminada.",
+        duration: 2,
+      });
+
+      await fetchSedes();
+
+      const deletedKey = normalizeHotelCode(sede?.key);
+      if (filtroSede && normalizeHotelCode(filtroSede) === deletedKey) {
+        setFiltroSede("todas");
+      }
+    } catch (err) {
+      console.error(err);
+      const status = err?.response?.status;
+      const data = err?.response?.data;
+
+      if (status === 409 && data?.error === "SEDE_HAS_ROOMS") {
+        messageApi.error(
+          data?.message ||
+            "No puedes eliminar esta sede porque tiene habitaciones asociadas."
+        );
+      } else {
+        messageApi.error(data?.message || "No se pudo eliminar la sede.");
       }
     } finally {
       setSedesLoading(false);
@@ -754,15 +876,39 @@ const GestionHabitacionesView = ({ isMobile, currentUser }) => {
       {
         title: "Acciones",
         key: "acciones",
-        width: 140,
+        width: 230,
         render: (_, s) => (
-          <Button size="small" onClick={() => handleToggleSedeStatus(s)} loading={sedesLoading}>
-            {s.isActive ? "Desactivar" : "Activar"}
-          </Button>
+          <Space size={8}>
+            <Button
+              size="small"
+              onClick={() => handleToggleSedeStatus(s)}
+              loading={sedesLoading}
+            >
+              {s.isActive ? "Desactivar" : "Activar"}
+            </Button>
+
+            <Popconfirm
+              title="Eliminar sede permanentemente"
+              description="Esta acción no se puede deshacer. Solo se permite si no tiene habitaciones asociadas."
+              okText="Eliminar"
+              cancelText="Cancelar"
+              okButtonProps={{ danger: true }}
+              onConfirm={() => handleDeleteSedePermanent(s)}
+            >
+              <Tooltip title="Eliminar permanentemente">
+                <Button
+                  size="small"
+                  danger
+                  icon={<DeleteOutlined />}
+                  loading={sedesLoading}
+                />
+              </Tooltip>
+            </Popconfirm>
+          </Space>
         ),
       },
     ],
-    [sedesLoading]
+    [sedesLoading] // funciones usan closures, ok
   );
 
   const getRoomSedeLabel = (room) => {
@@ -856,10 +1002,15 @@ const GestionHabitacionesView = ({ isMobile, currentUser }) => {
       >
         <Space direction="vertical" style={{ width: "100%" }} size={12}>
           <Text style={{ fontSize: 11, color: "#6b7280" }}>
-            Aquí puedes crear nuevas sedes y activar / desactivar las existentes.
+            Aquí puedes crear nuevas sedes, activar/desactivar y eliminar permanentemente.
           </Text>
 
-          <Form form={sedeForm} layout="inline" size="small" onFinish={handleCreateSede}>
+          <Form
+            form={sedeForm}
+            layout="inline"
+            size="small"
+            onFinish={handleCreateSede}
+          >
             <Form.Item
               label="Nombre de la sede"
               name="name"
@@ -868,8 +1019,23 @@ const GestionHabitacionesView = ({ isMobile, currentUser }) => {
               <Input placeholder="Casa Frida" />
             </Form.Item>
             <Form.Item>
-              <Button type="primary" htmlType="submit" icon={<PlusOutlined />} loading={creatingSede}>
+              <Button
+                type="primary"
+                htmlType="submit"
+                icon={<PlusOutlined />}
+                loading={creatingSede}
+              >
                 Agregar sede
+              </Button>
+            </Form.Item>
+
+            <Form.Item>
+              <Button
+                icon={<ReloadOutlined />}
+                onClick={fetchSedes}
+                loading={sedesLoading}
+              >
+                Recargar
               </Button>
             </Form.Item>
           </Form>
@@ -884,6 +1050,10 @@ const GestionHabitacionesView = ({ isMobile, currentUser }) => {
           />
         </Space>
       </Modal>
+
+      {/* NOTA: tu modal de reservas futuras no estaba incluido en el snippet;
+          asumo que ya lo tienes abajo en tu archivo. Si quieres, pégame esa parte
+          y te lo regreso 100% completo con el Modal y el Table de reservas. */}
     </>
   );
 };
