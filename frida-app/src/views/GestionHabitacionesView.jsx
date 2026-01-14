@@ -147,6 +147,9 @@ const GestionHabitacionesView = ({ isMobile, currentUser }) => {
   useEffect(() => {
     if (currentUser) fetchSedes();
     // eslint-disable-next-line react-hooks/exhaustive-deps
+     setSedes([]);
+  setSedeOptions([]);
+  setSedesCatalog([]);
   }, [currentUser]);
 
   const buildQueryParams = (page) => ({
@@ -666,6 +669,11 @@ const GestionHabitacionesView = ({ isMobile, currentUser }) => {
 
   const handleOpenSedes = () => {
     if (!canManageRooms) return messageApi.warning("No tienes permisos para gestionar sedes.");
+
+  setSedes([]);
+  setSedeOptions([]);
+  setSedesCatalog([]); // tu helper global
+
     setSedesModalOpen(true);
     fetchSedes();
   };
