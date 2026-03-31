@@ -1,4 +1,8 @@
+import { useState, useEffect } from 'react'
 import { STATS, BOOKINGS_DATA } from '../../data/admin'
+import { SkeletonCard } from '@/components/frida/Skeleton'
+import Skeleton from '@/components/frida/Skeleton'
+import { useToast } from '@/components/frida/Toast'
 
 const MONTHS = ['ENE', 'FEB', 'MAR', 'ABR', 'MAY', 'JUN', 'JUL', 'AGO', 'SEP', 'OCT', 'NOV', 'DIC']
 const REVENUE = [62, 75, 88, 72, 95, 78, 84, 92, 70, 88, 96, 100]
@@ -41,7 +45,11 @@ const ACTIVITY = [
   },
 ]
 
-export default function DashboardPage() {
+export default function DashboardPage({ onNavigate }) {
+  const addToast = useToast()
+  const [loading, setLoading] = useState(true)
+  useEffect(() => { const t = setTimeout(() => setLoading(false), 1400); return () => clearTimeout(t) }, [])
+
   const today = new Date().toLocaleDateString('es-MX', {
     weekday: 'long',
     year: 'numeric',
@@ -55,24 +63,38 @@ export default function DashboardPage() {
       <div className="admin-page-header">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <div>
-            <span className="admin-page-eyebrow">Operational Insight</span>
+            <span className="admin-page-eyebrow">Resumen operacional</span>
             <h1 className="admin-page-title">
-              Hoteles Frida<br />
-              <em>Performance Dashboard</em>
+              Tablero<br />
+              <em>Principal</em>
             </h1>
-            <p className="admin-page-sub">
-              Monitoreo en tiempo real de ocupación, ingresos y actividad operacional
-              de ambas propiedades.
-            </p>
+            {/* Status chips */}
+            <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginTop: '16px' }}>
+              {[
+                { icon: 'circle', label: 'Sistema en línea', color: '#16a34a', bg: 'rgba(34,197,94,0.12)' },
+                { icon: 'hotel', label: `${STATS.total - STATS.available}/${STATS.total} ocupadas`, color: 'var(--primary)', bg: 'rgba(0,105,113,0.10)' },
+                { icon: 'wb_sunny', label: '8 check-ins hoy', color: '#d97706', bg: 'rgba(245,158,11,0.12)' },
+              ].map((chip, i) => (
+                <span key={i} style={{
+                  display: 'inline-flex', alignItems: 'center', gap: '6px',
+                  padding: '5px 14px', borderRadius: 'var(--radius-full)',
+                  background: chip.bg, color: chip.color,
+                  fontFamily: 'var(--font-body)', fontWeight: 700, fontSize: '12px',
+                }}>
+                  <span className="material-symbols-outlined" style={{ fontSize: '13px' }}>{chip.icon}</span>
+                  {chip.label}
+                </span>
+              ))}
+            </div>
           </div>
           <div style={{ textAlign: 'right' }}>
             <div className="admin-date" style={{ textTransform: 'capitalize' }}>{today}</div>
             <div style={{ display: 'flex', gap: '12px', marginTop: '12px', justifyContent: 'flex-end' }}>
-              <button className="btn-outline">
+              <button className="btn-outline" onClick={() => addToast('Reporte exportado correctamente', { type: 'success', title: 'Exportado' })}>
                 <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>download</span>
                 Exportar
               </button>
-              <button className="btn-primary">
+              <button className="btn-primary" onClick={() => onNavigate('nueva-reserva')}>
                 <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>add</span>
                 Nueva reserva
               </button>
@@ -83,76 +105,86 @@ export default function DashboardPage() {
 
       {/* Metrics grid */}
       <div className="metrics-grid">
-        {/* Occupancy */}
-        <div className="metric-card metric-card--light">
-          <div className="metric-card__label">Ocupación actual</div>
-          <div>
-            <div className="metric-card__value">{STATS.occupancy}%</div>
-            <div className="metric-card__trend">
-              <span className="material-symbols-outlined" style={{ fontSize: '16px', color: '#16a34a' }}>trending_up</span>
-              +6% vs. semana pasada
+        {loading ? (
+          <>
+            <SkeletonCard height="180px" />
+            <SkeletonCard height="180px" />
+            <SkeletonCard height="180px" />
+          </>
+        ) : (
+          <>
+            {/* Occupancy */}
+            <div className="metric-card metric-card--light">
+              <div className="metric-card__label">Ocupación actual</div>
+              <div>
+                <div className="metric-card__value">{STATS.occupancy}%</div>
+                <div className="metric-card__trend">
+                  <span className="material-symbols-outlined" style={{ fontSize: '16px', color: '#16a34a' }}>trending_up</span>
+                  +6% vs. semana pasada
+                </div>
+              </div>
+              <div style={{
+                height: '4px',
+                borderRadius: '2px',
+                background: 'var(--surface-container-high)',
+                marginTop: '16px',
+              }}>
+                <div style={{
+                  height: '100%',
+                  width: `${STATS.occupancy}%`,
+                  background: 'linear-gradient(90deg, var(--surface-tint), var(--secondary))',
+                  borderRadius: '2px',
+                }} />
+              </div>
+              <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                marginTop: '8px',
+                fontFamily: 'var(--font-body)',
+                fontSize: '11px',
+                color: 'var(--outline)',
+              }}>
+                <span>{STATS.available} disponibles</span>
+                <span>{STATS.total} total</span>
+              </div>
             </div>
-          </div>
-          <div style={{
-            height: '4px',
-            borderRadius: '2px',
-            background: 'var(--surface-container-high)',
-            marginTop: '16px',
-          }}>
-            <div style={{
-              height: '100%',
-              width: `${STATS.occupancy}%`,
-              background: 'linear-gradient(90deg, var(--surface-tint), var(--secondary))',
-              borderRadius: '2px',
-            }} />
-          </div>
-          <div style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            marginTop: '8px',
-            fontFamily: 'var(--font-body)',
-            fontSize: '11px',
-            color: 'var(--outline)',
-          }}>
-            <span>{STATS.available} disponibles</span>
-            <span>{STATS.total} total</span>
-          </div>
-        </div>
 
-        {/* ADR */}
-        <div className="metric-card metric-card--primary">
-          <div className="metric-card__label">Tarifa promedio diaria</div>
-          <div>
-            <div className="metric-card__value" style={{ fontSize: '3.5rem' }}>
-              ${STATS.adr.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+            {/* ADR */}
+            <div className="metric-card metric-card--primary">
+              <div className="metric-card__label">Tarifa promedio diaria</div>
+              <div>
+                <div className="metric-card__value" style={{ fontSize: '3.5rem' }}>
+                  ${STATS.adr.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                </div>
+                <div className="metric-card__trend">
+                  <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>trending_up</span>
+                  +12% vs. mes anterior
+                </div>
+                <div className="metric-card--primary metric-card__sub">
+                  ADR por encima del objetivo trimestral de $320 MXN
+                </div>
+              </div>
             </div>
-            <div className="metric-card__trend">
-              <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>trending_up</span>
-              +12% vs. mes anterior
-            </div>
-            <div className="metric-card--primary metric-card__sub">
-              ADR por encima del objetivo trimestral de $320 MXN
-            </div>
-          </div>
-        </div>
 
-        {/* Revenue */}
-        <div className="metric-card metric-card--gold">
-          <div className="metric-card__label">Ingresos del día</div>
-          <div>
-            <div className="metric-card__value">
-              ${(STATS.dailyRevenue / 1000).toFixed(1)}k
+            {/* Revenue */}
+            <div className="metric-card metric-card--gold">
+              <div className="metric-card__label">Ingresos del día</div>
+              <div>
+                <div className="metric-card__value">
+                  ${(STATS.dailyRevenue / 1000).toFixed(1)}k
+                </div>
+                <div className="metric-card__trend">
+                  <span className="material-symbols-outlined" style={{ fontSize: '16px', color: 'var(--tertiary)' }}>trending_up</span>
+                  MXN proyectados
+                </div>
+              </div>
             </div>
-            <div className="metric-card__trend">
-              <span className="material-symbols-outlined" style={{ fontSize: '16px', color: 'var(--tertiary)' }}>trending_up</span>
-              MXN proyectados
-            </div>
-          </div>
-        </div>
+          </>
+        )}
       </div>
 
       {/* Chart + Activity */}
-      <div style={{ display: 'grid', gridTemplateColumns: '7fr 5fr', gap: '32px', marginBottom: '48px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '7fr 5fr', gap: '20px', marginBottom: '32px' }}>
         {/* Chart */}
         <div>
           <div className="chart-area">

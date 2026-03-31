@@ -1,8 +1,19 @@
+import { useState } from 'react'
 import { SHOP_DATA } from '../../data/admin'
 
 const LOW_STOCK_THRESHOLD = 5
 
 export default function ShopPage() {
+  const [searchProduct, setSearchProduct] = useState('')
+  const [catFilter, setCatFilter] = useState('all')
+
+  const categories = [...new Set(SHOP_DATA.map(p => p.category))]
+  const visibleProducts = SHOP_DATA.filter(p => {
+    if (catFilter !== 'all' && p.category !== catFilter) return false
+    if (searchProduct && !p.name.toLowerCase().includes(searchProduct.toLowerCase())) return false
+    return true
+  })
+
   const lowStockItems = SHOP_DATA.filter(p => p.stock <= LOW_STOCK_THRESHOLD)
   const totalRevenue = SHOP_DATA.reduce((acc, p) => acc + p.price * p.stock, 0)
 
@@ -12,15 +23,46 @@ export default function ShopPage() {
       <div className="admin-page-header">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <div>
-            <span className="admin-page-eyebrow">Boutique Revenue</span>
+            <span className="admin-page-eyebrow">Inventario boutique</span>
             <h1 className="admin-page-title">
               Inventario de<br />
               <em>La Boutique</em>
             </h1>
-            <p className="admin-page-sub">
-              Gestiona los productos artesanales y boutique disponibles para huéspedes,
-              monitorea stock y optimiza ingresos adicionales.
-            </p>
+            <div style={{ display: 'flex', gap: '10px', marginTop: '20px', flexWrap: 'wrap' }}>
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: '8px',
+                background: 'var(--surface-container)', border: '1px solid var(--outline-var)',
+                borderRadius: 'var(--radius-full)', padding: '8px 16px', flex: '1', minWidth: '200px',
+              }}>
+                <span className="material-symbols-outlined" style={{ fontSize: '16px', color: 'var(--outline)' }}>search</span>
+                <input
+                  type="text"
+                  placeholder="Buscar producto..."
+                  value={searchProduct}
+                  onChange={e => setSearchProduct(e.target.value)}
+                  style={{
+                    border: 'none', background: 'transparent', outline: 'none',
+                    fontFamily: 'var(--font-body)', fontSize: '13px', color: 'var(--on-surface)', width: '100%',
+                  }}
+                />
+              </div>
+              {['all', ...categories].map(c => (
+                <button
+                  key={c}
+                  onClick={() => setCatFilter(c)}
+                  style={{
+                    padding: '8px 16px', borderRadius: 'var(--radius-full)',
+                    border: `1.5px solid ${catFilter === c ? 'var(--primary)' : 'var(--outline-var)'}`,
+                    background: catFilter === c ? 'rgba(0,105,113,0.10)' : 'transparent',
+                    color: catFilter === c ? 'var(--primary)' : 'var(--on-surface-var)',
+                    fontFamily: 'var(--font-body)', fontWeight: 700, fontSize: '12px',
+                    cursor: 'pointer', transition: 'all 0.2s',
+                  }}
+                >
+                  {c === 'all' ? 'Todos' : c}
+                </button>
+              ))}
+            </div>
           </div>
           <button className="btn-primary">
             <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>add</span>
@@ -55,7 +97,7 @@ export default function ShopPage() {
             </div>
 
             {/* Product cards */}
-            {SHOP_DATA.map((product) => (
+            {visibleProducts.map((product) => (
               <div key={product.id} className="shop-product-card">
                 <div className="shop-product-card__image">
                   <img src={product.img} alt={product.name} />

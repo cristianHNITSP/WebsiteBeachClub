@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { USERS_DATA } from '../../data/admin'
 
 const ROLES = [
@@ -40,21 +41,61 @@ const badgeClassMap = {
 }
 
 export default function UsersPage() {
+  const [search, setSearch] = useState('')
+  const [roleFilter, setRoleFilter] = useState('all')
+
+  const filteredUsers = USERS_DATA.filter(u => {
+    if (roleFilter !== 'all' && u.role !== roleFilter) return false
+    if (search && !u.name.toLowerCase().includes(search.toLowerCase()) && !u.email.toLowerCase().includes(search.toLowerCase())) return false
+    return true
+  })
+
   return (
     <div>
       {/* Page header */}
       <div className="admin-page-header">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <div>
-            <span className="admin-page-eyebrow">Team Management</span>
+            <span className="admin-page-eyebrow">Gestión de personal</span>
             <h1 className="admin-page-title">
               Personal &<br />
               <em>Roles de Acceso</em>
             </h1>
-            <p className="admin-page-sub">
-              Directorio de colaboradores y arquitectura de permisos por rol dentro
-              del ecosistema operacional de Hoteles Frida.
-            </p>
+            <div style={{ display: 'flex', gap: '10px', marginTop: '20px', flexWrap: 'wrap' }}>
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: '8px',
+                background: 'var(--surface-container)', border: '1px solid var(--outline-var)',
+                borderRadius: 'var(--radius-full)', padding: '8px 16px', flex: '1', minWidth: '220px',
+              }}>
+                <span className="material-symbols-outlined" style={{ fontSize: '16px', color: 'var(--outline)' }}>search</span>
+                <input
+                  type="text"
+                  placeholder="Buscar por nombre o correo..."
+                  value={search}
+                  onChange={e => setSearch(e.target.value)}
+                  style={{
+                    border: 'none', background: 'transparent', outline: 'none',
+                    fontFamily: 'var(--font-body)', fontSize: '13px', color: 'var(--on-surface)', width: '100%',
+                  }}
+                />
+              </div>
+              {['all', 'Curator', 'Artisan', 'Steward'].map(r => (
+                <button
+                  key={r}
+                  onClick={() => setRoleFilter(r)}
+                  style={{
+                    padding: '8px 16px', borderRadius: 'var(--radius-full)',
+                    border: `1.5px solid ${roleFilter === r ? 'var(--primary)' : 'var(--outline-var)'}`,
+                    background: roleFilter === r ? 'rgba(0,105,113,0.10)' : 'transparent',
+                    color: roleFilter === r ? 'var(--primary)' : 'var(--on-surface-var)',
+                    fontFamily: 'var(--font-body)', fontWeight: 700, fontSize: '12px',
+                    cursor: 'pointer', transition: 'all 0.2s',
+                  }}
+                >
+                  {r === 'all' ? 'Todos' : r}
+                </button>
+              ))}
+            </div>
           </div>
           <button className="btn-primary">
             <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>person_add</span>
@@ -122,7 +163,7 @@ export default function UsersPage() {
         </div>
 
         <div className="user-list">
-          {USERS_DATA.map((user) => (
+          {filteredUsers.map((user) => (
             <div key={user.id} className="user-item">
               <div className="user-item__left">
                 <div className="user-item__avatar">

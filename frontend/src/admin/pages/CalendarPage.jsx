@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { CALENDAR_DATA } from '../../data/admin'
 
 const DAYS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom']
@@ -15,9 +16,10 @@ function getWeekDates() {
   })
 }
 
-export default function CalendarPage() {
+export default function CalendarPage({ onNavigate }) {
   const weekDates = getWeekDates()
   const todayNum = new Date().getDate()
+  const [property, setProperty] = useState('all')
 
   return (
     <div>
@@ -25,15 +27,34 @@ export default function CalendarPage() {
       <div className="admin-page-header">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <div>
-            <span className="admin-page-eyebrow">Availability Ledger</span>
+            <span className="admin-page-eyebrow">Vista semanal</span>
             <h1 className="admin-page-title">
               Calendario de<br />
               <em>Reservaciones</em>
             </h1>
-            <p className="admin-page-sub">
-              Vista semanal de ocupación por habitación. Gestiona bloqueos,
-              check-ins y check-outs desde aquí.
-            </p>
+            {/* Property filter */}
+            <div style={{ display: 'flex', gap: '8px', marginTop: '20px' }}>
+              {[
+                { key: 'all', label: 'Todas las propiedades' },
+                { key: 'chelem', label: 'Cabañas Frida — Chelem' },
+                { key: 'chuburna', label: 'Casa Frida — Chuburná' },
+              ].map(opt => (
+                <button
+                  key={opt.key}
+                  onClick={() => setProperty(opt.key)}
+                  style={{
+                    padding: '8px 16px', borderRadius: 'var(--radius-full)',
+                    border: `1.5px solid ${property === opt.key ? 'var(--primary)' : 'var(--outline-var)'}`,
+                    background: property === opt.key ? 'rgba(0,105,113,0.10)' : 'transparent',
+                    color: property === opt.key ? 'var(--primary)' : 'var(--on-surface-var)',
+                    fontFamily: 'var(--font-body)', fontWeight: 700, fontSize: '12px',
+                    cursor: 'pointer', transition: 'all 0.2s',
+                  }}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
           </div>
           <div style={{ display: 'flex', gap: '12px' }}>
             <button className="btn-outline">
@@ -47,7 +68,7 @@ export default function CalendarPage() {
               Siguiente
               <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>chevron_right</span>
             </button>
-            <button className="btn-primary">
+            <button className="btn-primary" onClick={() => onNavigate('nueva-reserva')}>
               <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>add</span>
               Nueva reserva
             </button>
@@ -197,6 +218,7 @@ export default function CalendarPage() {
           </div>
         ))}
       </div>
+
     </div>
   )
 }

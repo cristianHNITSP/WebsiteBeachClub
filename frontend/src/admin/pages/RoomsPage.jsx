@@ -1,8 +1,10 @@
 import { useState } from 'react'
 import { ROOMS_DATA } from '../../data/admin'
 
-export default function RoomsPage() {
+export default function RoomsPage({ onNavigate }) {
   const [selectedRoom, setSelectedRoom] = useState(ROOMS_DATA[0])
+  const [searchQuery, setSearchQuery] = useState('')
+  const [statusFilter, setStatusFilter] = useState('all')
 
   return (
     <div>
@@ -10,17 +12,50 @@ export default function RoomsPage() {
       <div className="admin-page-header">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <div>
-            <span className="admin-page-eyebrow">Room Management</span>
+            <span className="admin-page-eyebrow">Gestión de habitaciones</span>
             <h1 className="admin-page-title">
               Configuración de<br />
               <em>Habitaciones</em>
             </h1>
-            <p className="admin-page-sub">
-              Gestiona precios, disponibilidad, amenidades y estado operacional
-              de cada habitación y suite.
-            </p>
+            {/* Search + filter bar */}
+            <div style={{ display: 'flex', gap: '10px', marginTop: '20px', flexWrap: 'wrap' }}>
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: '8px',
+                background: 'var(--surface-container)', border: '1px solid var(--outline-var)',
+                borderRadius: 'var(--radius-full)', padding: '8px 16px', flex: '1', minWidth: '220px',
+              }}>
+                <span className="material-symbols-outlined" style={{ fontSize: '16px', color: 'var(--outline)' }}>search</span>
+                <input
+                  type="text"
+                  placeholder="Buscar habitación..."
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                  style={{
+                    border: 'none', background: 'transparent', outline: 'none',
+                    fontFamily: 'var(--font-body)', fontSize: '13px', color: 'var(--on-surface)',
+                    width: '100%',
+                  }}
+                />
+              </div>
+              {['all', 'active', 'maintenance'].map(s => (
+                <button
+                  key={s}
+                  onClick={() => setStatusFilter(s)}
+                  style={{
+                    padding: '8px 16px', borderRadius: 'var(--radius-full)',
+                    border: `1.5px solid ${statusFilter === s ? 'var(--primary)' : 'var(--outline-var)'}`,
+                    background: statusFilter === s ? 'rgba(0,105,113,0.10)' : 'transparent',
+                    color: statusFilter === s ? 'var(--primary)' : 'var(--on-surface-var)',
+                    fontFamily: 'var(--font-body)', fontWeight: 700, fontSize: '12px',
+                    cursor: 'pointer', transition: 'all 0.2s',
+                  }}
+                >
+                  {{ all: 'Todos', active: 'Disponibles', maintenance: 'Mantenimiento' }[s]}
+                </button>
+              ))}
+            </div>
           </div>
-          <button className="btn-primary">
+          <button className="btn-primary" onClick={() => onNavigate('nueva-habitacion')}>
             <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>add</span>
             Nueva habitación
           </button>
@@ -90,7 +125,11 @@ export default function RoomsPage() {
           <div style={{ marginTop: '32px' }}>
             <h3 className="admin-section-title">Todas las Habitaciones</h3>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '16px' }}>
-              {ROOMS_DATA.map(room => (
+              {ROOMS_DATA.filter(r => {
+                if (statusFilter !== 'all' && r.status !== statusFilter) return false
+                if (searchQuery && !r.name.toLowerCase().includes(searchQuery.toLowerCase())) return false
+                return true
+              }).map(room => (
                 <div
                   key={room.id}
                   style={{
@@ -243,6 +282,7 @@ export default function RoomsPage() {
           </div>
         </div>
       </div>
+
     </div>
   )
 }
