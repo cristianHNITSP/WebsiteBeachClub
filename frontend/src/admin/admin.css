@@ -1514,3 +1514,255 @@
   color: var(--on-surface);
   margin-bottom: 32px;
 }
+
+/* ===== VER SITIO LABEL ===== */
+.admin-topnav__ver-sitio-label {
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 600;
+  margin-left: 2px;
+}
+
+/* ===== DARK MODE – ADMIN OVERRIDES ===== */
+
+/* Root custom vars for dark */
+.dark {
+  --admin-nav-bg: rgba(15,17,23,0.90);
+  --admin-sidebar-bg: #131720;
+}
+
+/* Topnav */
+.dark .admin-topnav {
+  background: rgba(15,17,23,0.90);
+  box-shadow: 0 1px 0 rgba(255,255,255,0.05);
+}
+.dark .admin-topnav__brand {
+  color: #e2e8f0;
+}
+.dark .admin-topnav__link {
+  color: #94a3b8;
+}
+.dark .admin-topnav__link:hover,
+.dark .admin-topnav__link--active {
+  color: #4cc9d6;
+}
+.dark .admin-topnav__link--active {
+  border-bottom-color: #4cc9d6;
+}
+.dark .admin-topnav__icon-btn {
+  color: #94a3b8;
+}
+.dark .admin-topnav__icon-btn:hover {
+  background: rgba(255,255,255,0.07);
+}
+
+/* Sidebar */
+.dark .admin-sidebar {
+  background: #131720;
+  border-right-color: rgba(255,255,255,0.06);
+}
+.dark .admin-sidebar__property {
+  color: #f59e0b;
+}
+.dark .admin-sidebar__role {
+  color: #64748b;
+}
+.dark .admin-sidebar__item {
+  color: #94a3b8;
+}
+.dark .admin-sidebar__item:hover {
+  background: rgba(255,255,255,0.05);
+  color: #e2e8f0;
+}
+.dark .admin-sidebar__item--active {
+  background: rgba(76,201,214,0.10);
+  color: #4cc9d6;
+  box-shadow: none;
+}
+.dark .admin-sidebar__footer {
+  border-top-color: rgba(255,255,255,0.06);
+}
+.dark .admin-sidebar__link {
+  color: #475569;
+}
+.dark .admin-sidebar__link:hover {
+  color: #94a3b8;
+}
+
+/* Main layout background */
+.dark .admin-layout {
+  background: #0f1117;
+}
+
+/* Activity feed */
+.dark .activity-feed {
+  background: rgba(255,255,255,0.04);
+  border-color: rgba(255,255,255,0.07);
+  box-shadow: none;
+}
+
+/* Calendar */
+.dark .calendar-grid {
+  background: var(--surface-container-low);
+}
+.dark .calendar-header {
+  background: rgba(255,255,255,0.04);
+}
+.dark .calendar-room-col {
+  background: #1a1f2e;
+  color: #64748b;
+  box-shadow: 4px 0 12px rgba(0,0,0,0.3);
+}
+.dark .calendar-room-info {
+  background: #1a1f2e;
+  box-shadow: 4px 0 12px rgba(0,0,0,0.3);
+}
+.dark .calendar-room-type {
+  color: #64748b;
+}
+.dark .calendar-day-name {
+  color: #64748b;
+}
+.dark .calendar-day-cell {
+  border-right-color: rgba(255,255,255,0.06);
+}
+.dark .calendar-row {
+  border-top-color: rgba(255,255,255,0.06);
+}
+.dark .calendar-cell {
+  border-right-color: rgba(255,255,255,0.05);
+}
+.dark .calendar-booking--glass {
+  background: rgba(255,255,255,0.08);
+  border-color: rgba(255,255,255,0.12);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+}
+.dark .calendar-booking--blocked {
+  background: rgba(255,255,255,0.03);
+  border-color: #334155;
+}
+.dark .calendar-booking__status {
+  background: rgba(22,163,74,0.2);
+  color: #4ade80;
+}
+
+/* Shop */
+.dark .shop-hero__info {
+  background: rgba(15,17,23,0.82);
+  color: #e2e8f0;
+}
+
+/* Bottom nav mobile */
+.dark .admin-bottom-nav {
+  background: rgba(15,17,23,0.92);
+}
+
+/* Metric cards */
+.dark .metric-card--light {
+  background: rgba(255,255,255,0.05);
+}
+.dark .metric-card--gold {
+  background: rgba(115,92,0,0.18);
+}
+
+/* Status badges */
+.dark .status-badge--confirmed {
+  background: rgba(22,163,74,0.2);
+  color: #4ade80;
+}
+.dark .status-badge--maintenance {
+  background: rgba(245,158,11,0.15);
+  color: #fbbf24;
+}
+
+/* Rooms/Users tables */
+.dark .room-row,
+.dark .user-row {
+  border-bottom-color: rgba(255,255,255,0.05);
+}
+
+/* Ghost input (login, forms) */
+.dark .ghost-input {
+  background: rgba(255,255,255,0.07);
+  border-color: rgba(255,255,255,0.12);
+  color: #e2e8f0;
+}
+
+/* ===== ADMIN ACCOUNT PAGE ===== */
+.admin-account-page {
+  padding-top: 8px;
+}
+.admin-account-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--on-surface-variant);
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 500;
+  padding: 8px 0;
+  margin-bottom: 48px;
+  transition: color 0.2s;
+}
+.admin-account-back:hover {
+  color: var(--on-surface);
+}
+.admin-account-hero {
+  display: flex;
+  align-items: center;
+  gap: 32px;
+  margin-bottom: 56px;
+}
+.admin-account-avatar-lg {
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.admin-account-avatar-lg img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.admin-account-role {
+  font-family: var(--font-body);
+  font-size: 14px;
+  color: var(--on-surface-variant);
+  margin-top: 4px;
+}
+.admin-account-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+  max-width: 800px;
+}
+.admin-account-card {
+  background: var(--surface-container-low);
+  border-radius: var(--radius-xl);
+  padding: 32px;
+}
+.admin-account-card__icon {
+  font-size: 28px !important;
+  color: var(--surface-tint);
+  margin-bottom: 16px;
+  display: block;
+}
+.admin-account-card__label {
+  font-family: var(--font-body);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--outline);
+  margin-bottom: 8px;
+}
+.admin-account-card__value {
+  font-family: var(--font-body);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--on-surface);
+}

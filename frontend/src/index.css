@@ -1,100 +1,144 @@
 @import url('https://fonts.googleapis.com/css2?family=Noto+Serif:ital,wght@0,400;0,600;0,700;1,400;1,600&family=Manrope:wght@300;400;500;600;700;800&display=swap');
 
+/* ===== DESIGN TOKENS ===== */
 :root {
-  --primary: #003b41;
-  --primary-container: #00545b;
-  --on-primary: #ffffff;
-  --secondary: #7e469a;
-  --secondary-container: #e0a1fc;
-  --tertiary: #735c00;
-  --tertiary-fixed: #ffe088;
-  --surface-tint: #006971;
-  --background: #f7f9ff;
-  --surface: #f7f9ff;
-  --surface-container: #eaeef5;
+  --primary:           #006971;
+  --primary-dark:      #004f57;
+  --secondary:         #c07ef0;
+  --gold:              #f59e0b;
+  --gold-fixed:        #ffe088;
+  --gold-dark:         #735c00;
+  --error:             #ba1a1a;
+
+  --bg:                    #ffffff;
+  --surface:               #f7f9ff;
+  --surface-container:     #eaeef5;
   --surface-container-low: #f0f4fa;
-  --surface-container-high: #e4e8ef;
-  --surface-container-highest: #dfe3e9;
-  --surface-container-lowest: #ffffff;
-  --on-surface: #171c21;
-  --on-surface-variant: #4d444f;
-  --outline: #7e7480;
-  --outline-variant: #d0c2d0;
-  --error: #ba1a1a;
-  --gold: #f59e0b;
+  --surface-lowest:        #ffffff;
+
+  --on-surface:     #171c21;
+  --on-surface-var: #4d5963;
+
+  --outline:     #7e8fa0;
+  --outline-var: #c8d5de;
+
+  /* ── Aliases for legacy CSS references ── */
+  --primary-container:          #b2e8ed;
+  --surface-tint:               #006971;
+  --on-surface-variant:         #4d5963;
+  --outline-variant:            #c8d5de;
+  --surface-container-highest:  #d4dde3;
 
   --font-headline: 'Noto Serif', serif;
-  --font-body: 'Manrope', sans-serif;
+  --font-body:     'Manrope', sans-serif;
 
-  --radius-sm: 4px;
-  --radius-md: 8px;
-  --radius-lg: 12px;
-  --radius-xl: 20px;
+  --radius-sm:   4px;
+  --radius-md:   8px;
+  --radius-lg:   12px;
+  --radius-xl:   20px;
   --radius-full: 9999px;
 
-  --shadow-sm: 0 2px 8px rgba(23,28,33,0.06);
-  --shadow-md: 0 8px 24px rgba(23,28,33,0.10);
-  --shadow-lg: 0 20px 48px rgba(23,28,33,0.14);
+  --shadow-sm: 0 2px 8px rgba(0,59,65,0.07);
+  --shadow-md: 0 8px 28px rgba(0,59,65,0.12);
+  --shadow-lg: 0 24px 56px rgba(0,59,65,0.18);
+  --shadow-primary: 0 8px 32px rgba(0,105,113,0.35);
 }
 
-* {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
+/* ===== DARK MODE ===== */
+.dark {
+  --bg:                    #111820;
+  --surface:               #161e28;
+  --surface-container:     #1e2836;
+  --surface-container-low: #192230;
+  --surface-lowest:        #0e1520;
+  --on-surface:     #e4ecf2;
+  --on-surface-var: #8fa6b5;
+
+  --outline:     #445a6a;
+  --outline-var: #243040;
+
+  --primary-container:          #004a50;
+  --surface-tint:               #4dbac4;
+  --on-surface-variant:         #8fa6b5;
+  --outline-variant:            #243040;
+  --surface-container-highest:  #2a3a4a;
 }
 
-html {
-  scroll-behavior: smooth;
+/* ===== ANIMATIONS ===== */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(28px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes floatY {
+  0%, 100% { transform: translateY(0); }
+  50%       { transform: translateY(-18px); }
+}
+@keyframes shimmer {
+  0%   { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+@keyframes pulse-ring {
+  0%   { box-shadow: 0 0 0 0 rgba(0,105,113,0.3); }
+  70%  { box-shadow: 0 0 0 12px rgba(0,105,113,0); }
+  100% { box-shadow: 0 0 0 0 rgba(0,105,113,0); }
+}
+@keyframes scrollBounce {
+  0%, 100% { transform: translateX(-50%) translateY(0); }
+  50%       { transform: translateX(-50%) translateY(6px); }
 }
 
-body {
+/* ===== RESET ===== */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html  { scroll-behavior: smooth; }
+body  {
   font-family: var(--font-body);
-  background: var(--background);
+  background: var(--bg);
   color: var(--on-surface);
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
+a      { text-decoration: none; color: inherit; }
+img    { max-width: 100%; display: block; }
+button, input, select, textarea { font-family: var(--font-body); }
 
+/* ===== ICON FONT ===== */
 .material-symbols-outlined {
-  font-variation-settings:
-    'FILL' 0,
-    'wght' 400,
-    'GRAD' 0,
-    'opsz' 24;
+  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
   font-size: inherit;
   line-height: 1;
   vertical-align: middle;
 }
 
+/* ===== GLASS UTILITIES ===== */
 .glass-card {
-  background: rgba(255,255,255,0.7);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(255,255,255,0.3);
-  box-shadow: 0 8px 32px rgba(23,28,33,0.08);
+  background: rgba(255,255,255,0.72);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border: 1px solid rgba(255,255,255,0.35);
+  box-shadow: var(--shadow-md);
 }
-
+.dark .glass-card {
+  background: rgba(22,30,40,0.72);
+  border-color: rgba(255,255,255,0.08);
+}
 .glass-nav {
-  background: rgba(247,249,255,0.85);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  background: rgba(247,249,255,0.88);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+}
+.dark .glass-nav {
+  background: rgba(17,24,32,0.88);
 }
 
-a {
-  text-decoration: none;
-  color: inherit;
+/* ===== ANIMATION UTILITIES ===== */
+.animate-fade-in-up {
+  animation: fadeInUp 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
-
-img {
-  max-width: 100%;
-  display: block;
-}
-
-button {
-  font-family: var(--font-body);
-}
-
-input, select {
-  font-family: var(--font-body);
+.animate-float {
+  animation: floatY 6s ease-in-out infinite;
 }
