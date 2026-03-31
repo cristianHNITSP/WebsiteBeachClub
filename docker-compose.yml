@@ -84,6 +84,52 @@ services:
       retries: 10
 
   # =========================
+  # FRONTEND (DEV - Vite)
+  # =========================
+  frontend-dev:
+    image: node:22-alpine
+    container_name: frontend-dev
+    working_dir: /app
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    ports:
+      - "127.0.0.1:5176:5173"
+    environment:
+      NODE_ENV: development
+      VITE_RESERVAS_TARGET: "http://beachclub-reservas-service:4002"
+      VITE_USERS_TARGET: "http://beachclub-users-service:4001"
+      VITE_SHOP_TARGET: "http://beachclub-shop-service:4003"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    command: sh -c "npm install && npm run dev -- --host 0.0.0.0 --port 5173"
+    restart: unless-stopped
+    profiles: ["dev"]
+    networks:
+      - beachclub-net
+
+  # =========================
+  # FRONTEND (PROD - Nginx)
+  # =========================
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: prod
+    container_name: frontend-prod
+    ports:
+      - "127.0.0.1:4201:80"
+    restart: unless-stopped
+    profiles: ["prod"]
+    networks:
+      - beachclub-net
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/ >/dev/null 2>&1 || exit 1"]
+      interval: 20s
+      timeout: 5s
+      retries: 10
+
+  # =========================
   # MongoDB BeachClub
   # =========================
   beachclub-mongo:
