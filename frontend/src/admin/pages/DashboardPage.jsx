@@ -46,7 +46,7 @@ const ACTIVITY = [
   },
 ]
 
-export default function DashboardPage({ onNavigate }) {
+const DashboardPage = ({ onNavigate }) => {
   const addToast = useToast()
   const [loading, setLoading] = useState(true)
   useEffect(() => { const t = setTimeout(() => setLoading(false), 1400); return () => clearTimeout(t) }, [])
@@ -95,10 +95,7 @@ export default function DashboardPage({ onNavigate }) {
                 <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>download</span>
                 Exportar
               </button>
-              <button className="btn-primary" onClick={() => onNavigate('nueva-reserva')}>
-                <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>add</span>
-                Nueva reserva
-              </button>
+
             </div>
           </div>
         </div>
@@ -310,3 +307,5 @@ export default function DashboardPage({ onNavigate }) {
     </div>
   )
 }
+
+export default DashboardPage
