@@ -1,5 +1,6 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { CALENDAR_DATA } from '../../data/admin'
+import StatCard from '@/components/frida/StatCard'
 
 const DAYS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom']
 
@@ -16,10 +17,19 @@ function getWeekDates() {
   })
 }
 
+const CALENDAR_STATS = [
+  { icon: 'login',  label: 'Check-ins esta semana',  value: 8,  color: 'var(--surface-tint)' },
+  { icon: 'logout', label: 'Check-outs esta semana', value: 5,  color: 'var(--secondary)' },
+  { icon: 'hotel',  label: 'Noches reservadas',       value: 28, color: 'var(--primary)' },
+  { icon: 'block',  label: 'Días bloqueados',         value: 2,  color: 'var(--outline)' },
+]
+
 export default function CalendarPage({ onNavigate }) {
   const weekDates = getWeekDates()
   const todayNum = new Date().getDate()
   const [property, setProperty] = useState('all')
+  const [loading, setLoading] = useState(true)
+  useEffect(() => { const t = setTimeout(() => setLoading(false), 1200); return () => clearTimeout(t) }, [])
 
   return (
     <div>
@@ -178,44 +188,8 @@ export default function CalendarPage({ onNavigate }) {
 
       {/* Summary stats below calendar */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '20px', marginTop: '32px' }}>
-        {[
-          { icon: 'login', label: 'Check-ins esta semana', value: '8', color: 'var(--surface-tint)' },
-          { icon: 'logout', label: 'Check-outs esta semana', value: '5', color: 'var(--secondary)' },
-          { icon: 'hotel', label: 'Noches reservadas', value: '28', color: 'var(--primary)' },
-          { icon: 'block', label: 'Días bloqueados', value: '2', color: 'var(--outline)' },
-        ].map((stat, i) => (
-          <div key={i} style={{
-            background: 'rgba(255,255,255,0.7)',
-            backdropFilter: 'blur(16px)',
-            border: '1px solid rgba(255,255,255,0.3)',
-            borderRadius: '12px',
-            padding: '20px 24px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '14px',
-            boxShadow: 'var(--shadow-sm)',
-          }}>
-            <div style={{
-              width: '44px',
-              height: '44px',
-              borderRadius: '12px',
-              background: `${stat.color}18`,
-              display: 'grid',
-              placeItems: 'center',
-              fontSize: '20px',
-              color: stat.color,
-            }}>
-              <span className="material-symbols-outlined">{stat.icon}</span>
-            </div>
-            <div>
-              <div style={{ fontFamily: 'var(--font-headline)', fontSize: '1.75rem', fontWeight: '700', color: 'var(--on-surface)', lineHeight: '1' }}>
-                {stat.value}
-              </div>
-              <div style={{ fontFamily: 'var(--font-body)', fontSize: '11px', fontWeight: '600', color: 'var(--outline)', textTransform: 'uppercase', letterSpacing: '0.06em', marginTop: '4px' }}>
-                {stat.label}
-              </div>
-            </div>
-          </div>
+        {CALENDAR_STATS.map((stat, i) => (
+          <StatCard key={i} loading={loading} {...stat} />
         ))}
       </div>
 

@@ -3,6 +3,7 @@ import { STATS, BOOKINGS_DATA } from '../../data/admin'
 import { SkeletonCard } from '@/components/frida/Skeleton'
 import Skeleton from '@/components/frida/Skeleton'
 import { useToast } from '@/components/frida/Toast'
+import StatCard from '@/components/frida/StatCard'
 
 const MONTHS = ['ENE', 'FEB', 'MAR', 'ABR', 'MAY', 'JUN', 'JUL', 'AGO', 'SEP', 'OCT', 'NOV', 'DIC']
 const REVENUE = [62, 75, 88, 72, 95, 78, 84, 92, 70, 88, 96, 100]
@@ -297,16 +298,12 @@ export default function DashboardPage({ onNavigate }) {
 
         <div className="inventory-grid">
           {[
-            { label: 'Habitaciones ocupadas', value: `${STATS.total - STATS.available}/${STATS.total}`, sub: 'Ocupación 84% · Por encima del objetivo' },
-            { label: 'Check-ins hoy', value: '8', sub: 'Próximo: Ana Martínez · 3:00 PM' },
-            { label: 'Check-outs hoy', value: '5', sub: 'Completados: 3 · Pendientes: 2' },
-            { label: 'En mantenimiento', value: '1', sub: 'Suite Horizonte Azul · Listo 6 PM' },
+            { icon: 'bed',             label: 'Habitaciones ocupadas', value: STATS.total - STATS.available, suffix: `/${STATS.total}`, sub: 'Ocupación 84% · Por encima del objetivo', color: 'var(--primary)' },
+            { icon: 'login',           label: 'Check-ins hoy',         value: 8,                             sub: 'Próximo: Ana Martínez · 3:00 PM',    color: 'var(--surface-tint)' },
+            { icon: 'logout',          label: 'Check-outs hoy',        value: 5,                             sub: 'Completados: 3 · Pendientes: 2',     color: 'var(--secondary)' },
+            { icon: 'construction',    label: 'En mantenimiento',      value: 1,                             sub: 'Suite Horizonte Azul · Listo 6 PM',  color: '#d97706' },
           ].map((item, i) => (
-            <div key={i} className="inventory-card">
-              <span className="inventory-card__label">{item.label}</span>
-              <div className="inventory-card__value">{item.value}</div>
-              <div className="inventory-card__sub">{item.sub}</div>
-            </div>
+            <StatCard key={i} loading={loading} {...item} />
           ))}
         </div>
       </div>
