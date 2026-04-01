@@ -1,8 +1,10 @@
 import { useState } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
 import SectionPanel from '../components/SectionPanel'
 import { Field, Input, Select } from '@/components/frida/Field'
 import { useTheme } from '@/context/ThemeContext'
 import { useToast } from '@/components/frida/Toast'
+import s from './ConfigPage.module.css'
 
 /* ── Reusable sub-components ── */
 function ConfigSection({ title, children }) {
@@ -147,81 +149,43 @@ export default function ConfigPage({ onBack }) {
         </button>
       }
     >
-      <div style={{ display: 'grid', gridTemplateColumns: '200px 1fr', gap: '24px', alignItems: 'start' }}>
+      {/* Mobile-only compact profile row */}
+      <div className={s.profileCompact}>
+        <div className={s.profileCompactAvatar}>
+          <span className="material-symbols-outlined" style={{ color: '#fff', fontSize: '22px' }}>person</span>
+        </div>
+        <div>
+          <div className={s.profileCompactName}>{nombre}</div>
+          <div className={s.profileCompactRole}>Gerente General · En línea</div>
+        </div>
+      </div>
 
-        {/* ── Tab sidebar ── */}
-        <nav style={{
-          background: 'var(--surface-container-low)',
-          border: '1px solid var(--outline-var)',
-          borderRadius: 'var(--radius-xl)',
-          overflow: 'hidden',
-          position: 'sticky', top: '80px',
-        }}>
-          {/* Profile mini-card */}
-          <div style={{
-            padding: '20px', textAlign: 'center',
-            borderBottom: '1px solid var(--outline-var)',
-          }}>
-            <div style={{
-              width: '56px', height: '56px', borderRadius: '50%',
-              background: 'linear-gradient(135deg, var(--primary), #009aa5)',
-              display: 'grid', placeItems: 'center',
-              margin: '0 auto 10px',
-              border: '3px solid rgba(0,105,113,0.2)',
-            }}>
+      <div className={s.layout}>
+
+        {/* ── Tab sidebar (desktop vertical / mobile horizontal) ── */}
+        <nav className={s.nav}>
+          {/* Profile mini-card — desktop only */}
+          <div className={s.navProfile}>
+            <div className={s.navAvatar}>
               <span className="material-symbols-outlined" style={{ color: '#fff', fontSize: '26px' }}>person</span>
             </div>
-            <div style={{
-              fontFamily: 'var(--font-headline)', fontSize: '13px',
-              fontWeight: 700, color: 'var(--on-surface)',
-            }}>
-              {nombre}
-            </div>
-            <div style={{ fontSize: '11px', color: 'var(--on-surface-var)', marginTop: '2px' }}>
-              Gerente General
-            </div>
-            <div style={{
-              display: 'inline-flex', alignItems: 'center', gap: '5px',
-              marginTop: '8px', padding: '3px 10px',
-              borderRadius: 'var(--radius-full)',
-              background: 'rgba(22,163,74,0.10)',
-              color: '#16a34a',
-              fontFamily: 'var(--font-body)', fontSize: '10px', fontWeight: 800,
-            }}>
-              <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#16a34a' }} />
+            <div className={s.navName}>{nombre}</div>
+            <div className={s.navRole}>Gerente General</div>
+            <div className={s.navStatus}>
+              <span className={s.navStatusDot} />
               En línea
             </div>
           </div>
 
           {/* Tab items */}
-          <div style={{ padding: '8px' }}>
+          <div className={s.tabList}>
             {TABS.map(t => (
               <button
                 key={t.key}
                 onClick={() => setTab(t.key)}
-                style={{
-                  width: '100%', border: 'none', textAlign: 'left',
-                  padding: '10px 12px', borderRadius: 'var(--radius-md)',
-                  background: tab === t.key
-                    ? 'linear-gradient(135deg, rgba(0,105,113,0.12) 0%, rgba(0,105,113,0.06) 100%)'
-                    : 'transparent',
-                  color: tab === t.key ? 'var(--primary)' : 'var(--on-surface-var)',
-                  cursor: 'pointer', fontFamily: 'var(--font-body)',
-                  fontSize: '13px', fontWeight: tab === t.key ? 700 : 500,
-                  display: 'flex', alignItems: 'center', gap: '10px',
-                  transition: 'all 0.15s',
-                  position: 'relative',
-                }}
-                onMouseEnter={e => { if (tab !== t.key) e.currentTarget.style.background = 'var(--surface-container)' }}
-                onMouseLeave={e => { if (tab !== t.key) e.currentTarget.style.background = 'transparent' }}
+                className={`${s.tabBtn} ${tab === t.key ? s.tabBtnActive : ''}`}
               >
-                {tab === t.key && (
-                  <span style={{
-                    position: 'absolute', left: 0, top: '50%', transform: 'translateY(-50%)',
-                    width: '3px', height: '18px', background: 'var(--primary)',
-                    borderRadius: '0 3px 3px 0',
-                  }} />
-                )}
+                {tab === t.key && <span className={s.tabIndicator} />}
                 <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>{t.icon}</span>
                 {t.label}
               </button>
@@ -229,14 +193,21 @@ export default function ConfigPage({ onBack }) {
           </div>
         </nav>
 
-        {/* ── Tab content ── */}
-        <div>
+        {/* ── Tab content with animation ── */}
+        <div className={s.content}>
+        <AnimatePresence mode="wait">
 
           {/* ── PERFIL ── */}
           {tab === 'perfil' && (
-            <>
+            <motion.div
+              key="perfil"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -6 }}
+              transition={{ duration: 0.18, ease: 'easeOut' }}
+            >
               <ConfigSection title="Información personal">
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div className={s.twoCol}>
                   <Field label="Nombre completo">
                     <Input value={nombre} onChange={e => setNombre(e.target.value)} />
                   </Field>
@@ -268,7 +239,7 @@ export default function ConfigPage({ onBack }) {
               </ConfigSection>
 
               <ConfigSection title="Zona horaria e idioma">
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div className={s.twoCol}>
                   <Field label="Zona horaria">
                     <Select defaultValue="america_merida">
                       <option value="america_merida">América/Mérida (CST)</option>
@@ -284,12 +255,18 @@ export default function ConfigPage({ onBack }) {
                   </Field>
                 </div>
               </ConfigSection>
-            </>
+            </motion.div>
           )}
 
           {/* ── SEGURIDAD ── */}
           {tab === 'seguridad' && (
-            <>
+            <motion.div
+              key="seguridad"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -6 }}
+              transition={{ duration: 0.18, ease: 'easeOut' }}
+            >
               <ConfigSection title="Contraseña">
                 <ConfigRow
                   icon="lock"
@@ -429,12 +406,18 @@ export default function ConfigPage({ onBack }) {
                   </div>
                 ))}
               </ConfigSection>
-            </>
+            </motion.div>
           )}
 
           {/* ── ACCESIBILIDAD ── */}
           {tab === 'accesibilidad' && (
-            <>
+            <motion.div
+              key="accesibilidad"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -6 }}
+              transition={{ duration: 0.18, ease: 'easeOut' }}
+            >
               <ConfigSection title="Apariencia">
                 <ConfigRow
                   icon={isDark ? 'light_mode' : 'dark_mode'}
@@ -530,9 +513,10 @@ export default function ConfigPage({ onBack }) {
                   </ConfigRow>
                 ))}
               </ConfigSection>
-            </>
+            </motion.div>
           )}
 
+        </AnimatePresence>
         </div>
       </div>
     </SectionPanel>

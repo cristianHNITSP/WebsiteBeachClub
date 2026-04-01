@@ -1,38 +1,11 @@
-import { useState, useEffect, useRef } from 'react'
-import { motion, useInView } from 'framer-motion'
+import { useState } from 'react'
+import { motion } from 'framer-motion'
 import { SUCURSALES } from '../../data/rooms'
+import { Button, Icon, SectionHeader, SurfaceCard } from '@/components/frida'
+import { Field, Input, Select } from '@/components/frida'
 import RoomCard from '../components/RoomCard'
-
-/* ── Animation presets ── */
-const fadeUp = {
-  hidden:  { opacity: 0, y: 32 },
-  visible: { opacity: 1, y: 0 },
-}
-const fadeIn = {
-  hidden:  { opacity: 0 },
-  visible: { opacity: 1 },
-}
-const stagger = (delay = 0) => ({
-  hidden:  { opacity: 0, y: 24 },
-  visible: { opacity: 1, y: 0, transition: { duration: 0.7, ease: [0.16, 1, 0.3, 1], delay } },
-})
-
-function ScrollReveal({ children, delay = 0, className, style }) {
-  const ref = useRef(null)
-  const inView = useInView(ref, { once: true, margin: '-60px' })
-  return (
-    <motion.div
-      ref={ref}
-      initial="hidden"
-      animate={inView ? 'visible' : 'hidden'}
-      variants={stagger(delay)}
-      className={className}
-      style={style}
-    >
-      {children}
-    </motion.div>
-  )
-}
+import ScrollReveal from '../components/ScrollReveal'
+import s from './HomePage.module.css'
 
 const EXPERIENCE_ITEMS = [
   {
@@ -63,23 +36,18 @@ export default function HomePage({ onNavigate, onSelectRoom, rooms, favorites, o
 
   const filteredRooms = rooms.filter(r => {
     if (categoryFilter === 'familia') return r.roomType === 'familiar'
-    if (categoryFilter === 'deal') return r.hasDiscount
+    if (categoryFilter === 'deal')    return r.hasDiscount
     return true
   }).slice(0, 6)
-
-  const handleSearch = () => onNavigate('search')
 
   return (
     <div>
       {/* ══════════ HERO ══════════ */}
       <section className="hero">
         <div className="hero__bg-placeholder" />
-
-        {/* Ambient floating orbs */}
         <div className="hero__orb hero__orb--1" />
         <div className="hero__orb hero__orb--2" />
         <div className="hero__orb hero__orb--3" />
-
         <div className="hero__overlay" />
 
         <div className="hero__content">
@@ -124,58 +92,43 @@ export default function HomePage({ onNavigate, onSelectRoom, rooms, favorites, o
             transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1], delay: 0.4 }}
           >
             <div className="hero__search-grid">
-              <div>
-                <label className="field-label">Destino / Sucursal</label>
-                <select
-                  className="field-select"
-                  value={sucursal}
-                  onChange={e => setSucursal(e.target.value)}
-                >
+              <Field label="Destino / Sucursal">
+                <Select value={sucursal} onChange={e => setSucursal(e.target.value)}>
                   <option value="">Todas las propiedades</option>
-                  {SUCURSALES.map(s => (
-                    <option key={s.key} value={s.key}>{s.name} — {s.subtitle}</option>
+                  {SUCURSALES.map(sc => (
+                    <option key={sc.key} value={sc.key}>{sc.name} — {sc.subtitle}</option>
                   ))}
-                </select>
+                </Select>
+              </Field>
+
+              <div className={s.dateGrid}>
+                <Field label="Llegada">
+                  <Input type="date" value={checkIn} onChange={e => setCheckIn(e.target.value)} />
+                </Field>
+                <Field label="Salida">
+                  <Input type="date" value={checkOut} onChange={e => setCheckOut(e.target.value)} />
+                </Field>
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                <div>
-                  <label className="field-label">Llegada</label>
-                  <input
-                    type="date"
-                    className="field-input"
-                    value={checkIn}
-                    onChange={e => setCheckIn(e.target.value)}
-                  />
-                </div>
-                <div>
-                  <label className="field-label">Salida</label>
-                  <input
-                    type="date"
-                    className="field-input"
-                    value={checkOut}
-                    onChange={e => setCheckOut(e.target.value)}
-                  />
-                </div>
-              </div>
-              <div>
-                <label className="field-label" style={{ opacity: 0 }}>_</label>
-                <button
-                  className="navbar__btn-primary"
+
+              <Field label=" ">
+                <Button
+                  variant="primary"
                   style={{ width: '100%', height: '42px', fontSize: '13px' }}
-                  onClick={handleSearch}
+                  onClick={() => onNavigate('search')}
                 >
-                  <span className="material-symbols-outlined" style={{ fontSize: '17px' }}>search</span>
+                  <Icon name="search" size={17} />
                   Buscar
-                </button>
-              </div>
+                </Button>
+              </Field>
             </div>
           </motion.div>
         </div>
 
-        <button className="hero__scroll-btn" onClick={() => {
-          document.getElementById('sucursales')?.scrollIntoView({ behavior: 'smooth' })
-        }}>
-          <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>south</span>
+        <button
+          className="hero__scroll-btn"
+          onClick={() => document.getElementById('sucursales')?.scrollIntoView({ behavior: 'smooth' })}
+        >
+          <Icon name="south" size={16} />
           Descubrir
         </button>
       </section>
@@ -184,38 +137,33 @@ export default function HomePage({ onNavigate, onSelectRoom, rooms, favorites, o
       <section className="section" id="sucursales">
         <div className="section__container">
           <ScrollReveal>
-            <div className="section__heading">
-              <h2 className="section__title">Nuestras Sucursales</h2>
-              <div className="section__accent" />
-              <p className="section__sub">
-                Dos destinos, una sola promesa: vivir Yucatán con todos los sentidos.
-              </p>
-            </div>
+            <SectionHeader
+              eyebrow="Nuestros destinos"
+              title="Nuestras Sucursales"
+              subtitle="Dos destinos, una sola promesa: vivir Yucatán con todos los sentidos."
+            />
           </ScrollReveal>
 
           <div className="sucursal-grid">
-            {SUCURSALES.map((s, i) => (
-              <ScrollReveal key={s.key} delay={i * 0.12}>
-                <div
-                  className="sucursal-card"
-                  onClick={() => onNavigate('search')}
-                >
+            {SUCURSALES.map((sc, i) => (
+              <ScrollReveal key={sc.key} delay={i * 0.12}>
+                <div className="sucursal-card" onClick={() => onNavigate('search')}>
                   <div
                     className="sucursal-card__img-placeholder"
                     style={{
-                      background: s.key === 'chelem'
+                      background: sc.key === 'chelem'
                         ? 'linear-gradient(145deg, #002a2e 0%, #003b41 30%, #006971 65%, #009aa5 100%)'
-                        : 'linear-gradient(145deg, #1a0a2e 0%, #4a1a7a 30%, #7e2fa0 65%, #c07ef0 100%)'
+                        : 'linear-gradient(145deg, #1a0a2e 0%, #4a1a7a 30%, #7e2fa0 65%, #c07ef0 100%)',
                     }}
                   />
                   <div className="sucursal-card__overlay" />
                   <div className="sucursal-card__body">
                     <div>
-                      <div className="sucursal-card__name">{s.name}</div>
-                      <div className="sucursal-card__sub">{s.subtitle}</div>
+                      <div className="sucursal-card__name">{sc.name}</div>
+                      <div className="sucursal-card__sub">{sc.subtitle}</div>
                     </div>
                     <div className="sucursal-card__arrow">
-                      <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>arrow_forward</span>
+                      <Icon name="arrow_forward" size={18} />
                     </div>
                   </div>
                 </div>
@@ -228,21 +176,23 @@ export default function HomePage({ onNavigate, onSelectRoom, rooms, favorites, o
       {/* ══════════ FEATURED ROOMS ══════════ */}
       <section className="section--alt" id="habitaciones">
         <div className="section__container">
-          <div className="section-header-row">
+          <div className={s.sectionHeaderRow}>
             <ScrollReveal>
-              <div className="section__heading" style={{ marginBottom: 0 }}>
-                <h2 className="section__title">Habitaciones Destacadas</h2>
-                <div className="section__accent" />
-                <p className="section__sub">Selección curada de nuestros espacios más especiales.</p>
-              </div>
+              <SectionHeader
+                eyebrow="Selección curada"
+                title="Habitaciones Destacadas"
+                subtitle="Nuestros espacios más especiales."
+                style={{ marginBottom: 0 }}
+              />
             </ScrollReveal>
+
             <ScrollReveal delay={0.1}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'flex-end' }}>
-                <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+              <div className={s.filterGroup}>
+                <div className={s.filterChips}>
                   {[
-                    { key: 'all', label: 'Todos' },
+                    { key: 'all',    label: 'Todos' },
                     { key: 'familia', label: 'Familia' },
-                    { key: 'deal', label: 'Ofertas' },
+                    { key: 'deal',   label: 'Ofertas' },
                   ].map(cat => (
                     <button
                       key={cat.key}
@@ -253,10 +203,13 @@ export default function HomePage({ onNavigate, onSelectRoom, rooms, favorites, o
                     </button>
                   ))}
                 </div>
-                <button className="view-all-btn" onClick={() => onNavigate('search')}>
-                  Ver todos
-                  <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>arrow_forward</span>
-                </button>
+                <Button
+                  variant="ghost"
+                  style={{ fontSize: '12px' }}
+                  onClick={() => onNavigate('search')}
+                >
+                  Ver todos <Icon name="arrow_forward" size={14} />
+                </Button>
               </div>
             </ScrollReveal>
           </div>
@@ -281,58 +234,35 @@ export default function HomePage({ onNavigate, onSelectRoom, rooms, favorites, o
       <section className="section">
         <div className="section__container">
           <ScrollReveal>
-            <div className="section__heading" style={{ textAlign: 'center', marginBottom: '48px' }}>
-              <h2 className="section__title">La experiencia Frida</h2>
-              <div className="section__accent" style={{ margin: '12px auto 10px' }} />
-              <p className="section__sub">Todo lo que necesitas para una estancia perfecta.</p>
-            </div>
+            <SectionHeader
+              eyebrow="Por qué elegirnos"
+              title="La experiencia Frida"
+              subtitle="Todo lo que necesitas para una estancia perfecta."
+              center
+              style={{ marginBottom: '48px' }}
+            />
           </ScrollReveal>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '28px' }}>
+
+          <div className={s.experienceGrid}>
             {EXPERIENCE_ITEMS.map((item, i) => (
-              <ScrollReveal key={i} delay={i * 0.12}>
+              <ScrollReveal key={i} delay={i * 0.12} style={{ height: '100%' }}>
                 <motion.div
                   whileHover={{ y: -6, boxShadow: '0 20px 48px rgba(0,59,65,0.14)' }}
                   transition={{ duration: 0.3 }}
-                  style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    textAlign: 'center',
-                    padding: '36px 28px 32px',
-                    borderRadius: '20px',
-                    background: 'var(--surface-lowest)',
-                    border: '1px solid var(--outline-var)',
-                    boxShadow: 'var(--shadow-sm)',
-                  }}
+                  style={{ height: '100%', borderRadius: '20px' }}
                 >
-                  <div style={{
-                    width: '64px',
-                    height: '64px',
-                    borderRadius: '18px',
-                    background: item.color,
-                    display: 'grid',
-                    placeItems: 'center',
-                    marginBottom: '20px',
-                    color: '#fff',
-                    fontSize: '26px',
-                    boxShadow: '0 8px 24px rgba(0,0,0,0.18)',
-                  }}>
-                    <span className="material-symbols-outlined">{item.icon}</span>
-                  </div>
-                  <h3 style={{
-                    fontFamily: 'var(--font-headline)',
-                    fontSize: '1.15rem',
-                    fontWeight: '700',
-                    color: 'var(--on-surface)',
-                    marginBottom: '10px',
-                    lineHeight: 1.2,
-                  }}>{item.title}</h3>
-                  <p style={{
-                    fontFamily: 'var(--font-body)',
-                    fontSize: '14px',
-                    color: 'var(--on-surface-var)',
-                    lineHeight: '1.7',
-                  }}>{item.desc}</p>
+                  <SurfaceCard style={{ borderRadius: '20px', height: '100%' }}>
+                    <div className={s.experienceCard}>
+                      <div
+                        className={s.experienceIcon}
+                        style={{ background: item.color }}
+                      >
+                        <span className="material-symbols-outlined">{item.icon}</span>
+                      </div>
+                      <h3 className={s.experienceTitle}>{item.title}</h3>
+                      <p className={s.experienceDesc}>{item.desc}</p>
+                    </div>
+                  </SurfaceCard>
                 </motion.div>
               </ScrollReveal>
             ))}

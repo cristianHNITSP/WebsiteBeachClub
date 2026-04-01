@@ -1,0 +1,34 @@
+/* ── Profile hero row ── */
+.profileRow {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  margin-bottom: 32px;
+  flex-wrap: wrap;
+}
+
+.avatar {
+  width: 96px;
+  height: 96px;
+  border-radius: var(--radius-full);
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+/* ── Info cards grid ── */
+.infoGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+
+/* ── Responsive ── */
+@media (max-width: 768px) {
+  .infoGrid { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 480px) {
+  .profileRow { gap: 16px; }
+  .avatar     { width: 72px; height: 72px; }
+  .infoGrid   { grid-template-columns: 1fr; }
+}

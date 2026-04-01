@@ -2,6 +2,7 @@ import Button from '@/components/frida/Button'
 import { SurfaceCard } from '@/components/frida/Card'
 import Badge from '@/components/frida/Badge'
 import Icon from '@/components/frida/Icon'
+import s from './AdminAccountPage.module.css'
 
 const INFO_ITEMS = [
   { icon: 'badge',       label: 'Rol',       value: 'Gerente General' },
@@ -17,11 +18,11 @@ export default function AdminAccountPage({ onBack }) {
       </Button>
 
       {/* Perfil */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '24px', marginBottom: '32px' }}>
+      <div className={s.profileRow}>
         <img
           src="https://placehold.co/96x96/003b41/ffffff?text=A"
           alt="Avatar"
-          style={{ width: '96px', height: '96px', borderRadius: 'var(--radius-full)', objectFit: 'cover' }}
+          className={s.avatar}
         />
         <div>
           <Badge variant="outline" style={{ marginBottom: '8px' }}>Mi Cuenta</Badge>
@@ -38,7 +39,7 @@ export default function AdminAccountPage({ onBack }) {
       </div>
 
       {/* Info cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
+      <div className={s.infoGrid}>
         {INFO_ITEMS.map((item, i) => (
           <SurfaceCard key={i} style={{ padding: '20px' }}>
             <Icon name={item.icon} size={24} style={{ color: 'var(--primary)', display: 'block', marginBottom: '8px' }} />

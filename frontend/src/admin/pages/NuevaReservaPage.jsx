@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import SectionPanel from '../components/SectionPanel'
 import { Field, Input, Select, Textarea } from '@/components/frida/Field'
 import { useToast } from '@/components/frida/Toast'
+import s from './FormLayout.module.css'
 
 const EMPTY = {
   huespedNombre: '',
@@ -101,7 +102,7 @@ export default function NuevaReservaPage({ onBack, onDirtyChange }) {
       actions={actions}
     >
       <form id="nueva-reserva-form" onSubmit={handleSubmit}>
-        <div style={{ display: 'grid', gridTemplateColumns: '7fr 5fr', gap: '32px', alignItems: 'start' }}>
+        <div className={s.formGrid}>
 
           {/* ── Left column ── */}
           <div>
@@ -174,7 +175,7 @@ export default function NuevaReservaPage({ onBack, onDirtyChange }) {
           </div>
 
           {/* ── Right column ── */}
-          <div style={{ position: 'sticky', top: '80px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <div className={s.sidePanel}>
             {/* Payment */}
             <div style={{
               background: 'var(--surface-container-low)',

@@ -1,244 +1,203 @@
 import { useState } from 'react'
+import { Button, Icon, SurfaceCard } from '@/components/frida'
+import { Field, Input, Select } from '@/components/frida'
+import s from './DetailPage.module.css'
+
+const AMENITY_META = {
+  wifi:    { icon: 'wifi',           label: 'WiFi incluido' },
+  ac:      { icon: 'ac_unit',        label: 'Aire acond.' },
+  parking: { icon: 'local_parking',  label: 'Estacionamiento' },
+}
+
+const POLICIES = [
+  { icon: 'login',      label: 'Check-in',  value: '3:00 PM' },
+  { icon: 'logout',     label: 'Check-out', value: '12:00 PM' },
+  { icon: 'pets',       label: 'Mascotas',  value: 'No permitidas' },
+  { icon: 'smoke_free', label: 'Fumar',     value: 'No fumador' },
+]
 
 function StarRating({ rating }) {
+  const full = Math.round(rating)
   return (
     <span style={{ color: 'var(--gold)', fontSize: '16px', letterSpacing: '2px' }}>
-      {'★'.repeat(Math.round(rating))}{'☆'.repeat(5 - Math.round(rating))}
+      {'★'.repeat(full)}{'☆'.repeat(5 - full)}
     </span>
   )
 }
 
 export default function DetailPage({ room, onGoBack, onConfirm }) {
-  const [checkIn, setCheckIn] = useState('')
+  const [checkIn,  setCheckIn]  = useState('')
   const [checkOut, setCheckOut] = useState('')
-  const [guests, setGuests] = useState(2)
+  const [guests,   setGuests]   = useState(2)
 
   if (!room) {
     return (
-      <div className="detail-page-wrapper">
-        <div className="detail-page-inner">
-          <button className="back-btn" onClick={onGoBack}>
-            <span className="material-symbols-outlined">arrow_back</span>
-            Volver
-          </button>
+      <div className={s.wrapper}>
+        <div className={s.inner}>
+          <div className={s.backRow}>
+            <Button variant="ghost" onClick={onGoBack}>
+              <Icon name="arrow_back" size={16} /> Volver
+            </Button>
+          </div>
           <p>Habitación no encontrada.</p>
         </div>
       </div>
     )
   }
 
-  const locationLabel = room.location === 'chelem' ? 'Cabañas Frida — Chelem, Yucatán' : 'Casa Frida — Chuburná, Yucatán'
+  const locationLabel = room.location === 'chelem'
+    ? 'Cabañas Frida — Chelem, Yucatán'
+    : 'Casa Frida — Chuburná, Yucatán'
 
-  const nights = checkIn && checkOut
+  const nights   = checkIn && checkOut
     ? Math.max(1, Math.round((new Date(checkOut) - new Date(checkIn)) / 86400000))
     : 0
-
   const subtotal = nights * room.price
-  const taxes = subtotal * 0.16
-  const total = subtotal + taxes
-
+  const taxes    = subtotal * 0.16
+  const total    = subtotal + taxes
   const canConfirm = checkIn && checkOut && nights > 0
 
-  const amenityIcons = {
-    wifi: { icon: 'wifi', label: 'WiFi incluido' },
-    ac: { icon: 'ac_unit', label: 'Aire acond.' },
-    parking: { icon: 'local_parking', label: 'Estacionamiento' },
-  }
-
   return (
-    <div className="detail-page-wrapper">
-      <div className="detail-page-inner">
-        <div style={{ paddingTop: '100px' }}>
-          <button className="back-btn" onClick={onGoBack}>
-            <span className="material-symbols-outlined">arrow_back</span>
-            Volver a resultados
-          </button>
+    <div className={s.wrapper}>
+      <div className={s.inner}>
+        <div className={s.backRow}>
+          <Button variant="ghost" onClick={onGoBack}>
+            <Icon name="arrow_back" size={16} /> Volver a resultados
+          </Button>
         </div>
 
-        <div className="detail-layout">
-          {/* LEFT COLUMN */}
+        <div className={s.layout}>
+          {/* ── LEFT COLUMN ── */}
           <div>
             {/* Hero image */}
-            <div className="detail-hero">
+            <div className={s.hero}>
               <img src={room.img} alt={room.title} />
-              <div className="detail-hero__overlay" />
-              <div className="detail-hero__price">
-                <div style={{ textAlign: 'right' }}>
-                  {room.hasDiscount && (
-                    <div style={{
-                      fontFamily: 'var(--font-body)',
-                      fontSize: '11px',
-                      color: 'rgba(255,255,255,0.6)',
-                      textDecoration: 'line-through',
-                      textAlign: 'right',
-                    }}>
-                      MXN ${room.basePrice.toLocaleString()}
-                    </div>
-                  )}
-                  <div className="detail-hero__price-amount">
-                    MXN ${room.price.toLocaleString()}
+              <div className={s.heroOverlay} />
+              <div className={s.heroPrice}>
+                {room.hasDiscount && (
+                  <div className={s.heroPriceOriginal}>
+                    MXN ${room.basePrice.toLocaleString()}
                   </div>
-                  <div className="detail-hero__price-label">por noche</div>
-                </div>
+                )}
+                <div className={s.heroPriceAmount}>MXN ${room.price.toLocaleString()}</div>
+                <div className={s.heroPriceLabel}>por noche</div>
               </div>
             </div>
 
-            {/* Room info */}
-            <div className="detail-card">
-              <div className="detail-card__label">
-                <span className="material-symbols-outlined" style={{ fontSize: '12px', marginRight: '4px' }}>location_on</span>
+            {/* Room info card */}
+            <SurfaceCard className={s.infoCard}>
+              <div className={s.cardLabel}>
+                <Icon name="location_on" size={12} />
                 {locationLabel}
               </div>
-              <h1 className="detail-card__title">{room.title}</h1>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px' }}>
-                <StarRating rating={room.rating} />
-                <span style={{ fontFamily: 'var(--font-body)', fontWeight: '700', fontSize: '14px', color: 'var(--on-surface)' }}>
-                  {room.rating.toFixed(1)}
-                </span>
-                <span style={{ fontFamily: 'var(--font-body)', fontSize: '12px', color: 'var(--outline)' }}>
-                  ({room.reviews} reseñas)
-                </span>
-                <span style={{
-                  padding: '2px 10px',
-                  borderRadius: 'var(--radius-full)',
-                  background: 'var(--surface-container)',
-                  fontSize: '11px',
-                  fontWeight: '700',
-                  color: 'var(--on-surface-variant)',
-                  marginLeft: '4px',
-                }}>
-                  {room.size}
-                </span>
-              </div>
-              <p className="detail-card__desc">{room.desc}</p>
+              <h1 className={s.cardTitle}>{room.title}</h1>
 
-              <ul className="detail-amenities" style={{ listStyle: 'none', margin: 0, padding: 0 }}>
-                {room.amenities.map(a => amenityIcons[a] && (
-                  <li key={a} className="detail-amenity">
-                    <span className="material-symbols-outlined" style={{ fontSize: '14px', color: 'var(--surface-tint)' }}>
-                      {amenityIcons[a].icon}
-                    </span>
-                    {amenityIcons[a].label}
+              <div className={s.ratingRow}>
+                <StarRating rating={room.rating} />
+                <span className={s.ratingNum}>{room.rating.toFixed(1)}</span>
+                <span className={s.ratingCount}>({room.reviews} reseñas)</span>
+                {room.size && <span className={s.sizeBadge}>{room.size}</span>}
+              </div>
+
+              <p className={s.desc}>{room.desc}</p>
+
+              <ul className={s.amenities}>
+                {room.amenities.map(a => AMENITY_META[a] && (
+                  <li key={a} className={s.amenityItem}>
+                    <Icon name={AMENITY_META[a].icon} size={14} />
+                    {AMENITY_META[a].label}
                   </li>
                 ))}
-                <li className="detail-amenity">
-                  <span className="material-symbols-outlined" style={{ fontSize: '14px', color: 'var(--surface-tint)' }}>hotel</span>
+                <li className={s.amenityItem}>
+                  <Icon name="hotel" size={14} />
                   {room.roomType}
                 </li>
               </ul>
-            </div>
+            </SurfaceCard>
 
-            {/* Extra details */}
-            <div className="detail-card">
-              <div className="detail-card__label">Políticas & Condiciones</div>
-              <dl style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginTop: '12px', margin: '12px 0 0' }}>
-                {[
-                  { icon: 'login', label: 'Check-in', value: '3:00 PM' },
-                  { icon: 'logout', label: 'Check-out', value: '12:00 PM' },
-                  { icon: 'pets', label: 'Mascotas', value: 'No permitidas' },
-                  { icon: 'smoke_free', label: 'Fumar', value: 'No fumador' },
-                ].map((item, i) => (
-                  <div key={i} style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
-                    <span className="material-symbols-outlined" style={{ fontSize: '18px', color: 'var(--surface-tint)', marginTop: '2px' }}>
-                      {item.icon}
-                    </span>
+            {/* Policies card */}
+            <SurfaceCard className={s.infoCard}>
+              <div className={s.cardLabel}>Políticas &amp; Condiciones</div>
+              <dl className={s.policiesGrid}>
+                {POLICIES.map(item => (
+                  <div key={item.label} className={s.policyItem}>
+                    <Icon name={item.icon} size={18} style={{ color: 'var(--primary)', marginTop: '2px' }} />
                     <div>
-                      <dt style={{ fontFamily: 'var(--font-body)', fontSize: '10px', fontWeight: '700', color: 'var(--outline)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-                        {item.label}
-                      </dt>
-                      <dd style={{ fontFamily: 'var(--font-body)', fontSize: '13px', fontWeight: '600', color: 'var(--on-surface)', marginTop: '2px', marginLeft: 0 }}>
-                        {item.value}
-                      </dd>
+                      <dt className={s.policyLabel}>{item.label}</dt>
+                      <dd className={s.policyValue}>{item.value}</dd>
                     </div>
                   </div>
                 ))}
               </dl>
-            </div>
+            </SurfaceCard>
           </div>
 
-          {/* SUMMARY SIDEBAR */}
+          {/* ── BOOKING SIDEBAR ── */}
           <aside>
-            <form className="summary-card" onSubmit={e => e.preventDefault()}>
-              <div className="summary-card__title">Resumen de reserva</div>
+            <SurfaceCard className={s.summaryCard}>
+              <div className={s.summaryTitle}>Resumen de reserva</div>
 
-              <div style={{ marginBottom: '16px' }}>
-                <label className="field-label">Llegada</label>
-                <input
-                  type="date"
-                  className="field-input"
-                  value={checkIn}
-                  onChange={e => setCheckIn(e.target.value)}
-                />
-              </div>
-              <div style={{ marginBottom: '16px' }}>
-                <label className="field-label">Salida</label>
-                <input
-                  type="date"
-                  className="field-input"
-                  value={checkOut}
-                  onChange={e => setCheckOut(e.target.value)}
-                />
-              </div>
-              <div style={{ marginBottom: '16px' }}>
-                <label className="field-label">Huéspedes</label>
-                <select
-                  className="field-select"
-                  value={guests}
-                  onChange={e => setGuests(Number(e.target.value))}
-                >
-                  {[1,2,3,4,5,6].map(n => (
-                    <option key={n} value={n}>{n} {n === 1 ? 'huésped' : 'huéspedes'}</option>
-                  ))}
-                </select>
-              </div>
-
-              {nights > 0 && (
-                <>
-                  <div className="summary-row">
-                    <span className="summary-label">MXN ${room.price.toLocaleString()} × {nights} noche{nights !== 1 ? 's' : ''}</span>
-                    <span className="summary-value">MXN ${subtotal.toLocaleString()}</span>
-                  </div>
-                  <div className="summary-row">
-                    <span className="summary-label">Impuestos (16%)</span>
-                    <span className="summary-value">MXN ${Math.round(taxes).toLocaleString()}</span>
-                  </div>
-                  <div className="summary-total">
-                    <span className="summary-total-label">Total</span>
-                    <span className="summary-total-amount">MXN ${Math.round(total).toLocaleString()}</span>
-                  </div>
-                </>
-              )}
-
-              {!canConfirm && (
-                <div style={{
-                  marginTop: '14px',
-                  padding: '10px 14px',
-                  borderRadius: 'var(--radius-md)',
-                  background: 'var(--surface-container)',
-                  fontFamily: 'var(--font-body)',
-                  fontSize: '12px',
-                  color: 'var(--on-surface-variant)',
-                  textAlign: 'center',
-                }}>
-                  Selecciona fechas para ver el precio total
+              <form onSubmit={e => e.preventDefault()}>
+                <div className={s.fieldGap}>
+                  <Field label="Llegada">
+                    <Input type="date" value={checkIn} onChange={e => setCheckIn(e.target.value)} />
+                  </Field>
                 </div>
-              )}
+                <div className={s.fieldGap}>
+                  <Field label="Salida">
+                    <Input type="date" value={checkOut} onChange={e => setCheckOut(e.target.value)} />
+                  </Field>
+                </div>
+                <div className={s.fieldGap}>
+                  <Field label="Huéspedes">
+                    <Select value={guests} onChange={e => setGuests(Number(e.target.value))}>
+                      {[1,2,3,4,5,6].map(n => (
+                        <option key={n} value={n}>{n} {n === 1 ? 'huésped' : 'huéspedes'}</option>
+                      ))}
+                    </Select>
+                  </Field>
+                </div>
 
-              <button
-                className="summary-confirm"
-                disabled={!canConfirm}
-                onClick={() => canConfirm && onConfirm && onConfirm({ room, checkIn, checkOut, guests, total: Math.round(total) })}
-              >
-                {canConfirm ? 'Confirmar reserva' : 'Selecciona tus fechas'}
-              </button>
+                {nights > 0 && (
+                  <>
+                    <div className={s.summaryRow}>
+                      <span className={s.summaryLabel}>
+                        MXN ${room.price.toLocaleString()} × {nights} noche{nights !== 1 ? 's' : ''}
+                      </span>
+                      <span className={s.summaryValue}>MXN ${subtotal.toLocaleString()}</span>
+                    </div>
+                    <div className={s.summaryRow}>
+                      <span className={s.summaryLabel}>Impuestos (16%)</span>
+                      <span className={s.summaryValue}>MXN ${Math.round(taxes).toLocaleString()}</span>
+                    </div>
+                    <div className={s.summaryTotal}>
+                      <span className={s.summaryTotalLabel}>Total</span>
+                      <span className={s.summaryTotalAmount}>MXN ${Math.round(total).toLocaleString()}</span>
+                    </div>
+                  </>
+                )}
 
-              <div style={{ marginTop: '14px', textAlign: 'center' }}>
-                <span style={{ fontFamily: 'var(--font-body)', fontSize: '11px', color: 'var(--outline)' }}>
-                  <span className="material-symbols-outlined" style={{ fontSize: '12px', marginRight: '4px' }}>lock</span>
+                {!canConfirm && (
+                  <div className={s.datePlaceholder}>
+                    Selecciona fechas para ver el precio total
+                  </div>
+                )}
+
+                <Button
+                  variant={canConfirm ? 'primary' : 'ghost'}
+                  disabled={!canConfirm}
+                  style={{ width: '100%', height: '48px', marginTop: '18px', fontSize: '14px', justifyContent: 'center' }}
+                  onClick={() => canConfirm && onConfirm?.({ room, checkIn, checkOut, guests, total: Math.round(total) })}
+                >
+                  {canConfirm ? 'Confirmar reserva' : 'Selecciona tus fechas'}
+                </Button>
+
+                <div className={s.secureNote}>
+                  <Icon name="lock" size={12} />
                   Pago seguro · Cancelación gratuita
-                </span>
-              </div>
-            </form>
+                </div>
+              </form>
+            </SurfaceCard>
           </aside>
         </div>
       </div>

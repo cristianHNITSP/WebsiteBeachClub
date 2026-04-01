@@ -1,0 +1,88 @@
+/* ===== HOME PAGE ===== */
+
+/* Hero search — inner date grid */
+.dateGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+/* Section header + filter row */
+.sectionHeaderRow {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.filterGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-end;
+}
+
+.filterChips {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+/* Experience section */
+.experienceGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 28px;
+}
+
+.experienceCard {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 36px 28px 32px;
+  height: 100%;
+}
+
+.experienceIcon {
+  width: 64px;
+  height: 64px;
+  border-radius: 18px;
+  display: grid;
+  place-items: center;
+  margin-bottom: 20px;
+  color: #fff;
+  font-size: 26px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.18);
+  flex-shrink: 0;
+}
+
+.experienceTitle {
+  font-family: var(--font-headline);
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--on-surface);
+  margin-bottom: 10px;
+  line-height: 1.2;
+}
+
+.experienceDesc {
+  font-size: 14px;
+  color: var(--on-surface-var);
+  line-height: 1.7;
+  margin: 0;
+}
+
+/* ── Responsive ── */
+@media (max-width: 900px) {
+  .experienceGrid { grid-template-columns: 1fr 1fr; }
+}
+
+@media (max-width: 768px) {
+  .sectionHeaderRow { flex-direction: column; }
+  .filterGroup { align-items: flex-start; }
+  .filterChips { justify-content: flex-start; }
+  .experienceGrid { grid-template-columns: 1fr; }
+}

@@ -1,0 +1,243 @@
+/* ── Cell width token — override at breakpoints ── */
+.wrapper {
+  --cell-w: 96px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  border-radius: var(--radius-2xl, 2rem);
+  /* Ensures the scrollbar doesn't visually break the layout */
+  margin-bottom: 8px;
+}
+
+/* ── Grid container ── */
+.grid {
+  background: var(--surface-container-low);
+  border-radius: var(--radius-2xl, 2rem);
+  overflow: hidden;
+  /* Enough room for 7 cells + sticky room col */
+  min-width: calc(var(--cell-w) * 7 + 200px);
+}
+
+/* ════════════════════ HEADER ════════════════════ */
+.header {
+  height: 64px;
+  display: flex;
+  background: var(--surface-container);
+}
+
+.roomCol {
+  width: 200px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  padding: 0 24px;
+  font-family: var(--font-body);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: #94a3b8;
+  border-right: 1px solid var(--surface-container-high);
+  /* Sticky so room names stay visible while scrolling */
+  position: sticky;
+  left: 0;
+  z-index: 3;
+  background: var(--surface-container);
+}
+
+.daysRow {
+  display: flex;
+  flex: 1;
+}
+
+.dayCell {
+  width: var(--cell-w);
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  border-right: 1px solid var(--surface-container-high);
+}
+
+.dayCellToday { background: var(--surface-container-high); }
+
+.dayName {
+  font-size: 10px;
+  font-weight: 700;
+  color: #94a3b8;
+  text-transform: uppercase;
+}
+
+.dayNum {
+  font-family: var(--font-headline);
+  font-size: 1.125rem;
+  color: var(--primary);
+}
+
+/* ════════════════════ ROOM ROWS ════════════════════ */
+.row {
+  display: flex;
+  border-top: 1px solid var(--surface-container-high);
+}
+
+.roomInfo {
+  width: 200px;
+  flex-shrink: 0;
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  border-right: 1px solid var(--surface-container-high);
+  /* Sticky column */
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  background: var(--surface-container-low);
+  box-shadow: 4px 0 8px rgba(0, 0, 0, 0.04);
+}
+
+.roomName {
+  font-family: var(--font-headline);
+  font-size: 1.125rem;
+  color: var(--primary);
+}
+
+.roomType {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #94a3b8;
+  margin-top: 2px;
+}
+
+/* ════════════════════ CELL GRID ════════════════════ */
+.rowCells {
+  display: flex;
+  flex: 1;
+  position: relative;
+  min-height: 72px;
+}
+
+.cell {
+  width: var(--cell-w);
+  flex-shrink: 0;
+  border-right: 1px solid rgba(0, 0, 0, 0.04);
+}
+
+/* ════════════════════ BOOKING BARS ════════════════════ */
+.booking {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  height: 44px;
+  border-radius: var(--radius-full);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  cursor: pointer;
+  transition: transform 0.15s;
+  overflow: hidden;
+}
+
+.booking:hover { transform: translateY(-50%) scale(1.02); }
+
+.bookingGlass {
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  color: var(--on-surface);
+}
+
+.bookingPrimary   { background: var(--primary);   color: #fff; }
+.bookingSecondary { background: var(--secondary);  color: #fff; }
+.bookingBlocked   { background: rgba(0, 0, 0, 0.04); border: 1.5px dashed #cbd5e1; }
+
+.bookingAvatar {
+  height: 100%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  overflow: hidden;
+}
+
+.bookingName   { font-size: 12px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bookingSub    { font-size: 9px; opacity: 0.7; letter-spacing: 0.05em; text-transform: uppercase; }
+.bookingStatus {
+  font-size: 10px;
+  font-weight: 700;
+  background: #dcfce7;
+  color: #16a34a;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+/* ════════════════════ RESPONSIVE ════════════════════ */
+@media (max-width: 768px) {
+  .wrapper  { --cell-w: 80px; }
+  .roomCol,
+  .roomInfo { width: 160px; padding: 16px 14px; }
+  .roomName { font-size: 0.9rem; }
+  .bookingName { font-size: 11px; }
+}
+
+@media (max-width: 480px) {
+  .wrapper  { --cell-w: 64px; }
+  .roomCol,
+  .roomInfo { width: 120px; padding: 12px 10px; }
+  .roomName { font-size: 0.8rem; }
+  .roomType { display: none; }
+  .header   { height: 52px; }
+  .dayNum   { font-size: 0.95rem; }
+  .booking  { height: 36px; padding: 0 8px; gap: 6px; }
+  .bookingAvatar { display: none; }
+}
+
+@media (max-width: 390px) {
+  .wrapper  { --cell-w: 54px; }
+  .roomCol,
+  .roomInfo { width: 96px; padding: 10px 8px; }
+  .roomName { font-size: 0.75rem; }
+  .header   { height: 48px; }
+  .dayName  { font-size: 9px; }
+  .dayNum   { font-size: 0.85rem; }
+  .booking  { height: 30px; padding: 0 6px; gap: 4px; }
+  .bookingName { font-size: 10px; }
+  .bookingSub  { display: none; }
+}
+
+/* ════════════════════ DARK MODE ════════════════════ */
+:global(.dark) .grid    { background: var(--surface-container-low); }
+:global(.dark) .header  { background: rgba(255, 255, 255, 0.04); }
+
+:global(.dark) .roomCol,
+:global(.dark) .roomInfo {
+  background: #1a1f2e;
+  box-shadow: 4px 0 12px rgba(0, 0, 0, 0.3);
+}
+
+:global(.dark) .roomCol  { color: #64748b; }
+:global(.dark) .roomType,
+:global(.dark) .dayName  { color: #64748b; }
+
+:global(.dark) .dayCell  { border-right-color: rgba(255, 255, 255, 0.06); }
+:global(.dark) .row      { border-top-color: rgba(255, 255, 255, 0.06); }
+:global(.dark) .cell     { border-right-color: rgba(255, 255, 255, 0.05); }
+
+:global(.dark) .bookingGlass {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.12);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+}
+
+:global(.dark) .bookingBlocked {
+  background: rgba(255, 255, 255, 0.03);
+  border-color: #334155;
+}
+
+:global(.dark) .bookingStatus { background: rgba(22, 163, 74, 0.2); color: #4ade80; }

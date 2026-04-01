@@ -14,11 +14,11 @@
   flex-direction: column;
   align-items: flex-end;
   gap: 12px;
-  flex-shrink: 0;
+  min-width: 0; /* allow shrinking on intermediate viewports */
 }
 .admin-page-header-actions-row {
   display: flex;
-  gap: 10px;
+  gap: 8px;
   flex-wrap: wrap;
   justify-content: flex-end;
 }
@@ -270,72 +270,6 @@
 .badge--secondary { background: rgba(126,70,154,0.1); color: var(--secondary); }
 .badge--tertiary  { background: rgba(115,92,0,0.1);   color: var(--tertiary); }
 
-/* ===== CALENDAR ===== */
-.calendar-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-
-.calendar-grid { background: var(--surface-container-low); border-radius: 2rem; overflow: hidden; }
-
-.calendar-header { height: 64px; display: flex; background: var(--surface-container); }
-
-.calendar-room-col {
-  width: 288px; flex-shrink: 0; background: #fff; padding: 0 32px;
-  display: flex; align-items: center;
-  font-size: 10px; font-weight: 700; letter-spacing: 0.2em; text-transform: uppercase;
-  color: #94a3b8; box-shadow: 4px 0 12px rgba(0,0,0,0.06);
-}
-
-.calendar-days { display: flex; flex: 1; overflow-x: auto; }
-
-.calendar-day-cell {
-  width: 96px; flex-shrink: 0;
-  display: flex; flex-direction: column; align-items: center; justify-content: center;
-  border-right: 1px solid rgba(255,255,255,0.4);
-}
-.calendar-day-cell--today { background: var(--surface-container-high); }
-
-.calendar-day-name { font-size: 10px; font-weight: 700; color: #94a3b8; text-transform: uppercase; }
-.calendar-day-num  { font-family: var(--font-headline); font-size: 1.125rem; color: var(--primary); }
-
-.calendar-row {
-  height: 96px; display: flex; position: relative;
-  border-top: 1px solid rgba(255,255,255,0.4);
-}
-
-.calendar-room-info {
-  width: 288px; flex-shrink: 0; background: #fff; padding: 0 32px;
-  display: flex; flex-direction: column; justify-content: center;
-  box-shadow: 4px 0 12px rgba(0,0,0,0.06);
-}
-.calendar-room-name { font-family: var(--font-headline); font-size: 1.125rem; color: var(--primary); }
-.calendar-room-type { font-size: 10px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: #94a3b8; margin-top: 2px; }
-
-.calendar-row-cells { display: flex; flex: 1; position: relative; overflow: hidden; }
-
-.calendar-cell { width: 96px; flex-shrink: 0; border-right: 1px solid rgba(255,255,255,0.2); }
-
-.calendar-booking {
-  position: absolute; top: 50%; transform: translateY(-50%);
-  height: 56px; border-radius: var(--radius-full);
-  padding: 6px 12px; display: flex; align-items: center; gap: 12px;
-  cursor: pointer; transition: transform 0.2s; z-index: 10;
-}
-.calendar-booking:hover { transform: translateY(-50%) scale(1.02); }
-
-.calendar-booking--glass {
-  background: rgba(255,255,255,0.7);
-  backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255,255,255,0.5);
-  box-shadow: 0 4px 16px rgba(0,0,0,0.08);
-}
-.calendar-booking--primary  { background: var(--primary);   color: #fff; }
-.calendar-booking--secondary{ background: var(--secondary); color: #fff; }
-.calendar-booking--blocked  { background: rgba(0,0,0,0.04); border: 1.5px dashed #cbd5e1; }
-
-.calendar-booking__avatar  { height: 100%; aspect-ratio: 1; border-radius: 50%; overflow: hidden; }
-.calendar-booking__name    { font-size: 12px; font-weight: 700; }
-.calendar-booking__sub     { font-size: 9px; opacity: 0.7; letter-spacing: 0.05em; text-transform: uppercase; }
-.calendar-booking__status  { font-size: 10px; font-weight: 700; background: #dcfce7; color: #16a34a; padding: 2px 8px; border-radius: var(--radius-full); }
-
 /* ===== SHOP ===== */
 .shop-grid { display: grid; grid-template-columns: 8fr 4fr; gap: 32px; }
 
@@ -548,7 +482,8 @@
 
 @media (max-width: 768px) {
   .admin-page-header     { gap: 8px; }
-  .admin-page-header-actions { align-items: flex-start; }
+  /* When header wraps, actions take full width so buttons can wrap within it */
+  .admin-page-header-actions     { align-items: flex-start; width: 100%; }
   .admin-page-header-actions-row { justify-content: flex-start; }
   .metrics-grid          { grid-template-columns: 1fr; }
   .role-grid             { grid-template-columns: 1fr; }
@@ -559,15 +494,44 @@
   .inventory-grid        { grid-template-columns: repeat(2, 1fr); }
   .inventory-section     { margin-left: -16px; margin-right: -16px; padding: 24px 16px; }
   .admin-account-hero    { flex-direction: column; align-items: flex-start; gap: 16px; }
-  .room-config-hero      { height: 280px; }
-  .dashboard-charts-row  { grid-template-columns: 1fr; gap: 16px; }
-  .room-detail-cards     { grid-template-columns: 1fr; }
+  .room-config-hero        { height: 280px; }
+  .room-config-hero__info  { bottom: 16px; left: 16px; right: 16px; padding: 16px; }
+  .room-config-hero__badge { top: 16px; right: 16px; }
+  .room-config-hero__title { font-size: 1.35rem; }
+  .dashboard-charts-row    { grid-template-columns: 1fr; gap: 16px; }
+  .room-detail-cards       { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 480px) {
-  .inventory-grid        { grid-template-columns: 1fr; }
-  .room-detail-cards     { grid-template-columns: 1fr; }
-  .metrics-grid          { grid-template-columns: 1fr; }
+  .room-config-hero        { height: 220px; }
+  .room-config-hero__info  { bottom: 12px; left: 12px; right: 12px; padding: 12px; }
+  .room-config-hero__title { font-size: 1.1rem; }
+  .inventory-grid          { grid-template-columns: 1fr; }
+  .room-detail-cards       { grid-template-columns: 1fr; }
+  .metrics-grid            { grid-template-columns: 1fr; }
+  .metric-card             { padding: 18px; min-height: 150px; }
+  .metric-card__value      { font-size: 2.2rem; }
+  .featured-suite          { padding: 28px; min-height: 300px; }
+  .chart-area              { padding: 18px; }
+  .chart-header            { flex-wrap: wrap; gap: 8px; align-items: flex-start; }
+}
+
+/* ═══════════════════════════════════════
+   Very small phones — 360 × 760 / 375 × 667
+   ═══════════════════════════════════════ */
+@media (max-width: 390px) {
+  .admin-page-header       { margin-bottom: 16px; gap: 6px; }
+  .admin-date              { font-size: 12px; }
+  .metric-card             { padding: 14px; min-height: 130px; }
+  .metric-card__value      { font-size: 1.9rem; }
+  .featured-suite          { padding: 18px; min-height: 260px; }
+  .chart-area              { padding: 14px; }
+  .chart-month             { font-size: 8px; letter-spacing: 0.08em; }
+  .inventory-section       { margin-left: -12px; margin-right: -12px; padding: 20px 12px; }
+  .role-card               { padding: 16px; }
+  .role-card__title        { font-size: 1.2rem; }
+  .user-item               { padding: 10px 12px; }
+  .user-item__right        { gap: 10px; }
 }
 
 /* ═══════════════════════════════════════
@@ -590,23 +554,6 @@
   box-shadow: none;
 }
 
-.dark .calendar-grid    { background: var(--surface-container-low); }
-.dark .calendar-header  { background: rgba(255,255,255,0.04); }
-.dark .calendar-room-col,
-.dark .calendar-room-info { background: #1a1f2e; box-shadow: 4px 0 12px rgba(0,0,0,0.3); }
-.dark .calendar-room-col  { color: #64748b; }
-.dark .calendar-room-type,
-.dark .calendar-day-name  { color: #64748b; }
-.dark .calendar-day-cell  { border-right-color: rgba(255,255,255,0.06); }
-.dark .calendar-row       { border-top-color: rgba(255,255,255,0.06); }
-.dark .calendar-cell      { border-right-color: rgba(255,255,255,0.05); }
-.dark .calendar-booking--glass {
-  background: rgba(255,255,255,0.08);
-  border-color: rgba(255,255,255,0.12);
-  box-shadow: 0 4px 16px rgba(0,0,0,0.3);
-}
-.dark .calendar-booking--blocked { background: rgba(255,255,255,0.03); border-color: #334155; }
-.dark .calendar-booking__status  { background: rgba(22,163,74,0.2); color: #4ade80; }
 
 .dark .shop-hero__info { background: rgba(15,17,23,0.82); color: #e2e8f0; }
 

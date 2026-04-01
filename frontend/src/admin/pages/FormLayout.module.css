@@ -1,0 +1,50 @@
+/* ════════════════════════════════════════════
+   FormLayout — shared by NuevaReservaPage
+   and NuevaHabitacionPage (and any future
+   2-col form + sidebar layout)
+   ════════════════════════════════════════════ */
+
+/* ── Main 2-column grid ── */
+.formGrid {
+  display: grid;
+  grid-template-columns: 7fr 5fr;
+  gap: 32px;
+  align-items: start;
+}
+
+/* ── Right sidebar: sticky on desktop, flows normally on mobile ── */
+.sidePanel {
+  position: sticky;
+  top: 88px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* ════════════ RESPONSIVE ════════════ */
+
+/* Tablet: reduce gap but keep 2-col */
+@media (max-width: 1024px) {
+  .formGrid { gap: 24px; }
+}
+
+/* Mobile: stack form above sidebar */
+@media (max-width: 768px) {
+  .formGrid  { grid-template-columns: 1fr; gap: 20px; }
+  .sidePanel { position: static; }
+}
+
+/* ── 3-column inline grid (Capacidad / Cama / Tamaño) ── */
+.threeCol {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 12px;
+}
+
+@media (max-width: 480px) {
+  .threeCol { grid-template-columns: 1fr 1fr; }
+}
+
+@media (max-width: 390px) {
+  .threeCol { grid-template-columns: 1fr; }
+}

@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react'
 import { CALENDAR_DATA } from '../../data/admin'
 import StatCard from '@/components/frida/StatCard'
-
-const DAYS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom']
+import WeeklyCalendar from '../components/WeeklyCalendar'
 
 function getWeekDates() {
   const today = new Date()
@@ -108,81 +107,11 @@ export default function CalendarPage({ onNavigate }) {
       </div>
 
       {/* Calendar grid */}
-      <div className="calendar-grid" style={{ overflowX: 'auto' }}>
-        {/* Header */}
-        <div className="calendar-header">
-          <div className="calendar-room-col">Habitación</div>
-          <div className="calendar-days">
-            {weekDates.map((date, i) => (
-              <div
-                key={i}
-                className={`calendar-day-cell${date.getDate() === todayNum ? ' calendar-day-cell--today' : ''}`}
-              >
-                <span className="calendar-day-name">{DAYS[i]}</span>
-                <span className="calendar-day-num">{date.getDate()}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Room rows */}
-        {CALENDAR_DATA.map((roomRow) => (
-          <div key={roomRow.roomId} className="calendar-row">
-            <div className="calendar-room-info">
-              <div className="calendar-room-name">{roomRow.roomName}</div>
-              <div className="calendar-room-type">{roomRow.roomType}</div>
-            </div>
-            <div className="calendar-row-cells">
-              {/* Empty cells */}
-              {Array.from({ length: 7 }, (_, i) => (
-                <div key={i} className="calendar-cell" />
-              ))}
-
-              {/* Booking bars */}
-              {roomRow.bookings.map((booking, bIdx) => {
-                const cellWidth = 96
-                const left = booking.startDay * cellWidth + 6
-                const width = booking.span * cellWidth - 12
-
-                const bookingClass = {
-                  primary: 'calendar-booking--primary',
-                  secondary: 'calendar-booking--secondary',
-                  blocked: 'calendar-booking--blocked',
-                  glass: 'calendar-booking--glass',
-                }[booking.type] || 'calendar-booking--glass'
-
-                return (
-                  <div
-                    key={bIdx}
-                    className={`calendar-booking ${bookingClass}`}
-                    style={{ left: `${left}px`, width: `${width}px` }}
-                    title={booking.guestName}
-                  >
-                    {booking.avatar && (
-                      <div className="calendar-booking__avatar">
-                        <img
-                          src={booking.avatar}
-                          alt={booking.guestName}
-                          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                        />
-                      </div>
-                    )}
-                    <div>
-                      <div className="calendar-booking__name">{booking.guestName}</div>
-                      <div className="calendar-booking__sub">{booking.span} noche{booking.span !== 1 ? 's' : ''}</div>
-                    </div>
-                    {booking.type === 'primary' && (
-                      <div style={{ marginLeft: 'auto' }}>
-                        <span className="calendar-booking__status">Conf.</span>
-                      </div>
-                    )}
-                  </div>
-                )
-              })}
-            </div>
-          </div>
-        ))}
-      </div>
+      <WeeklyCalendar
+        data={CALENDAR_DATA}
+        weekDates={weekDates}
+        todayNum={todayNum}
+      />
 
       {/* Summary stats below calendar */}
       <div className="inventory-grid">

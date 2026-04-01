@@ -1,4 +1,7 @@
 import { useState } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
+import { Button, Icon, StatCard, Badge } from '@/components/frida'
+import s from './AccountPage.module.css'
 
 const MOCK_BOOKINGS = [
   {
@@ -21,91 +24,110 @@ const MOCK_BOOKINGS = [
   },
 ]
 
-export default function AccountPage({ bookings: externalBookings, favoritesCount, onOpenDetail }) {
+const STATUS_VARIANT = {
+  upcoming:  { badge: 'tag',     label: 'Próxima' },
+  confirmed: { badge: 'tag',     label: 'Confirmada' },
+  past:      { badge: 'default', label: 'Completada' },
+}
+
+const TABS = [
+  { key: 'upcoming',  label: 'Próximas' },
+  { key: 'past',      label: 'Historial' },
+  { key: 'favorites', label: 'Favoritos' },
+  { key: 'messages',  label: 'Mensajes' },
+]
+
+const MOCK_MESSAGES = [
+  {
+    id: 1,
+    from: 'Equipo Hoteles Frida',
+    subject: 'Confirmación de tu reserva #BK001',
+    preview: 'Tu reserva en Suite Coral Grande ha sido confirmada...',
+    time: 'Hace 2 horas',
+    unread: true,
+  },
+  {
+    id: 2,
+    from: 'Concierge',
+    subject: 'Recomendaciones para tu estancia en Chelem',
+    preview: 'Hola, te compartimos algunas actividades locales...',
+    time: 'Hace 1 día',
+    unread: false,
+  },
+]
+
+const tabVariants = {
+  initial: { opacity: 0, y: 10 },
+  animate: { opacity: 1, y: 0, transition: { duration: 0.3, ease: [0.16, 1, 0.3, 1] } },
+  exit:    { opacity: 0, y: -6, transition: { duration: 0.15 } },
+}
+
+function formatDate(dateStr) {
+  if (!dateStr) return ''
+  return new Date(dateStr).toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: 'numeric' })
+}
+
+export default function AccountPage({ bookings: externalBookings, favoritesCount = 0, onOpenDetail }) {
   const [activeTab, setActiveTab] = useState('upcoming')
   const displayBookings = externalBookings || MOCK_BOOKINGS
 
   const upcomingBookings = displayBookings.filter(b => b.status === 'upcoming' || b.status === 'confirmed')
-  const pastBookings = displayBookings.filter(b => b.status === 'past')
-
-  const statusColors = {
-    upcoming: '#16a34a',
-    confirmed: '#006971',
-    past: '#7e7480',
-  }
-
-  const statusLabels = {
-    upcoming: 'Próxima',
-    confirmed: 'Confirmada',
-    past: 'Completada',
-  }
-
-  const formatDate = (dateStr) => {
-    if (!dateStr) return ''
-    const d = new Date(dateStr)
-    return d.toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: 'numeric' })
-  }
+  const pastBookings     = displayBookings.filter(b => b.status === 'past')
 
   return (
-    <div className="account-page-wrapper">
-      {/* Hero banner */}
-      <header className="account-hero">
-        <p className="account-hero__greeting">Bienvenida de vuelta</p>
-        <h1 className="account-hero__name">Mi Cuenta</h1>
+    <div className={s.wrapper}>
+      {/* ── Hero banner ── */}
+      <header className={s.hero}>
+        <motion.p
+          className={s.heroGreeting}
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+        >
+          Bienvenida de vuelta
+        </motion.p>
+        <motion.h1
+          className={s.heroName}
+          initial={{ opacity: 0, y: 18 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1], delay: 0.1 }}
+        >
+          Mi Cuenta
+        </motion.h1>
       </header>
 
-      {/* Stats row */}
-      <section className="account-stats" aria-label="Resumen de cuenta">
-        <article className="stat-card">
-          <div className="stat-icon" style={{ background: 'rgba(0,59,65,0.1)' }}>
-            <span className="material-symbols-outlined" style={{ color: 'var(--primary)', fontSize: '20px' }}>hotel</span>
-          </div>
-          <div>
-            <div className="stat-value">{upcomingBookings.length}</div>
-            <div className="stat-label">Reservas activas</div>
-          </div>
-        </article>
-        <article className="stat-card">
-          <div className="stat-icon" style={{ background: 'rgba(126,70,154,0.1)' }}>
-            <span className="material-symbols-outlined" style={{ color: 'var(--secondary)', fontSize: '20px' }}>favorite</span>
-          </div>
-          <div>
-            <div className="stat-value">{favoritesCount || 0}</div>
-            <div className="stat-label">Favoritos</div>
-          </div>
-        </article>
-        <article className="stat-card">
-          <div className="stat-icon" style={{ background: 'rgba(245,158,11,0.1)' }}>
-            <span className="material-symbols-outlined" style={{ color: 'var(--gold)', fontSize: '20px' }}>star</span>
-          </div>
-          <div>
-            <div className="stat-value">{pastBookings.length}</div>
-            <div className="stat-label">Estancias</div>
-          </div>
-        </article>
-        <article className="stat-card">
-          <div className="stat-icon" style={{ background: 'rgba(0,105,113,0.1)' }}>
-            <span className="material-symbols-outlined" style={{ color: 'var(--surface-tint)', fontSize: '20px' }}>mail</span>
-          </div>
-          <div>
-            <div className="stat-value">2</div>
-            <div className="stat-label">Mensajes</div>
-          </div>
-        </article>
-      </section>
+      {/* ── Stats row ── */}
+      <div className={s.statsRow}>
+        {[
+          { icon: 'hotel',    label: 'Reservas activas', value: upcomingBookings.length, color: 'var(--primary)' },
+          { icon: 'favorite', label: 'Favoritos',        value: favoritesCount,          color: 'var(--secondary)' },
+          { icon: 'star',     label: 'Estancias',        value: pastBookings.length,     color: 'var(--gold)' },
+          { icon: 'mail',     label: 'Mensajes',         value: 2,                       color: 'var(--primary)' },
+        ].map((stat, i) => (
+          <motion.div
+            key={stat.label}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1], delay: i * 0.08 }}
+          >
+            <StatCard
+              icon={stat.icon}
+              label={stat.label}
+              value={stat.value}
+              color={stat.color}
+            />
+          </motion.div>
+        ))}
+      </div>
 
-      {/* Main content */}
-      <div className="account-content">
-        <nav className="tabs" aria-label="Secciones de cuenta">
-          {[
-            { key: 'upcoming', label: 'Próximas' },
-            { key: 'past', label: 'Historial' },
-            { key: 'favorites', label: 'Favoritos' },
-            { key: 'messages', label: 'Mensajes' },
-          ].map(tab => (
+      {/* ── Main content ── */}
+      <div className={s.content}>
+        {/* Tabs */}
+        <nav className={s.tabs} aria-label="Secciones de cuenta">
+          {TABS.map(tab => (
             <button
               key={tab.key}
-              className={`tab-btn${activeTab === tab.key ? ' tab-btn--active' : ''}`}
+              className={`${s.tab} ${activeTab === tab.key ? s.tabActive : ''}`}
               onClick={() => setActiveTab(tab.key)}
             >
               {tab.label}
@@ -113,192 +135,129 @@ export default function AccountPage({ bookings: externalBookings, favoritesCount
           ))}
         </nav>
 
-        {/* Upcoming */}
-        {activeTab === 'upcoming' && (
-          <section aria-label="Próximas reservas">
-            {upcomingBookings.length === 0 ? (
-              <div className="empty-state" role="status">
-                <span className="empty-state__icon">🏖️</span>
-                <div className="empty-state__title">No tienes reservas próximas</div>
-                <div className="empty-state__sub">Cuando reserves una habitación, aparecerá aquí.</div>
-              </div>
-            ) : (
-              upcomingBookings.map(booking => (
-                <article key={booking.id} className="booking-card">
-                  <div className="booking-card__image">
-                    <img src={booking.img} alt={booking.room} />
-                    <span
-                      className="booking-card__badge"
-                      style={{ background: statusColors[booking.status] || 'var(--surface-tint)' }}
-                    >
-                      {statusLabels[booking.status] || booking.status}
-                    </span>
-                  </div>
-                  <div className="booking-card__body">
-                    <div>
-                      <h2 className="booking-card__title">{booking.room}</h2>
-                      <div className="booking-card__details">
-                        <span className="material-symbols-outlined" style={{ fontSize: '12px', marginRight: '4px' }}>location_on</span>
-                        {booking.location}
-                      </div>
-                      <div className="booking-card__details" style={{ marginTop: '6px' }}>
-                        <span className="material-symbols-outlined" style={{ fontSize: '12px', marginRight: '4px' }}>calendar_today</span>
-                        <time dateTime={booking.checkIn}>{formatDate(booking.checkIn)}</time>
-                        {' → '}
-                        <time dateTime={booking.checkOut}>{formatDate(booking.checkOut)}</time>
-                      </div>
-                    </div>
-                    <button
-                      className="booking-card__cta"
-                      onClick={() => onOpenDetail && onOpenDetail(booking)}
-                    >
-                      Ver reserva
-                      <span className="material-symbols-outlined" style={{ fontSize: '12px' }}>arrow_forward</span>
-                    </button>
-                  </div>
-                </article>
-              ))
-            )}
-          </section>
-        )}
+        <AnimatePresence mode="wait">
+          <motion.div key={activeTab} variants={tabVariants} initial="initial" animate="animate" exit="exit">
 
-        {/* Past */}
-        {activeTab === 'past' && (
-          <section aria-label="Historial de reservas">
-            {pastBookings.length === 0 ? (
-              <div className="empty-state" role="status">
-                <span className="empty-state__icon">📋</span>
-                <div className="empty-state__title">Sin estancias anteriores</div>
-                <div className="empty-state__sub">Tu historial de reservas aparecerá aquí.</div>
-              </div>
-            ) : (
-              pastBookings.map(booking => (
-                <article key={booking.id} className="booking-card">
-                  <div className="booking-card__image">
-                    <img src={booking.img} alt={booking.room} />
-                    <span className="booking-card__badge" style={{ background: statusColors[booking.status] }}>
-                      {statusLabels[booking.status]}
-                    </span>
+            {/* ── Upcoming ── */}
+            {activeTab === 'upcoming' && (
+              <section aria-label="Próximas reservas">
+                {upcomingBookings.length === 0 ? (
+                  <div className={s.emptyState} role="status">
+                    <span className={s.emptyIcon}>🏖️</span>
+                    <div className={s.emptyTitle}>No tienes reservas próximas</div>
+                    <div className={s.emptySub}>Cuando reserves una habitación, aparecerá aquí.</div>
                   </div>
-                  <div className="booking-card__body">
-                    <div>
-                      <h2 className="booking-card__title">{booking.room}</h2>
-                      <div className="booking-card__details">
-                        <span className="material-symbols-outlined" style={{ fontSize: '12px', marginRight: '4px' }}>location_on</span>
-                        {booking.location}
-                      </div>
-                      <div className="booking-card__details" style={{ marginTop: '6px' }}>
-                        <span className="material-symbols-outlined" style={{ fontSize: '12px', marginRight: '4px' }}>calendar_today</span>
-                        <time dateTime={booking.checkIn}>{formatDate(booking.checkIn)}</time>
-                        {' → '}
-                        <time dateTime={booking.checkOut}>{formatDate(booking.checkOut)}</time>
-                      </div>
-                    </div>
-                    <button className="booking-card__cta">
-                      Reservar de nuevo
-                      <span className="material-symbols-outlined" style={{ fontSize: '12px' }}>refresh</span>
-                    </button>
-                  </div>
-                </article>
-              ))
-            )}
-          </section>
-        )}
-
-        {/* Favorites */}
-        {activeTab === 'favorites' && (
-          <section className="empty-state" aria-label="Favoritos" role="status">
-            <span className="empty-state__icon">♡</span>
-            <div className="empty-state__title">
-              {favoritesCount > 0 ? `${favoritesCount} habitación${favoritesCount !== 1 ? 'es' : ''} en favoritos` : 'Sin favoritos aún'}
-            </div>
-            <div className="empty-state__sub">
-              {favoritesCount > 0
-                ? 'Visita las habitaciones para verlas en detalle.'
-                : 'Marca con ♡ las habitaciones que te interesen para guardarlas aquí.'}
-            </div>
-          </section>
-        )}
-
-        {/* Messages */}
-        {activeTab === 'messages' && (
-          <section aria-label="Mensajes">
-            {[
-              {
-                id: 1,
-                from: 'Equipo Hoteles Frida',
-                subject: 'Confirmación de tu reserva #BK001',
-                preview: 'Tu reserva en Suite Coral Grande ha sido confirmada...',
-                time: 'Hace 2 horas',
-                unread: true,
-              },
-              {
-                id: 2,
-                from: 'Concierge',
-                subject: 'Recomendaciones para tu estancia en Chelem',
-                preview: 'Hola, te compartimos algunas actividades locales...',
-                time: 'Hace 1 día',
-                unread: false,
-              },
-            ].map(msg => (
-              <article
-                key={msg.id}
-                style={{
-                  display: 'flex',
-                  gap: '14px',
-                  padding: '16px 20px',
-                  borderRadius: '12px',
-                  background: msg.unread ? 'rgba(0,105,113,0.04)' : 'rgba(255,255,255,0.5)',
-                  border: msg.unread ? '1px solid rgba(0,105,113,0.12)' : '1px solid rgba(255,255,255,0.3)',
-                  marginBottom: '10px',
-                  cursor: 'pointer',
-                  backdropFilter: 'blur(12px)',
-                }}
-              >
-                <div style={{
-                  width: '40px',
-                  height: '40px',
-                  borderRadius: '50%',
-                  background: 'linear-gradient(135deg, var(--primary-container), var(--primary))',
-                  display: 'grid',
-                  placeItems: 'center',
-                  color: '#fff',
-                  flexShrink: 0,
-                  fontSize: '18px',
-                }}>
-                  <span className="material-symbols-outlined">mail</span>
-                </div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                    <p style={{ fontFamily: 'var(--font-body)', fontWeight: '700', fontSize: '13px', color: 'var(--on-surface)' }}>
-                      {msg.from}
-                    </p>
-                    <time style={{ fontFamily: 'var(--font-body)', fontSize: '11px', color: 'var(--outline)' }}>
-                      {msg.time}
-                    </time>
-                  </div>
-                  <h2 style={{ fontFamily: 'var(--font-body)', fontWeight: '600', fontSize: '13px', color: 'var(--on-surface)', marginTop: '2px' }}>
-                    {msg.subject}
-                  </h2>
-                  <p style={{ fontFamily: 'var(--font-body)', fontSize: '12px', color: 'var(--outline)', marginTop: '4px' }}>
-                    {msg.preview}
-                  </p>
-                </div>
-                {msg.unread && (
-                  <div style={{
-                    width: '8px',
-                    height: '8px',
-                    borderRadius: '50%',
-                    background: 'var(--surface-tint)',
-                    flexShrink: 0,
-                    marginTop: '6px',
-                  }} />
+                ) : (
+                  upcomingBookings.map(booking => (
+                    <BookingCard key={booking.id} booking={booking} onOpen={onOpenDetail} />
+                  ))
                 )}
-              </article>
-            ))}
-          </section>
-        )}
+              </section>
+            )}
+
+            {/* ── Past ── */}
+            {activeTab === 'past' && (
+              <section aria-label="Historial de reservas">
+                {pastBookings.length === 0 ? (
+                  <div className={s.emptyState} role="status">
+                    <span className={s.emptyIcon}>📋</span>
+                    <div className={s.emptyTitle}>Sin estancias anteriores</div>
+                    <div className={s.emptySub}>Tu historial de reservas aparecerá aquí.</div>
+                  </div>
+                ) : (
+                  pastBookings.map(booking => (
+                    <BookingCard key={booking.id} booking={booking} pastMode />
+                  ))
+                )}
+              </section>
+            )}
+
+            {/* ── Favorites ── */}
+            {activeTab === 'favorites' && (
+              <div className={s.emptyState} role="status" aria-label="Favoritos">
+                <span className={s.emptyIcon}>♡</span>
+                <div className={s.emptyTitle}>
+                  {favoritesCount > 0
+                    ? `${favoritesCount} habitación${favoritesCount !== 1 ? 'es' : ''} en favoritos`
+                    : 'Sin favoritos aún'}
+                </div>
+                <div className={s.emptySub}>
+                  {favoritesCount > 0
+                    ? 'Visita las habitaciones para verlas en detalle.'
+                    : 'Marca con ♡ las habitaciones que te interesen para guardarlas aquí.'}
+                </div>
+              </div>
+            )}
+
+            {/* ── Messages ── */}
+            {activeTab === 'messages' && (
+              <section aria-label="Mensajes">
+                {MOCK_MESSAGES.map(msg => (
+                  <article
+                    key={msg.id}
+                    className={`${s.messageCard} ${msg.unread ? s.messageCardUnread : ''}`}
+                  >
+                    <div className={s.messageAvatar}>
+                      <span className="material-symbols-outlined">mail</span>
+                    </div>
+                    <div className={s.messageBody}>
+                      <div className={s.messageHeader}>
+                        <p className={s.messageFrom}>{msg.from}</p>
+                        <time className={s.messageTime}>{msg.time}</time>
+                      </div>
+                      <h2 className={s.messageSubject}>{msg.subject}</h2>
+                      <p className={s.messagePreview}>{msg.preview}</p>
+                    </div>
+                    {msg.unread && <div className={s.unreadDot} />}
+                  </article>
+                ))}
+              </section>
+            )}
+
+          </motion.div>
+        </AnimatePresence>
       </div>
     </div>
+  )
+}
+
+/* ── BookingCard subcomponent ── */
+function BookingCard({ booking, onOpen, pastMode = false }) {
+  const meta = STATUS_VARIANT[booking.status] ?? STATUS_VARIANT.past
+
+  return (
+    <article className={s.bookingCard}>
+      <div className={s.bookingImg}>
+        <img src={booking.img} alt={booking.room} />
+        <div style={{ position: 'absolute', top: '10px', left: '10px' }}>
+          <Badge variant={meta.badge}>{meta.label}</Badge>
+        </div>
+      </div>
+      <div className={s.bookingBody}>
+        <div>
+          <h2 className={s.bookingTitle}>{booking.room}</h2>
+          <div className={s.bookingDetail}>
+            <Icon name="location_on" size={12} />
+            {booking.location}
+          </div>
+          <div className={s.bookingDetail}>
+            <Icon name="calendar_today" size={12} />
+            <time dateTime={booking.checkIn}>{formatDate(booking.checkIn)}</time>
+            {' → '}
+            <time dateTime={booking.checkOut}>{formatDate(booking.checkOut)}</time>
+          </div>
+        </div>
+        <div className={s.bookingActions}>
+          <Button
+            variant="primary"
+            style={{ fontSize: '12px', padding: '7px 16px' }}
+            onClick={() => !pastMode && onOpen?.(booking)}
+          >
+            {pastMode ? 'Reservar de nuevo' : 'Ver reserva'}
+            <Icon name={pastMode ? 'refresh' : 'arrow_forward'} size={12} />
+          </Button>
+        </div>
+      </div>
+    </article>
   )
 }

@@ -49,3 +49,10 @@
     padding: 16px;
   }
 }
+
+/* Very small phones (360–375 px) */
+@media (max-width: 390px) {
+  .content {
+    padding: 12px;
+  }
+}

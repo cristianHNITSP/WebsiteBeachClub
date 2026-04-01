@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import Icon from '@/components/frida/Icon'
+import s from './SectionPanel.module.css'
 
 /* ── Confirm-exit modal ── */
 function ConfirmModal({ onConfirm, onCancel }) {
@@ -122,60 +123,27 @@ export default function SectionPanel({
 
   return (
     <>
-      {/* Header */}
+      {/* Header — uses admin-page-header flex (space-between, flex-wrap) from admin.css */}
       <div className="admin-page-header">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '16px' }}>
-            {/* Back button */}
-            <button
-              onClick={handleBack}
-              style={{
-                marginTop: '4px',
-                width: '38px', height: '38px', flexShrink: 0,
-                borderRadius: 'var(--radius-md)',
-                border: '1.5px solid var(--outline-var)',
-                background: 'var(--surface-container-low)',
-                cursor: 'pointer', display: 'grid', placeItems: 'center',
-                color: 'var(--on-surface-var)',
-                transition: 'all 0.15s',
-              }}
-              onMouseEnter={e => {
-                e.currentTarget.style.background = 'var(--surface-container)'
-                e.currentTarget.style.color = 'var(--on-surface)'
-                e.currentTarget.style.borderColor = 'var(--outline)'
-              }}
-              onMouseLeave={e => {
-                e.currentTarget.style.background = 'var(--surface-container-low)'
-                e.currentTarget.style.color = 'var(--on-surface-var)'
-                e.currentTarget.style.borderColor = 'var(--outline-var)'
-              }}
-            >
-              <Icon name="arrow_back" size={18} />
-            </button>
+        <div className={s.titleGroup}>
+          {/* Back button */}
+          <button className={s.backBtn} onClick={handleBack}>
+            <Icon name="arrow_back" size={18} />
+          </button>
 
-            <div>
-              {eyebrow && (
-                <span className="admin-page-eyebrow">{eyebrow}</span>
-              )}
-              <h1 className="admin-page-title">{title}</h1>
-              {subtitle && (
-                <p style={{
-                  fontFamily: 'var(--font-body)', fontSize: '13px',
-                  color: 'var(--on-surface-var)', marginTop: '6px',
-                }}>
-                  {subtitle}
-                </p>
-              )}
-            </div>
+          <div>
+            {eyebrow && <span className="admin-page-eyebrow">{eyebrow}</span>}
+            <h1 className="admin-page-title">{title}</h1>
+            {subtitle && <p className={s.subtitle}>{subtitle}</p>}
           </div>
-
-          {/* Right-side actions */}
-          {actions && (
-            <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-              {actions}
-            </div>
-          )}
         </div>
+
+        {/* Right-side actions */}
+        {actions && (
+          <div className="admin-page-header-actions">
+            <div className="admin-page-header-actions-row">{actions}</div>
+          </div>
+        )}
       </div>
 
       {/* Content */}

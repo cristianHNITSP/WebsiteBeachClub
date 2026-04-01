@@ -104,3 +104,8 @@
   .topnav { padding: 0 14px; gap: 8px; }
   .verSitioLabel { display: none; }
 }
+
+@media (max-width: 390px) {
+  .topnav  { padding: 0 10px; gap: 4px; }
+  .logoText { display: none; }
+}

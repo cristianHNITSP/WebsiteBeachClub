@@ -1,0 +1,233 @@
+/* ════════════════════════════════════════
+   ConfigPage layout
+   ════════════════════════════════════════ */
+
+/* ── 2-column grid: nav sidebar + content ── */
+.layout {
+  display: grid;
+  grid-template-columns: 200px 1fr;
+  gap: 24px;
+  align-items: start;
+}
+
+/* ── Desktop navigation sidebar ── */
+.nav {
+  background: var(--surface-container-low);
+  border: 1px solid var(--outline-var);
+  border-radius: var(--radius-xl);
+  overflow: hidden;
+  position: sticky;
+  top: 80px;
+}
+
+.navProfile {
+  padding: 20px;
+  text-align: center;
+  border-bottom: 1px solid var(--outline-var);
+}
+
+.navAvatar {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--primary), #009aa5);
+  display: grid;
+  place-items: center;
+  margin: 0 auto 10px;
+  border: 3px solid rgba(0, 105, 113, 0.2);
+}
+
+.navName {
+  font-family: var(--font-headline);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--on-surface);
+}
+
+.navRole {
+  font-size: 11px;
+  color: var(--on-surface-var);
+  margin-top: 2px;
+}
+
+.navStatus {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 8px;
+  padding: 3px 10px;
+  border-radius: var(--radius-full);
+  background: rgba(22, 163, 74, 0.10);
+  color: #16a34a;
+  font-family: var(--font-body);
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.navStatusDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #16a34a;
+}
+
+/* ── Tab list ── */
+.tabList {
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.tabBtn {
+  width: 100%;
+  border: none;
+  text-align: left;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--on-surface-var);
+  cursor: pointer;
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  transition: background 0.15s, color 0.15s;
+  position: relative;
+}
+
+.tabBtn:hover { background: var(--surface-container); }
+
+.tabBtnActive {
+  background: linear-gradient(135deg, rgba(0,105,113,0.12) 0%, rgba(0,105,113,0.06) 100%);
+  color: var(--primary);
+  font-weight: 700;
+}
+
+.tabBtnActive:hover { background: linear-gradient(135deg, rgba(0,105,113,0.16) 0%, rgba(0,105,113,0.09) 100%); }
+
+.tabIndicator {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 18px;
+  background: var(--primary);
+  border-radius: 0 3px 3px 0;
+}
+
+/* ── Content area ── */
+.content { min-width: 0; }
+
+/* ── Mobile-only compact profile — hidden on desktop ── */
+.profileCompact { display: none; }
+
+/* ════════════════════════════════════════
+   RESPONSIVE — mobile tab bar
+   ════════════════════════════════════════ */
+@media (max-width: 768px) {
+  .layout {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  /* ── Nav becomes a horizontal tab bar ── */
+  .nav {
+    position: static;
+  }
+
+  /* Hide the profile card — shown in compact row above instead */
+  .navProfile { display: none; }
+
+  /* Tab list: horizontal scrollable pills */
+  .tabList {
+    flex-direction: row;
+    padding: 6px;
+    gap: 4px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .tabList::-webkit-scrollbar { display: none; }
+
+  .tabBtn {
+    width: auto;
+    flex: 1;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    gap: 4px;
+    padding: 10px 10px;
+    font-size: 11px;
+    font-weight: 600;
+    text-align: center;
+    white-space: nowrap;
+    min-width: 0;
+  }
+
+  .tabBtnActive {
+    background: var(--primary);
+    color: #fff;
+  }
+
+  .tabBtnActive:hover { background: var(--primary); opacity: 0.92; }
+
+  .tabIndicator { display: none; }
+
+  /* ── Compact profile row — shown on mobile only ── */
+  .profileCompact {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: var(--surface-container-low);
+    border: 1px solid var(--outline-var);
+    border-radius: var(--radius-xl);
+    padding: 14px 16px;
+    margin-bottom: 4px;
+  }
+
+  .profileCompactAvatar {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--primary), #009aa5);
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+    border: 2px solid rgba(0, 105, 113, 0.2);
+  }
+
+  .profileCompactName {
+    font-family: var(--font-headline);
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--on-surface);
+  }
+
+  .profileCompactRole {
+    font-size: 11px;
+    color: var(--on-surface-var);
+    margin-top: 1px;
+  }
+}
+
+/* ── 2-col form grid inside ConfigSections — stacks at narrow widths ── */
+.twoCol {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+@media (max-width: 480px) {
+  .twoCol { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 480px) {
+  .tabBtn { font-size: 10px; padding: 9px 8px; }
+}
+
+@media (max-width: 390px) {
+  .tabBtn { font-size: 9px; padding: 8px 6px; gap: 3px; }
+}
