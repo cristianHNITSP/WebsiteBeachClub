@@ -2,6 +2,15 @@ import s from './WeeklyCalendar.module.css'
 
 const DAYS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom']
 
+// Skeleton booking bar positions per row index — visual variety while loading
+const SKELETON_BARS = [
+  [{ startDay: 0, span: 3 }, { startDay: 4, span: 3 }],
+  [{ startDay: 1, span: 4 }],
+  [{ startDay: 0, span: 2 }, { startDay: 3, span: 3 }],
+  [{ startDay: 2, span: 4 }],
+  [{ startDay: 0, span: 5 }],
+]
+
 const BOOKING_CLASS = {
   primary:   s.bookingPrimary,
   secondary: s.bookingSecondary,
@@ -17,8 +26,9 @@ const BOOKING_CLASS = {
  *                bookings: { startDay (0-6), span, type, guestName, avatar? }
  *   weekDates  — array of 7 Date objects (Mon→Sun)
  *   todayNum   — today's date number (new Date().getDate())
+ *   loading    — show skeleton placeholder rows
  */
-export default function WeeklyCalendar({ data, weekDates, todayNum }) {
+export default function WeeklyCalendar({ data, weekDates, todayNum, loading = false }) {
   return (
     <div className={s.wrapper}>
       <div className={s.grid}>
@@ -27,24 +37,42 @@ export default function WeeklyCalendar({ data, weekDates, todayNum }) {
         <div className={s.header}>
           <div className={s.roomCol}>Habitación</div>
           <div className={s.daysRow}>
-            {weekDates.map((date, i) => (
+            {DAYS.map((day, i) => (
               <div
                 key={i}
-                className={`${s.dayCell}${date.getDate() === todayNum ? ` ${s.dayCellToday}` : ''}`}
+                className={`${s.dayCell}${!loading && weekDates[i].getDate() === todayNum ? ` ${s.dayCellToday}` : ''}`}
               >
-                <span className={s.dayName}>{DAYS[i]}</span>
-                <span className={s.dayNum}>{date.getDate()}</span>
+                {loading ? (
+                  <>
+                    <div className={`${s.skeletonBase} ${s.skeletonDayName}`} />
+                    <div className={`${s.skeletonBase} ${s.skeletonDayNum}`} />
+                  </>
+                ) : (
+                  <>
+                    <span className={s.dayName}>{day}</span>
+                    <span className={s.dayNum}>{weekDates[i].getDate()}</span>
+                  </>
+                )}
               </div>
             ))}
           </div>
         </div>
 
         {/* ── Room rows ── */}
-        {data.map((roomRow) => (
+        {data.map((roomRow, rowIdx) => (
           <div key={roomRow.roomId} className={s.row}>
             <div className={s.roomInfo}>
-              <div className={s.roomName}>{roomRow.roomName}</div>
-              <div className={s.roomType}>{roomRow.roomType}</div>
+              {loading ? (
+                <>
+                  <div className={`${s.skeletonBase} ${s.skeletonRoomName}`} />
+                  <div className={`${s.skeletonBase} ${s.skeletonRoomType}`} />
+                </>
+              ) : (
+                <>
+                  <div className={s.roomName}>{roomRow.roomName}</div>
+                  <div className={s.roomType}>{roomRow.roomType}</div>
+                </>
+              )}
             </div>
 
             <div className={s.rowCells}>
@@ -53,8 +81,20 @@ export default function WeeklyCalendar({ data, weekDates, todayNum }) {
                 <div key={i} className={s.cell} />
               ))}
 
-              {/* Booking bars — positions are relative to --cell-w CSS variable */}
-              {roomRow.bookings.map((booking, bIdx) => {
+              {/* Skeleton booking bars while loading */}
+              {loading && (SKELETON_BARS[rowIdx % SKELETON_BARS.length]).map((bar, bIdx) => (
+                <div
+                  key={bIdx}
+                  className={`${s.skeletonBase} ${s.skeletonBooking}`}
+                  style={{
+                    left:  `calc(var(--cell-w) * ${bar.startDay} + 6px)`,
+                    width: `calc(var(--cell-w) * ${bar.span} - 12px)`,
+                  }}
+                />
+              ))}
+
+              {/* Real booking bars */}
+              {!loading && roomRow.bookings.map((booking, bIdx) => {
                 const bookingCls = BOOKING_CLASS[booking.type] ?? s.bookingGlass
                 return (
                   <div

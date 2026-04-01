@@ -167,9 +167,14 @@ export default function AdminApp() {
 
   if (page === 'config') {
     return (
-      <AdminLayout page={page} navPage={prevPage} onNavigate={handleNavigate}>
-        <ConfigPage onBack={() => doNavigate(prevPage)} />
-      </AdminLayout>
+      <>
+        <AdminLayout page={page} navPage={prevPage} onNavigate={handleNavigate}>
+          <ConfigPage onBack={() => doNavigate(prevPage)} onDirtyChange={setIsDirty} />
+        </AdminLayout>
+        {showNavGuard && (
+          <NavGuardModal onConfirm={confirmNavGuard} onCancel={cancelNavGuard} />
+        )}
+      </>
     )
   }
 

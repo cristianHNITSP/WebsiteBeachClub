@@ -4,14 +4,15 @@ import SectionPanel from '../components/SectionPanel'
 import { useToast } from '@/components/frida/Toast'
 import s from './FormLayout.module.css'
 
-/* ── Internal: hover-aware photo card ── */
+/* ── Internal: hover/tap-aware photo card ── */
 function PhotoCard({ photo, onMarkFavorite, onRemove }) {
-  const [hovered, setHovered] = useState(false)
+  const [active, setActive] = useState(false)
 
   return (
     <div
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
+      onMouseEnter={() => setActive(true)}
+      onMouseLeave={() => setActive(false)}
+      onClick={() => setActive(v => !v)}
       style={{
         position: 'relative',
         borderRadius: 'var(--radius-lg)',
@@ -21,7 +22,7 @@ function PhotoCard({ photo, onMarkFavorite, onRemove }) {
           ? '2.5px solid var(--primary)'
           : '2px solid var(--outline-var)',
         transition: 'border-color 0.2s',
-        cursor: 'default',
+        cursor: 'pointer',
       }}
     >
       <img
@@ -51,13 +52,13 @@ function PhotoCard({ photo, onMarkFavorite, onRemove }) {
         background: 'linear-gradient(to top, rgba(0,0,0,0.65), transparent 55%)',
         display: 'flex', alignItems: 'flex-end',
         padding: '8px',
-        opacity: hovered ? 1 : 0,
+        opacity: active ? 1 : 0,
         transition: 'opacity 0.2s',
-        pointerEvents: hovered ? 'auto' : 'none',
+        pointerEvents: active ? 'auto' : 'none',
       }}>
         {!photo.favorite && (
           <button
-            onClick={() => onMarkFavorite(photo.id)}
+            onClick={(e) => { e.stopPropagation(); onMarkFavorite(photo.id) }}
             title="Marcar como principal"
             style={{
               width: '28px', height: '28px', borderRadius: 'var(--radius-sm)',
@@ -74,7 +75,7 @@ function PhotoCard({ photo, onMarkFavorite, onRemove }) {
           </button>
         )}
         <button
-          onClick={() => onRemove(photo.id)}
+          onClick={(e) => { e.stopPropagation(); onRemove(photo.id) }}
           title="Eliminar foto"
           style={{
             width: '28px', height: '28px', borderRadius: 'var(--radius-sm)',
@@ -485,7 +486,7 @@ export default function GestionFotosPage({ room, onBack, onDirtyChange }) {
               info
             </span>
             <p style={{ fontFamily: 'var(--font-body)', fontSize: '12px', color: 'var(--on-surface-var)', lineHeight: 1.6 }}>
-              La foto marcada con <strong>★ Principal</strong> aparece en la tarjeta de la habitación y como imagen destacada. Pasa el cursor sobre cualquier foto en la galería para cambiarla.
+              La foto marcada con <strong>★ Principal</strong> aparece en la tarjeta de la habitación y como imagen destacada. Toca o pasa el cursor sobre cualquier foto para ver las opciones.
             </p>
           </div>
         </div>

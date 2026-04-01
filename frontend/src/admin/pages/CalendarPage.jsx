@@ -28,7 +28,7 @@ export default function CalendarPage({ onNavigate }) {
   const todayNum = new Date().getDate()
   const [property, setProperty] = useState('all')
   const [loading, setLoading] = useState(true)
-  useEffect(() => { const t = setTimeout(() => setLoading(false), 1200); return () => clearTimeout(t) }, [])
+  useEffect(() => { const t = setTimeout(() => setLoading(false), 2500); return () => clearTimeout(t) }, [])
 
   return (
     <div>
@@ -111,6 +111,7 @@ export default function CalendarPage({ onNavigate }) {
         data={CALENDAR_DATA}
         weekDates={weekDates}
         todayNum={todayNum}
+        loading={loading}
       />
 
       {/* Summary stats below calendar */}

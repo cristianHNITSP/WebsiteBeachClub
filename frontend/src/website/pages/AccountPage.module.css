@@ -45,35 +45,17 @@
   padding: 32px 32px 80px;
 }
 
-/* ── Tabs ── */
+/* ── Tabs (NavItem handles active underline + color per item) ── */
 .tabs {
   display: flex;
   gap: 0;
   border-bottom: 1px solid var(--outline-var);
   margin-bottom: 24px;
+  overflow-x: auto;
+  /* hide scrollbar but keep scrollability */
+  scrollbar-width: none;
 }
-
-.tab {
-  background: none;
-  border: none;
-  cursor: pointer;
-  font-family: var(--font-body);
-  font-weight: 700;
-  font-size: 12px;
-  letter-spacing: 0.08em;
-  padding: 12px 20px;
-  color: var(--on-surface-var);
-  border-bottom: 2px solid transparent;
-  transition: color 0.18s, border-color 0.18s;
-  text-transform: uppercase;
-}
-
-.tab:hover { color: var(--on-surface); }
-
-.tabActive {
-  color: var(--primary);
-  border-bottom-color: var(--primary);
-}
+.tabs::-webkit-scrollbar { display: none; }
 
 /* ── Booking cards ── */
 .bookingCard {
@@ -261,5 +243,4 @@
   .bookingCard { flex-direction: column; }
   .bookingImg { width: 100%; height: 160px; }
   .tabs { overflow-x: auto; }
-  .tab { white-space: nowrap; padding: 10px 14px; }
 }

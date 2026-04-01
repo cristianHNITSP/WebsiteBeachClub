@@ -211,6 +211,68 @@
   .bookingSub  { display: none; }
 }
 
+/* ════════════════════ SKELETON ════════════════════ */
+@keyframes shimmer {
+  0%   { background-position: -600px 0; }
+  100% { background-position: 600px 0; }
+}
+
+.skeletonBase {
+  border-radius: 6px;
+  background: linear-gradient(
+    90deg,
+    #cbd5e1 0%,
+    #e2e8f0 40%,
+    #f1f5f9 50%,
+    #e2e8f0 60%,
+    #cbd5e1 100%
+  );
+  background-size: 1200px 100%;
+  animation: shimmer 1.6s infinite linear;
+}
+
+:global(.dark) .skeletonBase {
+  background: linear-gradient(
+    90deg,
+    #1e293b 0%,
+    #334155 40%,
+    #475569 50%,
+    #334155 60%,
+    #1e293b 100%
+  );
+  background-size: 1200px 100%;
+}
+
+.skeletonDayName {
+  width: 24px;
+  height: 9px;
+  margin-bottom: 4px;
+}
+
+.skeletonDayNum {
+  width: 20px;
+  height: 18px;
+}
+
+.skeletonRoomName {
+  width: 80%;
+  height: 14px;
+  margin-bottom: 6px;
+}
+
+.skeletonRoomType {
+  width: 50%;
+  height: 9px;
+}
+
+.skeletonBooking {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  height: 44px;
+  border-radius: var(--radius-full);
+}
+
 /* ════════════════════ DARK MODE ════════════════════ */
 :global(.dark) .grid    { background: var(--surface-container-low); }
 :global(.dark) .header  { background: rgba(255, 255, 255, 0.04); }

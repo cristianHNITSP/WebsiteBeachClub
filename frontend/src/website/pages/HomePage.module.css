@@ -86,3 +86,8 @@
   .filterChips { justify-content: flex-start; }
   .experienceGrid { grid-template-columns: 1fr; }
 }
+
+@media (max-width: 390px) {
+  /* Stack date inputs vertically on very small phones */
+  .dateGrid { grid-template-columns: 1fr; }
+}

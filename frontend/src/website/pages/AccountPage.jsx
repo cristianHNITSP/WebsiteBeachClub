@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Button, Icon, StatCard, Badge } from '@/components/frida'
+import NavItem from '@/components/frida/NavItem'
 import s from './AccountPage.module.css'
 
 const MOCK_BOOKINGS = [
@@ -125,13 +126,17 @@ export default function AccountPage({ bookings: externalBookings, favoritesCount
         {/* Tabs */}
         <nav className={s.tabs} aria-label="Secciones de cuenta">
           {TABS.map(tab => (
-            <button
+            <NavItem
               key={tab.key}
-              className={`${s.tab} ${activeTab === tab.key ? s.tabActive : ''}`}
+              active={activeTab === tab.key}
               onClick={() => setActiveTab(tab.key)}
+              style={{
+                whiteSpace: 'nowrap',
+                color: activeTab === tab.key ? 'var(--primary)' : undefined,
+              }}
             >
               {tab.label}
-            </button>
+            </NavItem>
           ))}
         </nav>
 

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import SectionPanel from '../components/SectionPanel'
 import { Field, Input, Select } from '@/components/frida/Field'
@@ -103,7 +103,7 @@ const TABS = [
   { key: 'accesibilidad',  label: 'Accesibilidad',    icon: 'accessibility' },
 ]
 
-export default function ConfigPage({ onBack }) {
+export default function ConfigPage({ onBack, onDirtyChange }) {
   const addToast = useToast()
   const { isDark, toggleDark } = useTheme()
   const [tab, setTab] = useState('perfil')
@@ -124,7 +124,23 @@ export default function ConfigPage({ onBack }) {
   const [correo, setCorreo]   = useState('admin@hotelesfrida.mx')
   const [telefono, setTelefono] = useState('+52 999 000 0000')
 
+  const dirty =
+    nombre    !== 'Administrador'          ||
+    correo    !== 'admin@hotelesfrida.mx'  ||
+    telefono  !== '+52 999 000 0000'       ||
+    twoFA     !== false  ||
+    loginAlerts  !== true  ||
+    sessionLog   !== true  ||
+    animations   !== true  ||
+    highContrast !== false ||
+    fontSize  !== 'normal' ||
+    language  !== 'es'
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { onDirtyChange?.(dirty) }, [dirty])
+
   const handleSave = () => {
+    onDirtyChange?.(false)
     addToast('Configuración guardada correctamente', { type: 'success', title: 'Guardado' })
   }
 

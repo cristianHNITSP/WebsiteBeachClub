@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { AnimatePresence, motion } from 'framer-motion'
 import { ROOMS } from '../data/rooms'
 import Navbar from './components/Navbar'
 import Footer from './components/Footer'
@@ -49,6 +50,12 @@ export default function WebsiteApp() {
 
   const showFooter = view !== 'detail'
 
+  const pageVariants = {
+    initial: { opacity: 0, y: 18 },
+    animate: { opacity: 1, y: 0, transition: { duration: 0.42, ease: [0.16, 1, 0.3, 1] } },
+    exit:    { opacity: 0, y: -10, transition: { duration: 0.2, ease: 'easeIn' } },
+  }
+
   return (
     <div>
       <Navbar
@@ -58,40 +65,52 @@ export default function WebsiteApp() {
       />
 
       <main>
-        {view === 'home' && (
-          <HomePage
-            onNavigate={handleNavigate}
-            onSelectRoom={handleSelectRoom}
-            rooms={ROOMS}
-            favorites={favorites}
-            onToggleFav={handleToggleFav}
-          />
-        )}
+        <AnimatePresence mode="wait">
 
-        {view === 'search' && (
-          <SearchPage
-            onSelectRoom={handleSelectRoom}
-            rooms={ROOMS}
-            favorites={favorites}
-            onToggleFav={handleToggleFav}
-          />
-        )}
+          {view === 'home' && (
+            <motion.div key="home" variants={pageVariants} initial="initial" animate="animate" exit="exit">
+              <HomePage
+                onNavigate={handleNavigate}
+                onSelectRoom={handleSelectRoom}
+                rooms={ROOMS}
+                favorites={favorites}
+                onToggleFav={handleToggleFav}
+              />
+            </motion.div>
+          )}
 
-        {view === 'detail' && (
-          <DetailPage
-            room={selectedRoom}
-            onGoBack={() => setView('search')}
-            onConfirm={handleConfirm}
-          />
-        )}
+          {view === 'search' && (
+            <motion.div key="search" variants={pageVariants} initial="initial" animate="animate" exit="exit">
+              <SearchPage
+                onSelectRoom={handleSelectRoom}
+                rooms={ROOMS}
+                favorites={favorites}
+                onToggleFav={handleToggleFav}
+              />
+            </motion.div>
+          )}
 
-        {view === 'account' && (
-          <AccountPage
-            bookings={[]}
-            favoritesCount={favorites.length}
-            onOpenDetail={(booking) => console.log('open booking', booking)}
-          />
-        )}
+          {view === 'detail' && (
+            <motion.div key="detail" variants={pageVariants} initial="initial" animate="animate" exit="exit">
+              <DetailPage
+                room={selectedRoom}
+                onGoBack={() => setView('search')}
+                onConfirm={handleConfirm}
+              />
+            </motion.div>
+          )}
+
+          {view === 'account' && (
+            <motion.div key="account" variants={pageVariants} initial="initial" animate="animate" exit="exit">
+              <AccountPage
+                bookings={[]}
+                favoritesCount={favorites.length}
+                onOpenDetail={(booking) => console.log('open booking', booking)}
+              />
+            </motion.div>
+          )}
+
+        </AnimatePresence>
       </main>
 
       {showFooter && <Footer onNavigate={handleNavigate} />}
