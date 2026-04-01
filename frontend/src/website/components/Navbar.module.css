@@ -1,0 +1,146 @@
+/* ── Navbar shell ── */
+.navbar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 50;
+  height: 72px;
+  padding: 0 32px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  transition: all 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+/* ── Logo button ── */
+.logo {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+/* ── Desktop nav links ── */
+.desktopLinks {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+/* ── Actions row ── */
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* "Reservar" pill button — hide text label on very small screens */
+.reservarBtn {
+  height: 38px;
+  padding: 0 20px;
+  border-radius: var(--radius-full);
+  border: none;
+  cursor: pointer;
+  background: linear-gradient(135deg, var(--primary) 0%, #009aa5 100%);
+  color: #fff;
+  font-family: var(--font-body);
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  box-shadow: 0 4px 16px rgba(0,105,113,0.4);
+  white-space: nowrap;
+}
+
+/* ── Hamburger button — hidden on desktop ── */
+.hamburger {
+  display: none;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 6px;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-md);
+  transition: background 0.2s;
+  flex-shrink: 0;
+}
+.hamburger:hover { background: rgba(0,0,0,0.08); }
+
+/* ── Mobile dropdown menu ── */
+.mobileMenu {
+  display: none; /* JS controls open/close, CSS controls existence on breakpoint */
+  position: fixed;
+  top: 72px;
+  left: 0;
+  right: 0;
+  z-index: 49;
+  flex-direction: column;
+  padding: 12px 16px 20px;
+  gap: 4px;
+  border-bottom: 1px solid var(--outline-var);
+  background: var(--surface);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.12);
+  /* slide-in animation */
+  animation: slideDown 0.22s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+.mobileMenuOpen { display: flex; }
+
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.mobileItem {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  padding: 13px 14px;
+  border-radius: var(--radius-md);
+  font-family: var(--font-body);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--on-surface-var);
+  transition: background 0.18s, color 0.18s;
+}
+.mobileItem:hover { background: var(--surface-container-low); color: var(--on-surface); }
+.mobileItemActive { color: var(--primary); background: var(--surface-container-low); }
+
+.mobileReservar {
+  margin-top: 8px;
+  padding: 14px;
+  border-radius: var(--radius-md);
+  background: linear-gradient(135deg, var(--primary) 0%, #009aa5 100%);
+  color: #fff;
+  border: none;
+  cursor: pointer;
+  font-family: var(--font-body);
+  font-weight: 700;
+  font-size: 15px;
+  text-align: center;
+}
+
+/* ════════════════════════════════════════
+   RESPONSIVE
+   ════════════════════════════════════════ */
+@media (max-width: 768px) {
+  .navbar { padding: 0 16px; }
+  .desktopLinks { display: none; }
+  .reservarBtn { display: none; }
+  .hamburger { display: flex; }
+}
+
+@media (max-width: 400px) {
+  .navbar { height: 60px; }
+  .mobileMenu { top: 60px; }
+}

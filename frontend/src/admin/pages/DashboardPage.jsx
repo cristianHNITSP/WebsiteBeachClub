@@ -62,41 +62,38 @@ const DashboardPage = ({ onNavigate }) => {
     <div>
       {/* Page header */}
       <div className="admin-page-header">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-          <div>
-            <span className="admin-page-eyebrow">Resumen operacional</span>
-            <h1 className="admin-page-title">
-              Tablero<br />
-              <em>Principal</em>
-            </h1>
-            {/* Status chips */}
-            <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginTop: '16px' }}>
-              {[
-                { icon: 'circle', label: 'Sistema en línea', color: '#16a34a', bg: 'rgba(34,197,94,0.12)' },
-                { icon: 'hotel', label: `${STATS.total - STATS.available}/${STATS.total} ocupadas`, color: 'var(--primary)', bg: 'rgba(0,105,113,0.10)' },
-                { icon: 'wb_sunny', label: '8 check-ins hoy', color: '#d97706', bg: 'rgba(245,158,11,0.12)' },
-              ].map((chip, i) => (
-                <span key={i} style={{
-                  display: 'inline-flex', alignItems: 'center', gap: '6px',
-                  padding: '5px 14px', borderRadius: 'var(--radius-full)',
-                  background: chip.bg, color: chip.color,
-                  fontFamily: 'var(--font-body)', fontWeight: 700, fontSize: '12px',
-                }}>
-                  <span className="material-symbols-outlined" style={{ fontSize: '13px' }}>{chip.icon}</span>
-                  {chip.label}
-                </span>
-              ))}
-            </div>
+        <div>
+          <span className="admin-page-eyebrow">Resumen operacional</span>
+          <h1 className="admin-page-title">
+            Tablero<br />
+            <em>Principal</em>
+          </h1>
+          {/* Status chips */}
+          <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginTop: '16px' }}>
+            {[
+              { icon: 'circle', label: 'Sistema en línea', color: '#16a34a', bg: 'rgba(34,197,94,0.12)' },
+              { icon: 'hotel', label: `${STATS.total - STATS.available}/${STATS.total} ocupadas`, color: 'var(--primary)', bg: 'rgba(0,105,113,0.10)' },
+              { icon: 'wb_sunny', label: '8 check-ins hoy', color: '#d97706', bg: 'rgba(245,158,11,0.12)' },
+            ].map((chip, i) => (
+              <span key={i} style={{
+                display: 'inline-flex', alignItems: 'center', gap: '6px',
+                padding: '5px 14px', borderRadius: 'var(--radius-full)',
+                background: chip.bg, color: chip.color,
+                fontFamily: 'var(--font-body)', fontWeight: 700, fontSize: '12px',
+              }}>
+                <span className="material-symbols-outlined" style={{ fontSize: '13px' }}>{chip.icon}</span>
+                {chip.label}
+              </span>
+            ))}
           </div>
-          <div style={{ textAlign: 'right' }}>
-            <div className="admin-date" style={{ textTransform: 'capitalize' }}>{today}</div>
-            <div style={{ display: 'flex', gap: '12px', marginTop: '12px', justifyContent: 'flex-end' }}>
-              <button className="btn-outline" onClick={() => addToast('Reporte exportado correctamente', { type: 'success', title: 'Exportado' })}>
-                <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>download</span>
-                Exportar
-              </button>
-
-            </div>
+        </div>
+        <div className="admin-page-header-actions">
+          <div className="admin-date" style={{ textTransform: 'capitalize' }}>{today}</div>
+          <div className="admin-page-header-actions-row">
+            <button className="btn-outline" onClick={() => addToast('Reporte exportado correctamente', { type: 'success', title: 'Exportado' })}>
+              <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>download</span>
+              Exportar
+            </button>
           </div>
         </div>
       </div>
@@ -182,7 +179,7 @@ const DashboardPage = ({ onNavigate }) => {
       </div>
 
       {/* Chart + Activity */}
-      <div style={{ display: 'grid', gridTemplateColumns: '7fr 5fr', gap: '20px', marginBottom: '32px' }}>
+      <div className="dashboard-charts-row">
         {/* Chart */}
         <div>
           <div className="chart-area">

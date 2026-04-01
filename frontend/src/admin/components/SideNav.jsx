@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import Icon from '@/components/frida/Icon'
+import s from './SideNav.module.css'
 
 /* ── Navigation groups ── */
 const NAV_GROUPS = [
@@ -28,73 +29,25 @@ const NAV_GROUPS = [
 ]
 
 const PROPERTIES = [
-  { id: 'grand',   name: 'Grand Oasis',            location: 'Chelem, Yucatán' },
-  { id: 'chuburna', name: 'Casa Frida',            location: 'Chuburná, Yucatán' },
-  { id: 'merida',  name: 'Boutique Mérida',        location: 'Centro Histórico' },
+  { id: 'grand',    name: 'Grand Oasis',     location: 'Chelem, Yucatán' },
+  { id: 'chuburna', name: 'Casa Frida',      location: 'Chuburná, Yucatán' },
+  { id: 'merida',   name: 'Boutique Mérida', location: 'Centro Histórico' },
 ]
 
 /* ── Single nav item ── */
 function SideItem({ item, active, onClick }) {
-  const [hov, setHov] = useState(false)
-  const isActive = active
-
   return (
     <button
       onClick={onClick}
-      onMouseEnter={() => setHov(true)}
-      onMouseLeave={() => setHov(false)}
-      style={{
-        display: 'flex', alignItems: 'center', gap: '10px',
-        padding: '9px 14px',
-        borderRadius: 'var(--radius-md)',
-        border: 'none',
-        background: isActive
-          ? 'linear-gradient(135deg, rgba(0,105,113,0.14) 0%, rgba(0,105,113,0.06) 100%)'
-          : hov ? 'var(--surface-container-low)' : 'transparent',
-        color: isActive ? 'var(--primary)' : hov ? 'var(--on-surface)' : 'var(--on-surface-var)',
-        cursor: 'pointer',
-        fontSize: '13px',
-        fontWeight: isActive ? 700 : 500,
-        fontFamily: 'var(--font-body)',
-        width: '100%',
-        textAlign: 'left',
-        transition: 'all 0.18s ease',
-        position: 'relative',
-      }}
+      className={`${s.navItem} ${active ? s.navItemActive : ''}`}
     >
-      {/* Active indicator */}
-      {isActive && (
-        <span style={{
-          position: 'absolute', left: 0, top: '50%', transform: 'translateY(-50%)',
-          width: '3px', height: '20px', background: 'var(--primary)',
-          borderRadius: '0 3px 3px 0',
-        }} />
-      )}
-
-      <span style={{
-        width: '32px', height: '32px',
-        borderRadius: 'var(--radius-sm)',
-        background: isActive ? 'rgba(0,105,113,0.15)' : hov ? 'var(--surface-container)' : 'transparent',
-        display: 'grid', placeItems: 'center',
-        flexShrink: 0,
-        transition: 'background 0.18s',
-      }}>
+      {active && <span className={s.activeIndicator} />}
+      <span className={s.navItemIcon}>
         <Icon name={item.icon} size={17} />
       </span>
-
-      <span style={{ flex: 1 }}>{item.label}</span>
-
+      <span className={s.navItemLabel}>{item.label}</span>
       {item.badge != null && (
-        <span style={{
-          minWidth: '18px', height: '18px',
-          padding: '0 5px',
-          background: isActive ? 'var(--primary)' : 'var(--secondary-container)',
-          color: isActive ? '#fff' : 'var(--secondary)',
-          borderRadius: 'var(--radius-full)',
-          fontSize: '10px', fontWeight: 800,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          letterSpacing: '0',
-        }}>
+        <span className={`${s.badge} ${active ? s.badgeActive : ''}`}>
           {item.badge}
         </span>
       )}
@@ -102,93 +55,38 @@ function SideItem({ item, active, onClick }) {
   )
 }
 
-export default function SideNav({ page, onNavigate }) {
+export default function SideNav({ page, onNavigate, isOpen }) {
   const [propertyOpen, setPropertyOpen] = useState(false)
   const [selectedProperty, setSelectedProperty] = useState(PROPERTIES[0])
 
   return (
-    <aside style={{
-      position: 'fixed', top: '64px', left: 0, bottom: 0,
-      width: '256px',
-      display: 'flex', flexDirection: 'column',
-      background: 'var(--surface)',
-      borderRight: '1px solid var(--outline-var)',
-      overflowY: 'auto',
-      zIndex: 40,
-    }}>
+    <aside className={`${s.sidenav} ${isOpen ? s.sidenavOpen : ''}`}>
 
       {/* ── Property switcher ── */}
-      <div style={{ padding: '14px 12px', borderBottom: '1px solid var(--outline-var)' }}>
+      <div className={s.propertySection}>
         <button
+          className={s.propertyBtn}
           onClick={() => setPropertyOpen(o => !o)}
-          style={{
-            width: '100%', background: 'var(--surface-container-low)',
-            border: '1px solid var(--outline-var)',
-            borderRadius: 'var(--radius-md)', padding: '10px 12px',
-            cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '10px',
-            textAlign: 'left', transition: 'background 0.18s',
-          }}
-          onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-container)'}
-          onMouseLeave={e => e.currentTarget.style.background = 'var(--surface-container-low)'}
         >
-          {/* Property icon */}
-          <span style={{
-            width: '34px', height: '34px', borderRadius: '10px', flexShrink: 0,
-            background: 'linear-gradient(135deg, var(--primary) 0%, #009aa5 100%)',
-            display: 'grid', placeItems: 'center',
-            boxShadow: '0 3px 8px rgba(0,105,113,0.28)',
-          }}>
+          <span className={s.propertyIcon}>
             <span className="material-symbols-outlined" style={{ color: '#fff', fontSize: '16px' }}>hotel</span>
           </span>
-
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{
-              fontFamily: 'var(--font-headline)', fontSize: '13px',
-              fontWeight: 700, color: 'var(--on-surface)',
-              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-            }}>
-              {selectedProperty.name}
-            </div>
-            <div style={{
-              fontSize: '11px', color: 'var(--on-surface-var)',
-              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-            }}>
-              {selectedProperty.location}
-            </div>
+          <div className={s.propertyInfo}>
+            <div className={s.propertyName}>{selectedProperty.name}</div>
+            <div className={s.propertyLocation}>{selectedProperty.location}</div>
           </div>
-
-          <span className="material-symbols-outlined" style={{
-            fontSize: '16px', color: 'var(--on-surface-var)',
-            transform: propertyOpen ? 'rotate(180deg)' : 'rotate(0)',
-            transition: 'transform 0.2s',
-            flexShrink: 0,
-          }}>
+          <span className={`material-symbols-outlined ${s.chevron} ${propertyOpen ? s.chevronOpen : ''}`}>
             expand_more
           </span>
         </button>
 
-        {/* Dropdown */}
         {propertyOpen && (
-          <div style={{
-            marginTop: '6px',
-            background: 'var(--surface-container-low)',
-            border: '1px solid var(--outline-var)',
-            borderRadius: 'var(--radius-md)',
-            overflow: 'hidden',
-          }}>
+          <div className={s.dropdown}>
             {PROPERTIES.map(p => (
               <button
                 key={p.id}
+                className={s.dropdownItem}
                 onClick={() => { setSelectedProperty(p); setPropertyOpen(false) }}
-                style={{
-                  width: '100%', border: 'none', background: 'transparent',
-                  padding: '9px 12px', cursor: 'pointer', textAlign: 'left',
-                  display: 'flex', alignItems: 'center', gap: '8px',
-                  borderBottom: '1px solid var(--outline-var)',
-                  transition: 'background 0.15s',
-                }}
-                onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-container)'}
-                onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
               >
                 <span className="material-symbols-outlined" style={{
                   fontSize: '14px',
@@ -197,24 +95,12 @@ export default function SideNav({ page, onNavigate }) {
                   {selectedProperty.id === p.id ? 'radio_button_checked' : 'radio_button_unchecked'}
                 </span>
                 <div>
-                  <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--on-surface)', fontFamily: 'var(--font-body)' }}>
-                    {p.name}
-                  </div>
-                  <div style={{ fontSize: '10px', color: 'var(--on-surface-var)' }}>{p.location}</div>
+                  <div className={s.dropdownItemName}>{p.name}</div>
+                  <div className={s.dropdownItemLocation}>{p.location}</div>
                 </div>
               </button>
             ))}
-            <button
-              style={{
-                width: '100%', border: 'none', background: 'transparent',
-                padding: '9px 12px', cursor: 'pointer', textAlign: 'left',
-                display: 'flex', alignItems: 'center', gap: '8px',
-                color: 'var(--primary)', fontSize: '12px', fontWeight: 700,
-                fontFamily: 'var(--font-body)',
-              }}
-              onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-container)'}
-              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-            >
+            <button className={s.dropdownAdd}>
               <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>add_circle</span>
               Agregar propiedad
             </button>
@@ -223,113 +109,47 @@ export default function SideNav({ page, onNavigate }) {
       </div>
 
       {/* ── Navigation groups ── */}
-      <nav style={{ flex: 1, padding: '10px 8px', display: 'flex', flexDirection: 'column', gap: '2px', overflowY: 'auto' }}>
+      <nav className={s.nav} aria-label="Navegación lateral">
         {NAV_GROUPS.map((group, gi) => (
-          <div key={gi} style={{ marginBottom: '6px' }}>
-            <span style={{
-              display: 'block',
-              padding: '8px 14px 4px',
-              fontFamily: 'var(--font-body)',
-              fontSize: '9px', fontWeight: 800,
-              letterSpacing: '0.18em', textTransform: 'uppercase',
-              color: 'var(--outline)',
-            }}>
-              {group.label}
-            </span>
-            {group.items.map(item => (
-              <SideItem
-                key={item.key}
-                item={item}
-                active={page === item.key}
-                onClick={() => onNavigate(item.key)}
-              />
-            ))}
+          <div key={gi} className={s.navGroup}>
+            <p className={s.groupLabel}>{group.label}</p>
+            <ul className={s.navList}>
+              {group.items.map(item => (
+                <li key={item.key}>
+                  <SideItem
+                    item={item}
+                    active={page === item.key}
+                    onClick={() => onNavigate(item.key)}
+                  />
+                </li>
+              ))}
+            </ul>
           </div>
         ))}
       </nav>
 
-      {/* ── User profile card ── */}
-      <div style={{
-        padding: '10px 8px',
-        borderTop: '1px solid var(--outline-var)',
-      }}>
-        {/* Quick actions */}
-        <div style={{ display: 'flex', gap: '6px', marginBottom: '8px' }}>
-          <button
-            onClick={() => onNavigate('config')}
-            style={{
-              flex: 1, padding: '8px', border: '1px solid var(--outline-var)',
-              borderRadius: 'var(--radius-md)', background: 'transparent',
-              cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px',
-              fontSize: '12px', color: 'var(--on-surface-var)', fontFamily: 'var(--font-body)',
-              transition: 'all 0.18s',
-            }}
-            onMouseEnter={e => { e.currentTarget.style.background = 'var(--surface-container-low)'; e.currentTarget.style.color = 'var(--on-surface)' }}
-            onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--on-surface-var)' }}
-          >
+      {/* ── Profile footer ── */}
+      <div className={s.profileSection}>
+        <div className={s.quickActions}>
+          <button className={s.quickBtn} onClick={() => onNavigate('config')}>
             <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>settings</span>
             Config.
           </button>
-          <button
-            onClick={() => onNavigate('login')}
-            style={{
-              flex: 1, padding: '8px', border: '1px solid var(--outline-var)',
-              borderRadius: 'var(--radius-md)', background: 'transparent',
-              cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px',
-              fontSize: '12px', color: 'var(--on-surface-var)', fontFamily: 'var(--font-body)',
-              transition: 'all 0.18s',
-            }}
-            onMouseEnter={e => { e.currentTarget.style.background = 'rgba(186,26,26,0.06)'; e.currentTarget.style.color = 'var(--error)'; e.currentTarget.style.borderColor = 'rgba(186,26,26,0.2)' }}
-            onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--on-surface-var)'; e.currentTarget.style.borderColor = 'var(--outline-var)' }}
-          >
+          <button className={`${s.quickBtn} ${s.quickBtnDanger}`} onClick={() => onNavigate('login')}>
             <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>logout</span>
             Salir
           </button>
         </div>
 
-        {/* Profile row */}
-        <div
-          onClick={() => onNavigate('config')}
-          style={{
-            display: 'flex', alignItems: 'center', gap: '10px',
-            padding: '10px 12px',
-            background: 'var(--surface-container-low)',
-            borderRadius: 'var(--radius-md)',
-            cursor: 'pointer',
-            border: '1px solid var(--outline-var)',
-            transition: 'background 0.18s',
-          }}
-          onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-container)'}
-          onMouseLeave={e => e.currentTarget.style.background = 'var(--surface-container-low)'}
-        >
-          <div style={{
-            width: '34px', height: '34px', borderRadius: 'var(--radius-full)',
-            background: 'linear-gradient(135deg, var(--primary), #009aa5)',
-            display: 'grid', placeItems: 'center', flexShrink: 0,
-            border: '2px solid rgba(0,105,113,0.3)',
-          }}>
+        <div className={s.profileRow} onClick={() => onNavigate('config')}>
+          <div className={s.avatar}>
             <span className="material-symbols-outlined" style={{ color: '#fff', fontSize: '17px' }}>person</span>
           </div>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{
-              fontFamily: 'var(--font-body)', fontSize: '12px',
-              fontWeight: 700, color: 'var(--on-surface)',
-              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-            }}>
-              Gerente General
-            </div>
-            <div style={{
-              fontSize: '10px', color: 'var(--on-surface-var)',
-              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-            }}>
-              admin@hoteles-frida.mx
-            </div>
+          <div className={s.profileInfo}>
+            <div className={s.profileName}>Gerente General</div>
+            <div className={s.profileEmail}>admin@hoteles-frida.mx</div>
           </div>
-          <span style={{
-            width: '8px', height: '8px', borderRadius: '50%',
-            background: '#16a34a', flexShrink: 0,
-            boxShadow: '0 0 0 2px rgba(22,163,74,0.25)',
-          }} />
+          <span className={s.onlineDot} />
         </div>
       </div>
     </aside>

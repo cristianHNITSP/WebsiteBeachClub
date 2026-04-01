@@ -17,7 +17,7 @@ export default function RoomCard({ room, onSelect, isFav, onToggleFav, vertical 
   const locationLabel = room.location === 'chelem' ? 'Cabañas Frida — Chelem' : 'Casa Frida — Chuburná'
 
   return (
-    <motion.div
+    <motion.article
       onClick={() => onSelect(room)}
       onHoverStart={() => setHovered(true)}
       onHoverEnd={() => setHovered(false)}
@@ -33,13 +33,15 @@ export default function RoomCard({ room, onSelect, isFav, onToggleFav, vertical 
         cursor: 'pointer',
         boxShadow: hovered ? 'var(--shadow-md)' : 'var(--shadow-sm)',
         transition: 'box-shadow 0.3s ease',
+        height: '100%',
       }}
     >
       {/* ── Image ── */}
-      <div style={{
+      <figure style={{
         position: 'relative',
         flexShrink: 0,
         overflow: 'hidden',
+        margin: 0,
         ...(vertical ? { height: '220px', width: '100%' } : { width: '268px', minHeight: '200px' }),
       }}>
         <motion.img
@@ -101,7 +103,10 @@ export default function RoomCard({ room, onSelect, isFav, onToggleFav, vertical 
           }
         </div>
 
-        {/* Fav button */}
+        {/* Fav button — figcaption oculto para accesibilidad */}
+        <figcaption style={{ position: 'absolute', width: '1px', height: '1px', overflow: 'hidden', clip: 'rect(0,0,0,0)', whiteSpace: 'nowrap' }}>
+          {room.title}
+        </figcaption>
         <motion.button
           onClick={e => { e.stopPropagation(); onToggleFav(room.id) }}
           title={isFav ? 'Quitar de favoritos' : 'Agregar a favoritos'}
@@ -123,7 +128,7 @@ export default function RoomCard({ room, onSelect, isFav, onToggleFav, vertical 
         >
           {isFav ? '♥' : '♡'}
         </motion.button>
-      </div>
+      </figure>
 
       {/* ── Body ── */}
       <div style={{
@@ -186,9 +191,9 @@ export default function RoomCard({ room, onSelect, isFav, onToggleFav, vertical 
         }}>
           <div>
             {room.hasDiscount && (
-              <p style={{ fontSize: '12px', textDecoration: 'line-through', color: 'var(--on-surface-var)', marginBottom: '1px' }}>
+              <del style={{ fontSize: '12px', color: 'var(--on-surface-var)', marginBottom: '1px', display: 'block' }}>
                 MXN ${room.basePrice.toLocaleString()}
-              </p>
+              </del>
             )}
             <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px' }}>
               <span style={{ fontWeight: 800, fontSize: '22px', color: 'var(--on-surface)', fontFamily: 'var(--font-body)' }}>
@@ -215,6 +220,6 @@ export default function RoomCard({ room, onSelect, isFav, onToggleFav, vertical 
           </motion.button>
         </div>
       </div>
-    </motion.div>
+    </motion.article>
   )
 }

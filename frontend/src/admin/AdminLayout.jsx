@@ -1,6 +1,8 @@
+import { useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import TopNav from './components/TopNav'
 import SideNav from './components/SideNav'
+import s from './AdminLayout.module.css'
 import './admin.css'
 
 const pageVariants = {
@@ -11,12 +13,29 @@ const pageVariants = {
 
 export default function AdminLayout({ children, page, navPage, onNavigate }) {
   const activeNav = navPage ?? page
+  const [sidebarOpen, setSidebarOpen] = useState(false)
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' })
+    setSidebarOpen(false)
+  }, [page])
+
   return (
-    <div className="admin-layout">
-      <TopNav page={activeNav} onNavigate={onNavigate} />
-      <SideNav page={activeNav} onNavigate={onNavigate} />
-      <main className="admin-main">
-        <div className="admin-content">
+    <div className={s.layout}>
+      <TopNav page={activeNav} onNavigate={onNavigate} onToggleSidebar={() => setSidebarOpen(o => !o)} />
+      <SideNav page={activeNav} onNavigate={onNavigate} isOpen={sidebarOpen} />
+
+      {/* Overlay tap-to-close on mobile/tablet */}
+      {sidebarOpen && (
+        <div
+          className={`${s.overlay} ${s.overlayActive}`}
+          onClick={() => setSidebarOpen(false)}
+          aria-hidden="true"
+        />
+      )}
+
+      <main className={s.main}>
+        <div className={s.content}>
           <AnimatePresence mode="wait">
             <motion.div
               key={page}

@@ -4,13 +4,13 @@ import Icon from '@/components/frida/Icon'
 
 function ColLabel({ children, style }) {
   return (
-    <p style={{
+    <h2 style={{
       fontSize: '10px', fontWeight: 800, textTransform: 'uppercase',
       letterSpacing: '0.14em', color: 'var(--primary)',
       marginBottom: '14px', ...style,
     }}>
       {children}
-    </p>
+    </h2>
   )
 }
 
@@ -47,7 +47,7 @@ export default function Footer({ onNavigate }) {
 
   return (
     <footer style={{ background: 'var(--surface-container)', borderTop: '1px solid var(--outline-var)' }}>
-      <div style={{
+      <div className="footer-grid" style={{
         maxWidth: '1200px', margin: '0 auto', padding: '72px 32px 56px',
         display: 'grid', gridTemplateColumns: '1.4fr 1fr 1fr', gap: '56px',
       }}>
@@ -80,9 +80,10 @@ export default function Footer({ onNavigate }) {
           </p>
 
           {/* Social links */}
-          <div style={{ display: 'flex', gap: '10px', marginBottom: '24px' }}>
+          <nav aria-label="Redes sociales" style={{ marginBottom: '24px' }}>
+          <ul style={{ display: 'flex', gap: '10px', listStyle: 'none', margin: 0, padding: 0 }}>
             {SOCIAL_LINKS.map(s => (
-              <motion.a
+              <li key={s.label}><motion.a
                 key={s.label}
                 href={s.href}
                 target="_blank"
@@ -110,9 +111,10 @@ export default function Footer({ onNavigate }) {
                 }}
               >
                 <span className="material-symbols-outlined" style={{ fontSize: '19px' }}>{s.icon}</span>
-              </motion.a>
+              </motion.a></li>
             ))}
-          </div>
+          </ul>
+          </nav>
 
           {/* CTA button */}
           <motion.button
@@ -134,39 +136,43 @@ export default function Footer({ onNavigate }) {
         </div>
 
         {/* ── Explorar ── */}
-        <div>
+        <nav aria-label="Explorar">
           <ColLabel>Explorar</ColLabel>
-          <FooterLink onClick={nav('home')}>Inicio</FooterLink>
-          <FooterLink onClick={nav('search')}>Habitaciones</FooterLink>
-          <FooterLink onClick={nav('search')}>Cabañas Frida — Chelem</FooterLink>
-          <FooterLink onClick={nav('search')}>Casa Frida — Chuburná</FooterLink>
-          <FooterLink onClick={nav('account')}>Mis Reservas</FooterLink>
+          <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+            <li><FooterLink onClick={nav('home')}>Inicio</FooterLink></li>
+            <li><FooterLink onClick={nav('search')}>Habitaciones</FooterLink></li>
+            <li><FooterLink onClick={nav('search')}>Cabañas Frida — Chelem</FooterLink></li>
+            <li><FooterLink onClick={nav('search')}>Casa Frida — Chuburná</FooterLink></li>
+            <li><FooterLink onClick={nav('account')}>Mis Reservas</FooterLink></li>
+          </ul>
           <ColLabel style={{ marginTop: '24px' }}>Legal</ColLabel>
-          <FooterLink>Política de privacidad</FooterLink>
-          <FooterLink>Términos y condiciones</FooterLink>
-          <FooterLink>Política de cancelación</FooterLink>
-        </div>
+          <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+            <li><FooterLink>Política de privacidad</FooterLink></li>
+            <li><FooterLink>Términos y condiciones</FooterLink></li>
+            <li><FooterLink>Política de cancelación</FooterLink></li>
+          </ul>
+        </nav>
 
         {/* ── Contacto ── */}
-        <div>
+        <address style={{ fontStyle: 'normal' }}>
           <ColLabel>Contacto</ColLabel>
           <p style={{ fontSize: '14px', color: 'var(--on-surface-var)', lineHeight: 1.75, marginBottom: '18px' }}>
             Disponibles todos los días de 8am a 10pm.
           </p>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-            <FooterLink>
+          <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: '2px' }}>
+            <li><FooterLink>
               <Icon name="phone" size={14} />
               +52 (999) 123 4567
-            </FooterLink>
-            <FooterLink>
+            </FooterLink></li>
+            <li><FooterLink>
               <Icon name="mail" size={14} />
               hola@hotelesfrida.mx
-            </FooterLink>
-            <FooterLink>
+            </FooterLink></li>
+            <li><FooterLink>
               <Icon name="location_on" size={14} />
               Chelem &amp; Chuburná, Yucatán
-            </FooterLink>
-          </div>
+            </FooterLink></li>
+          </ul>
 
           {/* WhatsApp CTA */}
           <motion.a
@@ -189,11 +195,11 @@ export default function Footer({ onNavigate }) {
             <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>chat</span>
             Chatear en WhatsApp
           </motion.a>
-        </div>
+        </address>
       </div>
 
       {/* Bottom bar */}
-      <div style={{
+      <div className="footer-bottom" style={{
         maxWidth: '1200px', margin: '0 auto', padding: '16px 32px',
         borderTop: '1px solid var(--outline-var)',
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',

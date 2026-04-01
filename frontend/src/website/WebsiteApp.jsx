@@ -24,7 +24,7 @@ export default function WebsiteApp() {
 
   useEffect(() => {
     setOverHero(view === 'home' && window.scrollY < 80)
-    window.scrollTo(0, 0)
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' })
   }, [view])
 
   const handleNavigate = (newView) => {
@@ -57,40 +57,42 @@ export default function WebsiteApp() {
         overHero={overHero && view === 'home'}
       />
 
-      {view === 'home' && (
-        <HomePage
-          onNavigate={handleNavigate}
-          onSelectRoom={handleSelectRoom}
-          rooms={ROOMS}
-          favorites={favorites}
-          onToggleFav={handleToggleFav}
-        />
-      )}
+      <main>
+        {view === 'home' && (
+          <HomePage
+            onNavigate={handleNavigate}
+            onSelectRoom={handleSelectRoom}
+            rooms={ROOMS}
+            favorites={favorites}
+            onToggleFav={handleToggleFav}
+          />
+        )}
 
-      {view === 'search' && (
-        <SearchPage
-          onSelectRoom={handleSelectRoom}
-          rooms={ROOMS}
-          favorites={favorites}
-          onToggleFav={handleToggleFav}
-        />
-      )}
+        {view === 'search' && (
+          <SearchPage
+            onSelectRoom={handleSelectRoom}
+            rooms={ROOMS}
+            favorites={favorites}
+            onToggleFav={handleToggleFav}
+          />
+        )}
 
-      {view === 'detail' && (
-        <DetailPage
-          room={selectedRoom}
-          onGoBack={() => setView('search')}
-          onConfirm={handleConfirm}
-        />
-      )}
+        {view === 'detail' && (
+          <DetailPage
+            room={selectedRoom}
+            onGoBack={() => setView('search')}
+            onConfirm={handleConfirm}
+          />
+        )}
 
-      {view === 'account' && (
-        <AccountPage
-          bookings={[]}
-          favoritesCount={favorites.length}
-          onOpenDetail={(booking) => console.log('open booking', booking)}
-        />
-      )}
+        {view === 'account' && (
+          <AccountPage
+            bookings={[]}
+            favoritesCount={favorites.length}
+            onOpenDetail={(booking) => console.log('open booking', booking)}
+          />
+        )}
+      </main>
 
       {showFooter && <Footer onNavigate={handleNavigate} />}
     </div>

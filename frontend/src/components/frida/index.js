@@ -8,7 +8,7 @@ export { default as SectionHeader }           from './SectionHeader'
 export { default as PageHeader }              from './PageHeader'
 
 /* ── New utility components ── */
-export { default as Skeleton, SkeletonText, SkeletonCard } from './Skeleton'
+export { default as Skeleton, SkeletonText, SkeletonCard, SkeletonRoomHero, SkeletonDetailCard, SkeletonRoomCard, SkeletonReservationList } from './Skeleton'
 export { default as Spinner, LoadingDots, LoadingPage }    from './Loading'
 export { default as Tooltip }                              from './Tooltip'
 export { ToastProvider, useToast }                         from './Toast'

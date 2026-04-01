@@ -12,10 +12,18 @@ export const BOOKINGS_DATA = [
 ]
 
 export const ROOMS_DATA = [
-  { id: 1, name: 'Suite Coral Grande', type: 'Suite', status: 'active', rate: 3200, img: 'https://placehold.co/600x400/003b41/006971?text=Suite+Coral+Grande' },
-  { id: 2, name: 'Cabaña del Manglar', type: 'Cabaña', status: 'active', rate: 2100, img: 'https://placehold.co/600x400/003b41/006971?text=Cabaña+del+Manglar' },
-  { id: 3, name: 'Suite Horizonte Azul', type: 'Suite Premium', status: 'maintenance', rate: 4800, img: 'https://placehold.co/600x400/003b41/006971?text=Suite+Horizonte+Azul' },
-  { id: 4, name: 'Villa Chuburná Sunset', type: 'Villa', status: 'active', rate: 3900, img: 'https://placehold.co/600x400/003b41/006971?text=Villa+Chuburná' },
+  { id:  1, name: 'Suite Coral Grande',         type: 'Suite',         status: 'active',      rate: 3200, img: 'https://placehold.co/600x400/003b41/006971?text=Suite+Coral+Grande' },
+  { id:  2, name: 'Cabaña del Manglar',          type: 'Cabaña',        status: 'active',      rate: 2100, img: 'https://placehold.co/600x400/1a4a2e/2d7a4f?text=Cabaña+del+Manglar' },
+  { id:  3, name: 'Suite Horizonte Azul',        type: 'Suite Premium', status: 'maintenance', rate: 4800, img: 'https://placehold.co/600x400/003b41/006971?text=Suite+Horizonte+Azul' },
+  { id:  4, name: 'Villa Chuburná Sunset',       type: 'Villa',         status: 'active',      rate: 3900, img: 'https://placehold.co/600x400/5c3200/a05a00?text=Villa+Chuburná+Sunset' },
+  { id:  5, name: 'Cabaña Brisa Marina',         type: 'Cabaña',        status: 'active',      rate: 2400, img: 'https://placehold.co/600x400/1a4a2e/2d7a4f?text=Cabaña+Brisa+Marina' },
+  { id:  6, name: 'Suite Frida Clásica',         type: 'Suite',         status: 'active',      rate: 2900, img: 'https://placehold.co/600x400/4a0030/8a005a?text=Suite+Frida+Clásica' },
+  { id:  7, name: 'Estudio Palapa Norte',        type: 'Estudio',       status: 'active',      rate: 1600, img: 'https://placehold.co/600x400/003b41/006971?text=Estudio+Palapa+Norte' },
+  { id:  8, name: 'Villa Flamingo Rosado',       type: 'Villa',         status: 'active',      rate: 4200, img: 'https://placehold.co/600x400/5c1a3a/a02060?text=Villa+Flamingo+Rosado' },
+  { id:  9, name: 'Habitación Familiar Arena',   type: 'Familiar',      status: 'active',      rate: 2600, img: 'https://placehold.co/600x400/5c4a00/a08800?text=Hab.+Familiar+Arena' },
+  { id: 10, name: 'Suite Cenote Esmeralda',      type: 'Suite Premium', status: 'maintenance', rate: 5200, img: 'https://placehold.co/600x400/003b2e/006b52?text=Suite+Cenote+Esmeralda' },
+  { id: 11, name: 'Cabaña Selva Profunda',       type: 'Cabaña',        status: 'active',      rate: 1900, img: 'https://placehold.co/600x400/1a4a2e/2d7a4f?text=Cabaña+Selva+Profunda' },
+  { id: 12, name: 'Estudio Frida Clásico',       type: 'Estudio',       status: 'active',      rate: 1450, img: 'https://placehold.co/600x400/4a0030/8a005a?text=Estudio+Frida+Clásico' },
 ]
 
 export const USERS_DATA = [

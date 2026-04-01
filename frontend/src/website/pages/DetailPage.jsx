@@ -112,26 +112,26 @@ export default function DetailPage({ room, onGoBack, onConfirm }) {
               </div>
               <p className="detail-card__desc">{room.desc}</p>
 
-              <div className="detail-amenities">
+              <ul className="detail-amenities" style={{ listStyle: 'none', margin: 0, padding: 0 }}>
                 {room.amenities.map(a => amenityIcons[a] && (
-                  <div key={a} className="detail-amenity">
+                  <li key={a} className="detail-amenity">
                     <span className="material-symbols-outlined" style={{ fontSize: '14px', color: 'var(--surface-tint)' }}>
                       {amenityIcons[a].icon}
                     </span>
                     {amenityIcons[a].label}
-                  </div>
+                  </li>
                 ))}
-                <div className="detail-amenity">
+                <li className="detail-amenity">
                   <span className="material-symbols-outlined" style={{ fontSize: '14px', color: 'var(--surface-tint)' }}>hotel</span>
                   {room.roomType}
-                </div>
-              </div>
+                </li>
+              </ul>
             </div>
 
             {/* Extra details */}
             <div className="detail-card">
               <div className="detail-card__label">Políticas & Condiciones</div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginTop: '12px' }}>
+              <dl style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginTop: '12px', margin: '12px 0 0' }}>
                 {[
                   { icon: 'login', label: 'Check-in', value: '3:00 PM' },
                   { icon: 'logout', label: 'Check-out', value: '12:00 PM' },
@@ -143,22 +143,22 @@ export default function DetailPage({ room, onGoBack, onConfirm }) {
                       {item.icon}
                     </span>
                     <div>
-                      <div style={{ fontFamily: 'var(--font-body)', fontSize: '10px', fontWeight: '700', color: 'var(--outline)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                      <dt style={{ fontFamily: 'var(--font-body)', fontSize: '10px', fontWeight: '700', color: 'var(--outline)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
                         {item.label}
-                      </div>
-                      <div style={{ fontFamily: 'var(--font-body)', fontSize: '13px', fontWeight: '600', color: 'var(--on-surface)', marginTop: '2px' }}>
+                      </dt>
+                      <dd style={{ fontFamily: 'var(--font-body)', fontSize: '13px', fontWeight: '600', color: 'var(--on-surface)', marginTop: '2px', marginLeft: 0 }}>
                         {item.value}
-                      </div>
+                      </dd>
                     </div>
                   </div>
                 ))}
-              </div>
+              </dl>
             </div>
           </div>
 
           {/* SUMMARY SIDEBAR */}
-          <div>
-            <div className="summary-card">
+          <aside>
+            <form className="summary-card" onSubmit={e => e.preventDefault()}>
               <div className="summary-card__title">Resumen de reserva</div>
 
               <div style={{ marginBottom: '16px' }}>
@@ -238,8 +238,8 @@ export default function DetailPage({ room, onGoBack, onConfirm }) {
                   Pago seguro · Cancelación gratuita
                 </span>
               </div>
-            </div>
-          </div>
+            </form>
+          </aside>
         </div>
       </div>
     </div>

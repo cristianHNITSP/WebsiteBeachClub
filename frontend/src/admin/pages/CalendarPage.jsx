@@ -35,45 +35,43 @@ export default function CalendarPage({ onNavigate }) {
     <div>
       {/* Page header */}
       <div className="admin-page-header">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-          <div>
-            <span className="admin-page-eyebrow">Vista semanal</span>
-            <h1 className="admin-page-title">
-              Calendario de<br />
-              <em>Reservaciones</em>
-            </h1>
-            {/* Property filter */}
-            <div style={{ display: 'flex', gap: '8px', marginTop: '20px' }}>
-              {[
-                { key: 'all', label: 'Todas las propiedades' },
-                { key: 'chelem', label: 'Cabañas Frida — Chelem' },
-                { key: 'chuburna', label: 'Casa Frida — Chuburná' },
-              ].map(opt => (
-                <button
-                  key={opt.key}
-                  onClick={() => setProperty(opt.key)}
-                  style={{
-                    padding: '8px 16px', borderRadius: 'var(--radius-full)',
-                    border: `1.5px solid ${property === opt.key ? 'var(--primary)' : 'var(--outline-var)'}`,
-                    background: property === opt.key ? 'rgba(0,105,113,0.10)' : 'transparent',
-                    color: property === opt.key ? 'var(--primary)' : 'var(--on-surface-var)',
-                    fontFamily: 'var(--font-body)', fontWeight: 700, fontSize: '12px',
-                    cursor: 'pointer', transition: 'all 0.2s',
-                  }}
-                >
-                  {opt.label}
-                </button>
-              ))}
-            </div>
+        <div>
+          <span className="admin-page-eyebrow">Vista semanal</span>
+          <h1 className="admin-page-title">
+            Calendario de<br />
+            <em>Reservaciones</em>
+          </h1>
+          {/* Property filter */}
+          <div style={{ display: 'flex', gap: '8px', marginTop: '20px', flexWrap: 'wrap' }}>
+            {[
+              { key: 'all', label: 'Todas las propiedades' },
+              { key: 'chelem', label: 'Cabañas Frida — Chelem' },
+              { key: 'chuburna', label: 'Casa Frida — Chuburná' },
+            ].map(opt => (
+              <button
+                key={opt.key}
+                onClick={() => setProperty(opt.key)}
+                style={{
+                  padding: '8px 16px', borderRadius: 'var(--radius-full)',
+                  border: `1.5px solid ${property === opt.key ? 'var(--primary)' : 'var(--outline-var)'}`,
+                  background: property === opt.key ? 'rgba(0,105,113,0.10)' : 'transparent',
+                  color: property === opt.key ? 'var(--primary)' : 'var(--on-surface-var)',
+                  fontFamily: 'var(--font-body)', fontWeight: 700, fontSize: '12px',
+                  cursor: 'pointer', transition: 'all 0.2s',
+                }}
+              >
+                {opt.label}
+              </button>
+            ))}
           </div>
-          <div style={{ display: 'flex', gap: '12px' }}>
+        </div>
+        <div className="admin-page-header-actions">
+          <div className="admin-page-header-actions-row">
             <button className="btn-outline">
               <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>chevron_left</span>
               Anterior
             </button>
-            <button className="btn-outline">
-              Hoy
-            </button>
+            <button className="btn-outline">Hoy</button>
             <button className="btn-outline">
               Siguiente
               <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>chevron_right</span>
@@ -187,7 +185,7 @@ export default function CalendarPage({ onNavigate }) {
       </div>
 
       {/* Summary stats below calendar */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '20px', marginTop: '32px' }}>
+      <div className="inventory-grid">
         {CALENDAR_STATS.map((stat, i) => (
           <StatCard key={i} loading={loading} {...stat} />
         ))}

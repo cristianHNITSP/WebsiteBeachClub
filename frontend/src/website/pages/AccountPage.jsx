@@ -49,14 +49,14 @@ export default function AccountPage({ bookings: externalBookings, favoritesCount
   return (
     <div className="account-page-wrapper">
       {/* Hero banner */}
-      <div className="account-hero">
-        <div className="account-hero__greeting">Bienvenida de vuelta</div>
+      <header className="account-hero">
+        <p className="account-hero__greeting">Bienvenida de vuelta</p>
         <h1 className="account-hero__name">Mi Cuenta</h1>
-      </div>
+      </header>
 
       {/* Stats row */}
-      <div className="account-stats">
-        <div className="stat-card">
+      <section className="account-stats" aria-label="Resumen de cuenta">
+        <article className="stat-card">
           <div className="stat-icon" style={{ background: 'rgba(0,59,65,0.1)' }}>
             <span className="material-symbols-outlined" style={{ color: 'var(--primary)', fontSize: '20px' }}>hotel</span>
           </div>
@@ -64,8 +64,8 @@ export default function AccountPage({ bookings: externalBookings, favoritesCount
             <div className="stat-value">{upcomingBookings.length}</div>
             <div className="stat-label">Reservas activas</div>
           </div>
-        </div>
-        <div className="stat-card">
+        </article>
+        <article className="stat-card">
           <div className="stat-icon" style={{ background: 'rgba(126,70,154,0.1)' }}>
             <span className="material-symbols-outlined" style={{ color: 'var(--secondary)', fontSize: '20px' }}>favorite</span>
           </div>
@@ -73,8 +73,8 @@ export default function AccountPage({ bookings: externalBookings, favoritesCount
             <div className="stat-value">{favoritesCount || 0}</div>
             <div className="stat-label">Favoritos</div>
           </div>
-        </div>
-        <div className="stat-card">
+        </article>
+        <article className="stat-card">
           <div className="stat-icon" style={{ background: 'rgba(245,158,11,0.1)' }}>
             <span className="material-symbols-outlined" style={{ color: 'var(--gold)', fontSize: '20px' }}>star</span>
           </div>
@@ -82,8 +82,8 @@ export default function AccountPage({ bookings: externalBookings, favoritesCount
             <div className="stat-value">{pastBookings.length}</div>
             <div className="stat-label">Estancias</div>
           </div>
-        </div>
-        <div className="stat-card">
+        </article>
+        <article className="stat-card">
           <div className="stat-icon" style={{ background: 'rgba(0,105,113,0.1)' }}>
             <span className="material-symbols-outlined" style={{ color: 'var(--surface-tint)', fontSize: '20px' }}>mail</span>
           </div>
@@ -91,12 +91,12 @@ export default function AccountPage({ bookings: externalBookings, favoritesCount
             <div className="stat-value">2</div>
             <div className="stat-label">Mensajes</div>
           </div>
-        </div>
-      </div>
+        </article>
+      </section>
 
       {/* Main content */}
       <div className="account-content">
-        <div className="tabs">
+        <nav className="tabs" aria-label="Secciones de cuenta">
           {[
             { key: 'upcoming', label: 'Próximas' },
             { key: 'past', label: 'Historial' },
@@ -111,20 +111,20 @@ export default function AccountPage({ bookings: externalBookings, favoritesCount
               {tab.label}
             </button>
           ))}
-        </div>
+        </nav>
 
         {/* Upcoming */}
         {activeTab === 'upcoming' && (
-          <div>
+          <section aria-label="Próximas reservas">
             {upcomingBookings.length === 0 ? (
-              <div className="empty-state">
+              <div className="empty-state" role="status">
                 <span className="empty-state__icon">🏖️</span>
                 <div className="empty-state__title">No tienes reservas próximas</div>
                 <div className="empty-state__sub">Cuando reserves una habitación, aparecerá aquí.</div>
               </div>
             ) : (
               upcomingBookings.map(booking => (
-                <div key={booking.id} className="booking-card">
+                <article key={booking.id} className="booking-card">
                   <div className="booking-card__image">
                     <img src={booking.img} alt={booking.room} />
                     <span
@@ -136,14 +136,16 @@ export default function AccountPage({ bookings: externalBookings, favoritesCount
                   </div>
                   <div className="booking-card__body">
                     <div>
-                      <div className="booking-card__title">{booking.room}</div>
+                      <h2 className="booking-card__title">{booking.room}</h2>
                       <div className="booking-card__details">
                         <span className="material-symbols-outlined" style={{ fontSize: '12px', marginRight: '4px' }}>location_on</span>
                         {booking.location}
                       </div>
                       <div className="booking-card__details" style={{ marginTop: '6px' }}>
                         <span className="material-symbols-outlined" style={{ fontSize: '12px', marginRight: '4px' }}>calendar_today</span>
-                        {formatDate(booking.checkIn)} → {formatDate(booking.checkOut)}
+                        <time dateTime={booking.checkIn}>{formatDate(booking.checkIn)}</time>
+                        {' → '}
+                        <time dateTime={booking.checkOut}>{formatDate(booking.checkOut)}</time>
                       </div>
                     </div>
                     <button
@@ -154,24 +156,24 @@ export default function AccountPage({ bookings: externalBookings, favoritesCount
                       <span className="material-symbols-outlined" style={{ fontSize: '12px' }}>arrow_forward</span>
                     </button>
                   </div>
-                </div>
+                </article>
               ))
             )}
-          </div>
+          </section>
         )}
 
         {/* Past */}
         {activeTab === 'past' && (
-          <div>
+          <section aria-label="Historial de reservas">
             {pastBookings.length === 0 ? (
-              <div className="empty-state">
+              <div className="empty-state" role="status">
                 <span className="empty-state__icon">📋</span>
                 <div className="empty-state__title">Sin estancias anteriores</div>
                 <div className="empty-state__sub">Tu historial de reservas aparecerá aquí.</div>
               </div>
             ) : (
               pastBookings.map(booking => (
-                <div key={booking.id} className="booking-card">
+                <article key={booking.id} className="booking-card">
                   <div className="booking-card__image">
                     <img src={booking.img} alt={booking.room} />
                     <span className="booking-card__badge" style={{ background: statusColors[booking.status] }}>
@@ -180,14 +182,16 @@ export default function AccountPage({ bookings: externalBookings, favoritesCount
                   </div>
                   <div className="booking-card__body">
                     <div>
-                      <div className="booking-card__title">{booking.room}</div>
+                      <h2 className="booking-card__title">{booking.room}</h2>
                       <div className="booking-card__details">
                         <span className="material-symbols-outlined" style={{ fontSize: '12px', marginRight: '4px' }}>location_on</span>
                         {booking.location}
                       </div>
                       <div className="booking-card__details" style={{ marginTop: '6px' }}>
                         <span className="material-symbols-outlined" style={{ fontSize: '12px', marginRight: '4px' }}>calendar_today</span>
-                        {formatDate(booking.checkIn)} → {formatDate(booking.checkOut)}
+                        <time dateTime={booking.checkIn}>{formatDate(booking.checkIn)}</time>
+                        {' → '}
+                        <time dateTime={booking.checkOut}>{formatDate(booking.checkOut)}</time>
                       </div>
                     </div>
                     <button className="booking-card__cta">
@@ -195,15 +199,15 @@ export default function AccountPage({ bookings: externalBookings, favoritesCount
                       <span className="material-symbols-outlined" style={{ fontSize: '12px' }}>refresh</span>
                     </button>
                   </div>
-                </div>
+                </article>
               ))
             )}
-          </div>
+          </section>
         )}
 
         {/* Favorites */}
         {activeTab === 'favorites' && (
-          <div className="empty-state">
+          <section className="empty-state" aria-label="Favoritos" role="status">
             <span className="empty-state__icon">♡</span>
             <div className="empty-state__title">
               {favoritesCount > 0 ? `${favoritesCount} habitación${favoritesCount !== 1 ? 'es' : ''} en favoritos` : 'Sin favoritos aún'}
@@ -213,12 +217,12 @@ export default function AccountPage({ bookings: externalBookings, favoritesCount
                 ? 'Visita las habitaciones para verlas en detalle.'
                 : 'Marca con ♡ las habitaciones que te interesen para guardarlas aquí.'}
             </div>
-          </div>
+          </section>
         )}
 
         {/* Messages */}
         {activeTab === 'messages' && (
-          <div>
+          <section aria-label="Mensajes">
             {[
               {
                 id: 1,
@@ -237,7 +241,7 @@ export default function AccountPage({ bookings: externalBookings, favoritesCount
                 unread: false,
               },
             ].map(msg => (
-              <div
+              <article
                 key={msg.id}
                 style={{
                   display: 'flex',
@@ -266,19 +270,19 @@ export default function AccountPage({ bookings: externalBookings, favoritesCount
                 </div>
                 <div style={{ flex: 1 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                    <div style={{ fontFamily: 'var(--font-body)', fontWeight: '700', fontSize: '13px', color: 'var(--on-surface)' }}>
+                    <p style={{ fontFamily: 'var(--font-body)', fontWeight: '700', fontSize: '13px', color: 'var(--on-surface)' }}>
                       {msg.from}
-                    </div>
-                    <div style={{ fontFamily: 'var(--font-body)', fontSize: '11px', color: 'var(--outline)' }}>
+                    </p>
+                    <time style={{ fontFamily: 'var(--font-body)', fontSize: '11px', color: 'var(--outline)' }}>
                       {msg.time}
-                    </div>
+                    </time>
                   </div>
-                  <div style={{ fontFamily: 'var(--font-body)', fontWeight: '600', fontSize: '13px', color: 'var(--on-surface)', marginTop: '2px' }}>
+                  <h2 style={{ fontFamily: 'var(--font-body)', fontWeight: '600', fontSize: '13px', color: 'var(--on-surface)', marginTop: '2px' }}>
                     {msg.subject}
-                  </div>
-                  <div style={{ fontFamily: 'var(--font-body)', fontSize: '12px', color: 'var(--outline)', marginTop: '4px' }}>
+                  </h2>
+                  <p style={{ fontFamily: 'var(--font-body)', fontSize: '12px', color: 'var(--outline)', marginTop: '4px' }}>
                     {msg.preview}
-                  </div>
+                  </p>
                 </div>
                 {msg.unread && (
                   <div style={{
@@ -290,9 +294,9 @@ export default function AccountPage({ bookings: externalBookings, favoritesCount
                     marginTop: '6px',
                   }} />
                 )}
-              </div>
+              </article>
             ))}
-          </div>
+          </section>
         )}
       </div>
     </div>

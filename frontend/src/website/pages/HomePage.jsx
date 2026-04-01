@@ -17,7 +17,7 @@ const stagger = (delay = 0) => ({
   visible: { opacity: 1, y: 0, transition: { duration: 0.7, ease: [0.16, 1, 0.3, 1], delay } },
 })
 
-function ScrollReveal({ children, delay = 0, className }) {
+function ScrollReveal({ children, delay = 0, className, style }) {
   const ref = useRef(null)
   const inView = useInView(ref, { once: true, margin: '-60px' })
   return (
@@ -27,6 +27,7 @@ function ScrollReveal({ children, delay = 0, className }) {
       animate={inView ? 'visible' : 'hidden'}
       variants={stagger(delay)}
       className={className}
+      style={style}
     >
       {children}
     </motion.div>
@@ -262,7 +263,7 @@ export default function HomePage({ onNavigate, onSelectRoom, rooms, favorites, o
 
           <div className="home-rooms-grid" style={{ marginTop: '36px' }}>
             {filteredRooms.map((room, i) => (
-              <ScrollReveal key={room.id} delay={i * 0.07}>
+              <ScrollReveal key={room.id} delay={i * 0.07} style={{ height: '100%' }}>
                 <RoomCard
                   room={room}
                   onSelect={onSelectRoom}

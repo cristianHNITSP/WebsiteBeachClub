@@ -1,0 +1,51 @@
+/* ── Layout shell ── */
+.layout {
+  min-height: 100vh;
+  background: var(--background);
+  font-family: var(--font-body);
+}
+
+/* ── Main content — offset for fixed sidebar + topnav ── */
+.main {
+  margin-left: 256px;
+  padding-top: 64px;
+  min-height: 100vh;
+}
+
+.content {
+  padding: 28px 32px;
+}
+
+/* ── Sidebar overlay (backdrop on mobile) ── */
+.overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  z-index: 39;
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  cursor: pointer;
+}
+.overlayActive { display: block; }
+
+/* ════════════════════════════════════════
+   RESPONSIVE
+   ════════════════════════════════════════ */
+
+/* Tablet: sidebar is a hidden drawer — main content fills full width */
+@media (max-width: 1024px) {
+  .main {
+    margin-left: 0;
+  }
+  .content {
+    padding: 22px 24px;
+  }
+}
+
+/* Mobile */
+@media (max-width: 768px) {
+  .content {
+    padding: 16px;
+  }
+}

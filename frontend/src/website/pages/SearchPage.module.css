@@ -1,0 +1,89 @@
+/* ── Wrapper ── */
+.wrapper {
+  min-height: 100vh;
+  padding-top: 72px;
+}
+
+.inner {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 32px 24px 64px;
+}
+
+/* ── 2-column layout: filters sidebar + results ── */
+.layout {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  gap: 24px;
+  align-items: start;
+}
+
+/* ── Filter sidebar ── */
+.filterSidebar {
+  position: sticky;
+  top: 88px; /* below fixed navbar */
+}
+
+/* Mobile filter toggle — hidden on desktop */
+.filterToggle {
+  display: none;
+  width: 100%;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 16px;
+  margin-bottom: 10px;
+  background: var(--surface-container-low);
+  border: 1px solid var(--outline-var);
+  border-radius: var(--radius-md);
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--on-surface);
+  cursor: pointer;
+  transition: background 0.18s;
+}
+.filterToggle:hover { background: var(--surface-container); }
+
+.filterToggleCount {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--on-surface-var);
+  font-weight: 500;
+}
+
+/* Filters panel — always visible on desktop */
+.filters { display: block; }
+
+/* filtersHidden only takes effect on mobile (see @media below) */
+.filtersHidden { /* no-op on desktop */ }
+
+/* ── Results column ── */
+.results { min-width: 0; }
+
+/* ════════════════════════════════════════
+   RESPONSIVE
+   ════════════════════════════════════════ */
+@media (max-width: 1024px) {
+  .layout {
+    grid-template-columns: 240px 1fr;
+    gap: 16px;
+  }
+}
+
+@media (max-width: 768px) {
+  .wrapper { padding-top: 60px; }
+
+  .inner { padding: 16px 16px 56px; }
+
+  /* Stack: filter toggle + collapsible panel above results */
+  .layout {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .filterSidebar { position: static; }
+  .filterToggle { display: flex; }
+
+  /* On mobile, hidden = actually hidden */
+  .filtersHidden { display: none; }
+}

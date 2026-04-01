@@ -11,11 +11,13 @@ import ShopPage from './pages/ShopPage'
 import AdminAccountPage from './pages/AdminAccountPage'
 import NuevaReservaPage from './pages/NuevaReservaPage'
 import NuevaHabitacionPage from './pages/NuevaHabitacionPage'
+import EditarHabitacionPage from './pages/EditarHabitacionPage'
+import GestionFotosPage from './pages/GestionFotosPage'
 import ConfigPage from './pages/ConfigPage'
 import './admin.css'
 
 /* Páginas que reemplazan el contenido completo */
-const FULL_PAGES = ['account', 'nueva-reserva', 'nueva-habitacion', 'config']
+const FULL_PAGES = ['account', 'nueva-reserva', 'nueva-habitacion', 'editar-habitacion', 'gestionar-fotos', 'config']
 
 /* ── Nav-guard modal ── */
 function NavGuardModal({ onConfirm, onCancel }) {
@@ -111,6 +113,8 @@ export default function AdminApp() {
   const [isDirty, setIsDirty]     = useState(false)
   const [pendingNav, setPendingNav] = useState(null)
   const [showNavGuard, setShowNavGuard] = useState(false)
+  const [editingRoom, setEditingRoom] = useState(null)
+  const [photosRoom,  setPhotosRoom]  = useState(null)
 
   const doNavigate = (newPage) => {
     setIsDirty(false)
@@ -137,6 +141,16 @@ export default function AdminApp() {
   const cancelNavGuard = () => {
     setShowNavGuard(false)
     setPendingNav(null)
+  }
+
+  const handleEditRoom = (room) => {
+    setEditingRoom(room)
+    handleNavigate('editar-habitacion')
+  }
+
+  const handleGestionarFotos = (room) => {
+    setPhotosRoom(room)
+    handleNavigate('gestionar-fotos')
   }
 
   if (page === 'login') {
@@ -191,10 +205,44 @@ export default function AdminApp() {
     )
   }
 
+  if (page === 'editar-habitacion') {
+    return (
+      <>
+        <AdminLayout page={page} navPage={prevPage} onNavigate={handleNavigate}>
+          <EditarHabitacionPage
+            room={editingRoom}
+            onBack={() => doNavigate(prevPage)}
+            onDirtyChange={setIsDirty}
+          />
+        </AdminLayout>
+        {showNavGuard && (
+          <NavGuardModal onConfirm={confirmNavGuard} onCancel={cancelNavGuard} />
+        )}
+      </>
+    )
+  }
+
+  if (page === 'gestionar-fotos') {
+    return (
+      <>
+        <AdminLayout page={page} navPage={prevPage} onNavigate={handleNavigate}>
+          <GestionFotosPage
+            room={photosRoom}
+            onBack={() => doNavigate(prevPage)}
+            onDirtyChange={setIsDirty}
+          />
+        </AdminLayout>
+        {showNavGuard && (
+          <NavGuardModal onConfirm={confirmNavGuard} onCancel={cancelNavGuard} />
+        )}
+      </>
+    )
+  }
+
   const renderPage = () => {
     switch (page) {
       case 'dashboard':    return <DashboardPage onNavigate={handleNavigate} />
-      case 'rooms':        return <RoomsPage onNavigate={handleNavigate} />
+      case 'rooms':        return <RoomsPage onNavigate={handleNavigate} onEditRoom={handleEditRoom} onGestionarFotos={handleGestionarFotos} />
       case 'users':        return <UsersPage />
       case 'calendar':     return <CalendarPage onNavigate={handleNavigate} />
       case 'shop':         return <ShopPage />
