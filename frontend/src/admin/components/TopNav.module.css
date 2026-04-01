@@ -98,6 +98,9 @@
 @media (max-width: 1024px) {
   .hamburger { display: flex; }
   .desktopNav { display: none; }
+  /* Logo stays left next to hamburger; actions pushed to far right */
+  .topnav   { justify-content: flex-start; }
+  .actions  { margin-left: auto; }
 }
 
 @media (max-width: 600px) {

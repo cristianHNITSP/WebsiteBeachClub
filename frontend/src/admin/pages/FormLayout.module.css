@@ -48,3 +48,15 @@
 @media (max-width: 390px) {
   .threeCol { grid-template-columns: 1fr; }
 }
+
+/* ── Equal 2-col grid for photo/media management pages ── */
+.photoGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 40px;
+  align-items: start;
+}
+
+@media (max-width: 768px) {
+  .photoGrid { grid-template-columns: 1fr; gap: 20px; }
+}

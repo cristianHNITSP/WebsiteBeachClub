@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import SectionPanel from '../components/SectionPanel'
 import { useToast } from '@/components/frida/Toast'
+import s from './FormLayout.module.css'
 
 /* ── Internal: hover-aware photo card ── */
 function PhotoCard({ photo, onMarkFavorite, onRemove }) {
@@ -200,7 +201,7 @@ export default function GestionFotosPage({ room, onBack, onDirtyChange }) {
       dirty={dirty}
       actions={actions}
     >
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '40px', alignItems: 'start' }}>
+      <div className={s.photoGrid}>
 
         {/* ── Left column: upload + grid ── */}
         <div>

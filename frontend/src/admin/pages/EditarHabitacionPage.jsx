@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import SectionPanel from '../components/SectionPanel'
 import { Field, Input, Select, Textarea } from '@/components/frida/Field'
 import { useToast } from '@/components/frida/Toast'
+import s from './FormLayout.module.css'
 
 const TYPE_MAP = {
   'Suite': 'suite', 'Suite Premium': 'suite',
@@ -117,7 +118,7 @@ export default function EditarHabitacionPage({ room, onBack, onDirtyChange }) {
       actions={actions}
     >
       <form id="editar-habitacion-form" onSubmit={handleSubmit}>
-        <div style={{ display: 'grid', gridTemplateColumns: '7fr 5fr', gap: '32px', alignItems: 'start' }}>
+        <div className={s.formGrid}>
 
           {/* ── Left column ── */}
           <div>
@@ -127,7 +128,7 @@ export default function EditarHabitacionPage({ room, onBack, onDirtyChange }) {
                 <Input required placeholder="Ej. Suite Coral Grande"
                   value={form.nombre} onChange={set('nombre')} />
               </Field>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+              <div className={s.twoCol}>
                 <Field label="Tipo">
                   <Select required value={form.tipo} onChange={set('tipo')}>
                     <option value="">Seleccionar…</option>
@@ -150,7 +151,7 @@ export default function EditarHabitacionPage({ room, onBack, onDirtyChange }) {
             </div>
 
             <SectionLabel>Capacidad y tamaño</SectionLabel>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
+            <div className={s.threeCol}>
               <Field label="Capacidad (personas)">
                 <Select value={form.capacidad} onChange={set('capacidad')}>
                   {[1,2,3,4,5,6,8,10].map(n => <option key={n} value={n}>{n}</option>)}
@@ -209,7 +210,7 @@ export default function EditarHabitacionPage({ room, onBack, onDirtyChange }) {
           </div>
 
           {/* ── Right column ── */}
-          <div style={{ position: 'sticky', top: '80px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <div className={s.sidePanel}>
             <div style={{
               background: 'var(--surface-container-low)',
               border: '1px solid var(--outline-var)',
