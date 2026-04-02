@@ -105,7 +105,7 @@ const TABS = [
 
 export default function ConfigPage({ onBack, onDirtyChange }) {
   const addToast = useToast()
-  const { isDark, toggleDark } = useTheme()
+  const { isDark, toggleDark, fontSize, setFontSize, highContrast, setHighContrast, reduceMotion, setReduceMotion } = useTheme()
   const [tab, setTab] = useState('perfil')
 
   /* Seguridad state */
@@ -113,10 +113,7 @@ export default function ConfigPage({ onBack, onDirtyChange }) {
   const [loginAlerts, setLoginAlerts] = useState(true)
   const [sessionLog, setSessionLog]  = useState(true)
 
-  /* Accesibilidad state */
-  const [animations, setAnimations]     = useState(true)
-  const [highContrast, setHighContrast] = useState(false)
-  const [fontSize, setFontSize]         = useState('normal')
+  /* Accesibilidad local state */
   const [language, setLanguage]         = useState('es')
 
   /* Perfil state */
@@ -125,16 +122,13 @@ export default function ConfigPage({ onBack, onDirtyChange }) {
   const [telefono, setTelefono] = useState('+52 999 000 0000')
 
   const dirty =
-    nombre    !== 'Administrador'          ||
-    correo    !== 'admin@hotelesfrida.mx'  ||
-    telefono  !== '+52 999 000 0000'       ||
-    twoFA     !== false  ||
-    loginAlerts  !== true  ||
-    sessionLog   !== true  ||
-    animations   !== true  ||
-    highContrast !== false ||
-    fontSize  !== 'normal' ||
-    language  !== 'es'
+    nombre       !== 'Administrador'          ||
+    correo       !== 'admin@hotelesfrida.mx'  ||
+    telefono     !== '+52 999 000 0000'       ||
+    twoFA        !== false  ||
+    loginAlerts  !== true   ||
+    sessionLog   !== true   ||
+    language     !== 'es'
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { onDirtyChange?.(dirty) }, [dirty])
@@ -480,10 +474,10 @@ export default function ConfigPage({ onBack, onDirtyChange }) {
               <ConfigSection title="Movimiento y animaciones">
                 <ConfigRow
                   icon="animation"
-                  label="Animaciones de interfaz"
-                  description="Transiciones y efectos de movimiento al navegar"
+                  label="Reducir animaciones"
+                  description="Elimina transiciones y efectos de movimiento al navegar"
                 >
-                  <Toggle value={animations} onChange={setAnimations} />
+                  <Toggle value={reduceMotion} onChange={setReduceMotion} />
                 </ConfigRow>
               </ConfigSection>
 

@@ -66,6 +66,43 @@
   --surface-container-highest: #2a3a4a;
 }
 
+/* ===== ACCESSIBILITY ===== */
+
+/* Font size — zoom scales everything including hardcoded px inline styles */
+.font-small { zoom: 0.875; }
+.font-large { zoom: 1.15;  }
+
+/* High contrast — override key tokens for WCAG AA compliance */
+.high-contrast {
+  --primary:               #004f57;
+  --on-surface:            #000000;
+  --on-surface-var:        #1a2530;
+  --outline:               #3a4a58;
+  --outline-var:           #5a6a78;
+  --surface-container-low: #ffffff;
+  --surface-container:     #e8edf2;
+  --bg:                    #ffffff;
+}
+.dark.high-contrast {
+  --primary:               #4dd8e4;
+  --on-surface:            #ffffff;
+  --on-surface-var:        #d0e4f0;
+  --outline:               #a0bece;
+  --outline-var:           #6090aa;
+  --surface-container-low: #0a1018;
+  --surface-container:     #111820;
+  --bg:                    #000000;
+}
+
+/* Reduce motion — eliminate all CSS animations and transitions */
+.reduce-motion *,
+.reduce-motion *::before,
+.reduce-motion *::after {
+  animation:        none !important;
+  transition:       none !important;
+  scroll-behavior:  auto !important;
+}
+
 /* ===== ANIMATIONS ===== */
 @keyframes fadeInUp {
   from {

@@ -165,29 +165,32 @@ export default function RoomsPage({ onNavigate, onEditRoom, onGestionarFotos }) 
       {/* Room config grid */}
       <div className="room-config-grid">
 
-        {/* ── Skeleton state ── */}
-        {loading && <>
-          <div>
+        {/* ── Skeleton: top (hero + detail cards) ── */}
+        {loading && (
+          <div className="room-config-main-top">
             <SkeletonRoomHero />
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', marginTop: '24px' }}>
               <SkeletonDetailCard />
               <SkeletonDetailCard />
               <SkeletonDetailCard />
             </div>
-            <div style={{ marginTop: '32px' }}>
-              <SkeletonDetailCard style={{ width: '200px', marginBottom: '16px', padding: '10px 16px' }} />
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '16px' }}>
-                <SkeletonRoomCard />
-                <SkeletonRoomCard />
-                <SkeletonRoomCard />
-                <SkeletonRoomCard />
-              </div>
+          </div>
+        )}
+
+        {/* ── Skeleton: bottom (room list) ── */}
+        {loading && (
+          <div className="room-config-main-bottom">
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '16px' }}>
+              <SkeletonRoomCard />
+              <SkeletonRoomCard />
+              <SkeletonRoomCard />
+              <SkeletonRoomCard />
             </div>
           </div>
-        </>}
+        )}
 
-        {/* ── Real content ── */}
-        {!loading && <div>
+        {/* ── Real content: top (hero + detail cards) ── */}
+        {!loading && <div className="room-config-main-top">
           {/* ── Hero card ── */}
           <div className="room-config-hero" ref={heroRef}>
             {/* Animated image — crossfades + slides from below on room change */}
@@ -277,8 +280,11 @@ export default function RoomsPage({ onNavigate, onEditRoom, onGestionarFotos }) 
             </motion.div>
           </AnimatePresence>
 
-          {/* ── Room list with pagination ── */}
-          <div style={{ marginTop: '32px' }}>
+        </div>}
+
+        {/* ── Real content: bottom (room list) ── */}
+        {!loading && <div className="room-config-main-bottom">
+          <div style={{ marginTop: '0' }}>
 
             {/* Fila 1: título + paginación */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>

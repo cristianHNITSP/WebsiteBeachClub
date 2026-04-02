@@ -185,9 +185,15 @@
 .room-config-grid {
   display: grid;
   grid-template-columns: 8fr 4fr;
+  grid-template-areas:
+    "top    sidebar"
+    "bottom sidebar";
   gap: 48px;
   align-items: start;
 }
+.room-config-main-top    { grid-area: top; }
+.room-config-main-bottom { grid-area: bottom; }
+.room-config-sidebar     { grid-area: sidebar; }
 
 .room-config-hero {
   position: relative;
@@ -471,7 +477,14 @@
    ═══════════════════════════════════════ */
 @media (max-width: 1024px) {
   .metrics-grid          { grid-template-columns: 1fr 1fr; }
-  .room-config-grid      { grid-template-columns: 1fr; gap: 20px; }
+  .room-config-grid      {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "top"
+      "sidebar"
+      "bottom";
+    gap: 20px;
+  }
   .role-grid             { grid-template-columns: repeat(2, 1fr); }
   .admin-account-grid    { grid-template-columns: repeat(2, 1fr); }
   .shop-grid             { grid-template-columns: 1fr; }
@@ -488,7 +501,14 @@
   .metrics-grid          { grid-template-columns: 1fr; }
   .role-grid             { grid-template-columns: 1fr; }
   .admin-account-grid    { grid-template-columns: 1fr; }
-  .room-config-grid      { grid-template-columns: 1fr; gap: 16px; }
+  .room-config-grid      {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "top"
+      "sidebar"
+      "bottom";
+    gap: 16px;
+  }
   .shop-grid             { grid-template-columns: 1fr; }
   .shop-products-grid    { grid-template-columns: 1fr; }
   .inventory-grid        { grid-template-columns: repeat(2, 1fr); }
