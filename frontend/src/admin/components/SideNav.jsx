@@ -15,23 +15,23 @@ const NAV_GROUPS = [
     label: 'Operaciones',
     items: [
       { key: 'rooms',        label: 'Habitaciones', icon: 'bed',               badge: null },
-      { key: 'housekeeping', label: 'Limpieza',      icon: 'cleaning_services', badge: 2 },
-      { key: 'users',        label: 'Huéspedes',     icon: 'group',             badge: null },
+      //{ key: 'housekeeping', label: 'Limpieza',      icon: 'cleaning_services', badge: 2 },
+      { key: 'users',        label: 'Usuarios',      icon: 'group',             badge: null },
     ],
   },
   {
     label: 'Gestión',
     items: [
-      { key: 'shop',      label: 'Boutique',  icon: 'storefront', badge: null },
-      { key: 'marketing', label: 'Marketing', icon: 'campaign',   badge: null },
+      { key: 'shop',      label: 'Tienda',  icon: 'storefront',   badge: null },
+      { key: 'sales',     label: 'Ventas',    icon: 'receipt_long', badge: null },
+      //{ key: 'marketing', label: 'Marketing', icon: 'campaign',     badge: null },
     ],
   },
 ]
 
 const PROPERTIES = [
-  { id: 'grand',    name: 'Grand Oasis',     location: 'Chelem, Yucatán' },
+  { id: 'Chelem',    name: 'Cabañas Frida',     location: 'Chelem, Yucatán' },
   { id: 'chuburna', name: 'Casa Frida',      location: 'Chuburná, Yucatán' },
-  { id: 'merida',   name: 'Boutique Mérida', location: 'Centro Histórico' },
 ]
 
 /* ── Single nav item ── */

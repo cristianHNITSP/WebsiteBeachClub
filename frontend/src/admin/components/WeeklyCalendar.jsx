@@ -28,7 +28,7 @@ const BOOKING_CLASS = {
  *   todayNum   — today's date number (new Date().getDate())
  *   loading    — show skeleton placeholder rows
  */
-export default function WeeklyCalendar({ data, weekDates, todayNum, loading = false }) {
+const WeeklyCalendar = ({ data, weekDates, todayNum, loading = false }) => {
   return (
     <div className={s.wrapper}>
       <div className={s.grid}>
@@ -135,3 +135,5 @@ export default function WeeklyCalendar({ data, weekDates, todayNum, loading = fa
     </div>
   )
 }
+
+export default WeeklyCalendar

@@ -8,6 +8,7 @@ import RoomsPage from './pages/RoomsPage'
 import UsersPage from './pages/UsersPage'
 import CalendarPage from './pages/CalendarPage'
 import ShopPage from './pages/ShopPage'
+import SalesPage from './pages/SalesPage'
 import AdminAccountPage from './pages/AdminAccountPage'
 import NuevaReservaPage from './pages/NuevaReservaPage'
 import NuevaHabitacionPage from './pages/NuevaHabitacionPage'
@@ -118,7 +119,7 @@ export default function AdminApp() {
 
   const doNavigate = (newPage) => {
     setIsDirty(false)
-    if (FULL_PAGES.includes(newPage)) setPrevPage(page)
+    if (FULL_PAGES.includes(newPage) && newPage !== page) setPrevPage(page)
     setPage(newPage)
   }
 
@@ -251,6 +252,7 @@ export default function AdminApp() {
       case 'users':        return <UsersPage />
       case 'calendar':     return <CalendarPage onNavigate={handleNavigate} />
       case 'shop':         return <ShopPage />
+      case 'sales':        return <SalesPage />
       case 'housekeeping': return (
         <div>
           <span className="admin-page-eyebrow">Operaciones</span>

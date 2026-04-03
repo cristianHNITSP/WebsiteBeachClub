@@ -177,9 +177,39 @@ export default function RoomsPage({ onNavigate, onEditRoom, onGestionarFotos }) 
           </div>
         )}
 
-        {/* ── Skeleton: bottom (room list) ── */}
+        {/* ── Skeleton + real content: bottom (room list) ── */}
         {loading && (
           <div className="room-config-main-bottom">
+            {/* Search + filters — visible but disabled during loading */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+              <h3 className="admin-section-title" style={{ marginBottom: 0 }}>Todas las Habitaciones</h3>
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                {[0, 1].map(i => (
+                  <div key={i} style={{ width: '32px', height: '32px', borderRadius: 'var(--radius-md)', border: '1.5px solid var(--outline-var)', opacity: 0.35 }} />
+                ))}
+                <span style={{ fontFamily: 'var(--font-body)', fontSize: '12px', fontWeight: 700, color: 'var(--outline)', minWidth: '44px', textAlign: 'center' }}>— / —</span>
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: '10px', marginBottom: '16px', flexWrap: 'wrap', opacity: 0.4, pointerEvents: 'none' }}>
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: '8px',
+                background: 'var(--surface-container)', border: '1px solid var(--outline-var)',
+                borderRadius: 'var(--radius-full)', padding: '8px 16px', flex: '1', minWidth: '180px',
+              }}>
+                <span className="material-symbols-outlined" style={{ fontSize: '16px', color: 'var(--outline)' }}>search</span>
+                <div style={{ height: '14px', width: '120px', borderRadius: 'var(--radius-sm)', background: 'var(--surface-container-high)' }} />
+              </div>
+              {['Todos', 'Disponibles', 'Mantenimiento'].map(s => (
+                <div key={s} style={{
+                  padding: '8px 14px', borderRadius: 'var(--radius-full)',
+                  border: '1.5px solid var(--outline-var)',
+                  fontFamily: 'var(--font-body)', fontWeight: 700, fontSize: '12px',
+                  color: 'var(--on-surface-var)',
+                }}>
+                  {s}
+                </div>
+              ))}
+            </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '16px' }}>
               <SkeletonRoomCard />
               <SkeletonRoomCard />
@@ -305,7 +335,7 @@ export default function RoomsPage({ onNavigate, onEditRoom, onGestionarFotos }) 
                   <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>chevron_left</span>
                 </button>
                 <span style={{ fontFamily: 'var(--font-body)', fontSize: '12px', fontWeight: 700, color: 'var(--outline)', minWidth: '44px', textAlign: 'center' }}>
-                  {currentPage + 1} / {totalPages}
+                  {totalPages === 0 ? '0 / 0' : `${currentPage + 1} / ${totalPages}`}
                 </span>
                 <button
                   onClick={() => setCurrentPage(p => p + 1)}
@@ -362,122 +392,126 @@ export default function RoomsPage({ onNavigate, onEditRoom, onGestionarFotos }) 
               ))}
             </div>
 
-            {/* Grid con altura mínima fija para evitar saltos de scroll al paginar/filtrar */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '16px', minHeight: '492px', alignContent: 'start' }}>
-              <AnimatePresence mode="popLayout">
-                {paginated.map(room => (
-                  <motion.div
-                    key={room.id}
-                    layout
-                    initial={{ opacity: 0, y: 12 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, scale: 0.96 }}
-                    transition={{ duration: 0.22 }}
-                    style={{
-                      borderRadius: 'var(--radius-xl)',
-                      overflow: 'hidden',
-                      cursor: 'pointer',
-                      border: selectedRoom.id === room.id ? '2px solid var(--primary)' : '2px solid transparent',
-                      transition: 'border-color 0.2s',
-                    }}
-                    onClick={() => handleSelectRoom(room)}
-                  >
-                    {/* Card image area */}
-                    <div style={{ position: 'relative', height: '180px', overflow: 'hidden' }}>
-                      <AnimatePresence mode="wait">
-                        {room.id === selectedRoom.id ? (
-                          /* Placeholder — this image is "shown" in the hero */
-                          <motion.div
-                            key="placeholder"
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            exit={{ opacity: 0 }}
-                            transition={{ duration: 0.2 }}
-                            style={{
-                              position: 'absolute', inset: 0,
-                              background: 'linear-gradient(135deg, var(--primary-container, rgba(0,105,113,0.25)), var(--surface-container-high))',
-                              display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            }}
-                          >
-                            <span className="material-symbols-outlined" style={{ fontSize: '36px', color: 'var(--primary)', opacity: 0.35 }}>
-                              hotel
-                            </span>
-                          </motion.div>
-                        ) : (
-                          /* Real image — flies up when selected */
-                          <motion.img
-                            key="img"
-                            src={room.img}
-                            alt={room.name}
-                            initial={{ opacity: 0, y: 10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, y: -28, scale: 0.95 }}
-                            transition={{ duration: 0.28, ease: [0.25, 0.46, 0.45, 0.94] }}
-                            style={{
-                              position: 'absolute', inset: 0,
-                              width: '100%', height: '100%', objectFit: 'cover',
-                            }}
-                          />
-                        )}
-                      </AnimatePresence>
-                      <div style={{
-                        position: 'absolute', inset: 0,
-                        background: 'linear-gradient(to top, rgba(23,28,33,0.7), transparent)',
-                        pointerEvents: 'none',
-                      }} />
-                      <div style={{ position: 'absolute', bottom: '12px', left: '16px', right: '12px' }}>
-                        <div style={{ fontFamily: 'var(--font-headline)', fontSize: '1rem', color: '#fff', fontWeight: '700' }}>
-                          {room.name}
-                        </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px' }}>
-                          <span style={{ fontFamily: 'var(--font-body)', fontSize: '11px', color: 'rgba(255,255,255,0.7)' }}>
-                            {room.type}
-                          </span>
-                          <span className={`status-badge ${room.status === 'active' ? 'status-badge--active' : 'status-badge--maintenance'}`}>
-                            {room.status === 'active' ? 'Activa' : 'Mant.'}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Card footer */}
-                    <div style={{
-                      padding: '14px 16px',
-                      background: 'var(--surface-container-low)',
-                      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                    }}>
-                      <span style={{ fontFamily: 'var(--font-body)', fontSize: '12px', color: 'var(--on-surface-variant)', fontWeight: '600' }}>
-                        MXN ${room.rate.toLocaleString()} / noche
-                      </span>
-                      <button
-                        className="btn-outline"
-                        style={{ height: '30px', padding: '0 12px', fontSize: '10px' }}
-                        onClick={e => { e.stopPropagation(); onEditRoom(room) }}
+            {/* Grid con altura fija para evitar saltos de scroll al paginar/filtrar */}
+            <div style={{ minHeight: '492px', position: 'relative' }}>
+              {filtered.length === 0 ? (
+                /* Empty state — centered inside the fixed-height container */
+                <div style={{
+                  position: 'absolute', inset: 0,
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                  textAlign: 'center',
+                  background: 'var(--surface-container-low)',
+                  borderRadius: 'var(--radius-xl)',
+                  border: '1px dashed var(--outline-var)',
+                }}>
+                  <span className="material-symbols-outlined" style={{ fontSize: '40px', color: 'var(--outline)', display: 'block', marginBottom: '12px' }}>
+                    search_off
+                  </span>
+                  <p style={{ fontFamily: 'var(--font-body)', fontSize: '13px', color: 'var(--outline)', margin: 0 }}>
+                    No se encontraron habitaciones con esos filtros
+                  </p>
+                </div>
+              ) : (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '16px', alignContent: 'start' }}>
+                  <AnimatePresence mode="popLayout">
+                    {paginated.map(room => (
+                      <motion.div
+                        key={room.id}
+                        layout
+                        initial={{ opacity: 0, y: 12 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, scale: 0.96 }}
+                        transition={{ duration: 0.22 }}
+                        style={{
+                          borderRadius: 'var(--radius-xl)',
+                          overflow: 'hidden',
+                          cursor: 'pointer',
+                          border: selectedRoom.id === room.id ? '2px solid var(--primary)' : '2px solid transparent',
+                          transition: 'border-color 0.2s',
+                        }}
+                        onClick={() => handleSelectRoom(room)}
                       >
-                        Editar
-                      </button>
-                    </div>
-                  </motion.div>
-                ))}
-              </AnimatePresence>
-            </div>
+                        {/* Card image area */}
+                        <div style={{ position: 'relative', height: '180px', overflow: 'hidden' }}>
+                          <AnimatePresence mode="wait">
+                            {room.id === selectedRoom.id ? (
+                              /* Placeholder — this image is "shown" in the hero */
+                              <motion.div
+                                key="placeholder"
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                exit={{ opacity: 0 }}
+                                transition={{ duration: 0.2 }}
+                                style={{
+                                  position: 'absolute', inset: 0,
+                                  background: 'linear-gradient(135deg, var(--primary-container, rgba(0,105,113,0.25)), var(--surface-container-high))',
+                                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                }}
+                              >
+                                <span className="material-symbols-outlined" style={{ fontSize: '36px', color: 'var(--primary)', opacity: 0.35 }}>
+                                  hotel
+                                </span>
+                              </motion.div>
+                            ) : (
+                              /* Real image — flies up when selected */
+                              <motion.img
+                                key="img"
+                                src={room.img}
+                                alt={room.name}
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, y: -28, scale: 0.95 }}
+                                transition={{ duration: 0.28, ease: [0.25, 0.46, 0.45, 0.94] }}
+                                style={{
+                                  position: 'absolute', inset: 0,
+                                  width: '100%', height: '100%', objectFit: 'cover',
+                                }}
+                              />
+                            )}
+                          </AnimatePresence>
+                          <div style={{
+                            position: 'absolute', inset: 0,
+                            background: 'linear-gradient(to top, rgba(23,28,33,0.7), transparent)',
+                            pointerEvents: 'none',
+                          }} />
+                          <div style={{ position: 'absolute', bottom: '12px', left: '16px', right: '12px' }}>
+                            <div style={{ fontFamily: 'var(--font-headline)', fontSize: '1rem', color: '#fff', fontWeight: '700' }}>
+                              {room.name}
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px' }}>
+                              <span style={{ fontFamily: 'var(--font-body)', fontSize: '11px', color: 'rgba(255,255,255,0.7)' }}>
+                                {room.type}
+                              </span>
+                              <span className={`status-badge ${room.status === 'active' ? 'status-badge--active' : 'status-badge--maintenance'}`}>
+                                {room.status === 'active' ? 'Activa' : 'Mant.'}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
 
-            {/* Empty state */}
-            {filtered.length === 0 && (
-              <div style={{
-                textAlign: 'center', padding: '48px 24px',
-                background: 'var(--surface-container-low)',
-                borderRadius: 'var(--radius-xl)',
-                border: '1px dashed var(--outline-var)',
-              }}>
-                <span className="material-symbols-outlined" style={{ fontSize: '40px', color: 'var(--outline)', display: 'block', marginBottom: '12px' }}>
-                  search_off
-                </span>
-                <p style={{ fontFamily: 'var(--font-body)', fontSize: '13px', color: 'var(--outline)' }}>
-                  No se encontraron habitaciones con esos filtros
-                </p>
-              </div>
-            )}
+                        {/* Card footer */}
+                        <div style={{
+                          padding: '14px 16px',
+                          background: 'var(--surface-container-low)',
+                          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                        }}>
+                          <span style={{ fontFamily: 'var(--font-body)', fontSize: '12px', color: 'var(--on-surface-variant)', fontWeight: '600' }}>
+                            MXN ${room.rate.toLocaleString()} / noche
+                          </span>
+                          <button
+                            className="btn-outline"
+                            style={{ height: '30px', padding: '0 12px', fontSize: '10px' }}
+                            onClick={e => { e.stopPropagation(); onEditRoom(room) }}
+                          >
+                            Editar
+                          </button>
+                        </div>
+                      </motion.div>
+                    ))}
+                  </AnimatePresence>
+                </div>
+              )}
+            </div>
           </div>
         </div>}
 

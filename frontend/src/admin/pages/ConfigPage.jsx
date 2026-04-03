@@ -4,7 +4,42 @@ import SectionPanel from '../components/SectionPanel'
 import { Field, Input, Select } from '@/components/frida/Field'
 import { useTheme } from '@/context/ThemeContext'
 import { useToast } from '@/components/frida/Toast'
+import Skeleton from '@/components/frida/Skeleton'
 import s from './ConfigPage.module.css'
+
+/* ── Skeleton helpers ── */
+function SkeletonSection({ rows = 2 }) {
+  return (
+    <div style={{
+      background: 'var(--surface-container-low)',
+      border: '1px solid var(--outline-var)',
+      borderRadius: 'var(--radius-xl)',
+      overflow: 'hidden',
+      marginBottom: '16px',
+    }}>
+      <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--outline-var)' }}>
+        <Skeleton variant="text" width="110px" height="9px" />
+      </div>
+      <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+        {Array.from({ length: rows }).map((_, i) => (
+          <div key={i}>
+            {i > 0 && <div style={{ borderTop: '1px solid var(--outline-var)', marginBottom: '14px' }} />}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px', padding: '4px 0' }}>
+              <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flex: 1 }}>
+                <Skeleton variant="circle" width="20px" height="20px" />
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', flex: 1 }}>
+                  <Skeleton variant="text" width="140px" height="13px" />
+                  <Skeleton variant="text" width="200px" height="10px" />
+                </div>
+              </div>
+              <Skeleton variant="text" width="42px" height="24px" style={{ borderRadius: '12px', flexShrink: 0 }} />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
 
 /* ── Reusable sub-components ── */
 function ConfigSection({ title, children }) {
@@ -107,6 +142,12 @@ export default function ConfigPage({ onBack, onDirtyChange }) {
   const addToast = useToast()
   const { isDark, toggleDark, fontSize, setFontSize, highContrast, setHighContrast, reduceMotion, setReduceMotion } = useTheme()
   const [tab, setTab] = useState('perfil')
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    const t = setTimeout(() => setLoading(false), 2000)
+    return () => clearTimeout(t)
+  }, [])
 
   /* Seguridad state */
   const [twoFA, setTwoFA]           = useState(false)
@@ -152,6 +193,7 @@ export default function ConfigPage({ onBack, onDirtyChange }) {
       title={<>Configuración<br /><em>del sistema</em></>}
       subtitle="Personaliza tu cuenta, seguridad y preferencias de accesibilidad"
       onBack={onBack}
+      dirty={dirty}
       actions={
         <button className="btn-primary" onClick={handleSave}>
           <span className="material-symbols-outlined" style={{ fontSize: '15px' }}>save</span>
@@ -161,13 +203,25 @@ export default function ConfigPage({ onBack, onDirtyChange }) {
     >
       {/* Mobile-only compact profile row */}
       <div className={s.profileCompact}>
-        <div className={s.profileCompactAvatar}>
-          <span className="material-symbols-outlined" style={{ color: '#fff', fontSize: '22px' }}>person</span>
-        </div>
-        <div>
-          <div className={s.profileCompactName}>{nombre}</div>
-          <div className={s.profileCompactRole}>Gerente General · En línea</div>
-        </div>
+        {loading ? (
+          <>
+            <Skeleton variant="circle" width="44px" height="44px" style={{ flexShrink: 0 }} />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', flex: 1 }}>
+              <Skeleton variant="text" width="130px" height="13px" />
+              <Skeleton variant="text" width="170px" height="10px" />
+            </div>
+          </>
+        ) : (
+          <>
+            <div className={s.profileCompactAvatar}>
+              <span className="material-symbols-outlined" style={{ color: '#fff', fontSize: '22px' }}>person</span>
+            </div>
+            <div>
+              <div className={s.profileCompactName}>{nombre}</div>
+              <div className={s.profileCompactRole}>Gerente General · En línea</div>
+            </div>
+          </>
+        )}
       </div>
 
       <div className={s.layout}>
@@ -176,39 +230,66 @@ export default function ConfigPage({ onBack, onDirtyChange }) {
         <nav className={s.nav}>
           {/* Profile mini-card — desktop only */}
           <div className={s.navProfile}>
-            <div className={s.navAvatar}>
-              <span className="material-symbols-outlined" style={{ color: '#fff', fontSize: '26px' }}>person</span>
-            </div>
-            <div className={s.navName}>{nombre}</div>
-            <div className={s.navRole}>Gerente General</div>
-            <div className={s.navStatus}>
-              <span className={s.navStatusDot} />
-              En línea
-            </div>
+            {loading ? (
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+                <Skeleton variant="circle" width="56px" height="56px" style={{ marginBottom: '2px' }} />
+                <Skeleton variant="text" width="80%" height="13px" />
+                <Skeleton variant="text" width="60%" height="10px" />
+                <Skeleton variant="text" width="70px" height="22px" style={{ borderRadius: 'var(--radius-full)', marginTop: '4px' }} />
+              </div>
+            ) : (
+              <>
+                <div className={s.navAvatar}>
+                  <span className="material-symbols-outlined" style={{ color: '#fff', fontSize: '26px' }}>person</span>
+                </div>
+                <div className={s.navName}>{nombre}</div>
+                <div className={s.navRole}>Gerente General</div>
+                <div className={s.navStatus}>
+                  <span className={s.navStatusDot} />
+                  En línea
+                </div>
+              </>
+            )}
           </div>
 
           {/* Tab items */}
           <div className={s.tabList}>
-            {TABS.map(t => (
-              <button
-                key={t.key}
-                onClick={() => setTab(t.key)}
-                className={`${s.tabBtn} ${tab === t.key ? s.tabBtnActive : ''}`}
-              >
-                {tab === t.key && <span className={s.tabIndicator} />}
-                <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>{t.icon}</span>
-                {t.label}
-              </button>
-            ))}
+            {loading ? (
+              Array.from({ length: 3 }).map((_, i) => (
+                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px' }}>
+                  <Skeleton variant="circle" width="16px" height="16px" />
+                  <Skeleton variant="text" width="70px" height="12px" />
+                </div>
+              ))
+            ) : (
+              TABS.map(t => (
+                <button
+                  key={t.key}
+                  onClick={() => setTab(t.key)}
+                  className={`${s.tabBtn} ${tab === t.key ? s.tabBtnActive : ''}`}
+                >
+                  {tab === t.key && <span className={s.tabIndicator} />}
+                  <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>{t.icon}</span>
+                  {t.label}
+                </button>
+              ))
+            )}
           </div>
         </nav>
 
         {/* ── Tab content with animation ── */}
         <div className={s.content}>
+        {loading ? (
+          <>
+            <SkeletonSection rows={2} />
+            <SkeletonSection rows={2} />
+            <SkeletonSection rows={1} />
+          </>
+        ) : null}
         <AnimatePresence mode="wait">
 
           {/* ── PERFIL ── */}
-          {tab === 'perfil' && (
+          {!loading && tab === 'perfil' && (
             <motion.div
               key="perfil"
               initial={{ opacity: 0, y: 10 }}
@@ -269,7 +350,7 @@ export default function ConfigPage({ onBack, onDirtyChange }) {
           )}
 
           {/* ── SEGURIDAD ── */}
-          {tab === 'seguridad' && (
+          {!loading && tab === 'seguridad' && (
             <motion.div
               key="seguridad"
               initial={{ opacity: 0, y: 10 }}
@@ -420,7 +501,7 @@ export default function ConfigPage({ onBack, onDirtyChange }) {
           )}
 
           {/* ── ACCESIBILIDAD ── */}
-          {tab === 'accesibilidad' && (
+          {!loading && tab === 'accesibilidad' && (
             <motion.div
               key="accesibilidad"
               initial={{ opacity: 0, y: 10 }}

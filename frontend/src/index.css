@@ -3,6 +3,7 @@
 /* ===== DESIGN TOKENS ===== */
 :root {
   --primary: #006971;
+  /*--primary: #c07ef0;*/
   --primary-dark: #004f57;
   --secondary: #c07ef0;
   --gold: #f59e0b;
