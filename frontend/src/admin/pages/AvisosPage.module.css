@@ -1,0 +1,95 @@
+/* ===== AVISOS ===== */
+.filtros {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+.resultado { font-size: var(--fs-xs); font-weight: 700; color: var(--muted-foreground); }
+
+.bandeja {
+  background: var(--card);
+  border-radius: var(--radius-xl);
+  box-shadow: inset 0 0 0 1px var(--border), var(--shadow-sm);
+  padding: 8px 12px;
+  min-height: 420px;
+}
+.lista { list-style: none; position: relative; /* ancla de popLayout */ }
+.grupo {
+  display: block;
+  padding: 16px 12px 6px;
+  color: var(--muted-foreground);
+}
+
+.aviso {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 14px 12px;
+  border-radius: var(--radius-lg);
+  transition: background-color 0.2s;
+}
+.aviso:hover { background: var(--muted); }
+.noLeido { background: color-mix(in srgb, var(--accent) 70%, transparent); }
+.noLeido:hover { background: var(--accent); }
+
+.icono {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+.cuerpo { flex: 1; min-width: 0; }
+.cabecera { display: flex; align-items: center; gap: 8px; }
+.titulo { font-size: var(--fs-sm); font-weight: 600; color: var(--foreground); }
+.noLeido .titulo { font-weight: 800; }
+.punto {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--primary);
+  flex-shrink: 0;
+}
+.texto { font-size: var(--fs-sm); color: var(--muted-foreground); margin-top: 2px; line-height: 1.5; }
+.meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 6px;
+  font-size: var(--fs-xs);
+  color: var(--muted-foreground);
+}
+
+.acciones { display: flex; align-items: center; gap: 2px; flex-shrink: 0; }
+.borrar:hover { color: var(--destructive); }
+
+.vacio {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 400px;
+  text-align: center;
+}
+.vacioIcono {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--accent);
+  color: var(--accent-foreground);
+  margin-bottom: 4px;
+}
+.vacioTitulo { font-family: var(--font-headline); font-size: var(--fs-lg); font-weight: 600; }
+.vacioTexto { font-size: var(--fs-sm); color: var(--muted-foreground); }
+
+@media (max-width: 640px) {
+  .aviso { flex-wrap: wrap; }
+  .acciones { width: 100%; justify-content: flex-end; }
+}

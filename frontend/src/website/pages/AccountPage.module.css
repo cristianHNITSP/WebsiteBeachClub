@@ -6,36 +6,84 @@
 
 /* ── Hero banner ── */
 .hero {
-  background: linear-gradient(135deg, var(--primary) 0%, #009aa5 60%, #004a50 100%);
-  padding: 100px 32px 52px;
-  color: #fff;
+  position: relative;
+  overflow: hidden;
+  background:
+    radial-gradient(ellipse 60% 80% at 85% 0%, color-mix(in srgb, var(--flor-turquesa) 40%, transparent), transparent 60%),
+    radial-gradient(ellipse 50% 90% at 10% 100%, color-mix(in srgb, var(--flor-orquidea) 55%, transparent), transparent 65%),
+    linear-gradient(135deg, var(--noche) 0%, var(--flor-morado) 100%);
+  padding: 110px 32px 64px;
+  color: var(--noche-fg);
+}
+.heroCorona {
+  position: absolute;
+  right: 32px;
+  bottom: 44px;
+  width: 11rem;
+  height: auto;
+  opacity: 0.9;
 }
 
 .heroGreeting {
-  font-family: var(--font-body);
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.15em;
+  font-size: var(--fs-xs);
+  font-weight: 500;
+  letter-spacing: var(--tracking-rotulo);
   text-transform: uppercase;
-  opacity: 0.7;
+  font-family: var(--font-headline); /* rótulo */
+  color: var(--noche-fg-suave);
   margin-bottom: 8px;
 }
 
 .heroName {
   font-family: var(--font-headline);
-  font-size: clamp(1.8rem, 3.5vw, 2.6rem);
+  font-size: var(--fs-3xl);
   font-weight: 700;
   margin: 0;
+  color: var(--noche-fg);
 }
 
 /* ── Stats row ── */
 .statsRow {
+  position: relative; /* el banner es position:relative: sin esto lo pinta encima */
+  z-index: 1;
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 14px;
   max-width: 1200px;
   margin: -28px auto 0;
   padding: 0 32px;
+}
+
+.statIcon {
+  width: 48px;
+  height: 48px;
+  border-radius: calc(var(--radius) * 0.8);
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+.statValor {
+  font-family: var(--font-headline);
+  font-size: var(--fs-2xl);
+  font-weight: 700;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+.statLabel {
+  font-size: var(--fs-xs);
+  font-weight: 500;
+  letter-spacing: var(--tracking-rotulo);
+  text-transform: uppercase;
+  font-family: var(--font-headline); /* rótulo */
+  color: var(--muted-foreground);
+}
+
+.tabDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--flor-rojo);
+  margin-left: 6px;
 }
 
 /* ── Main content ── */
@@ -45,34 +93,20 @@
   padding: 32px 32px 80px;
 }
 
-/* ── Tabs (NavItem handles active underline + color per item) ── */
-.tabs {
-  display: flex;
-  gap: 0;
-  border-bottom: 1px solid var(--outline-var);
-  margin-bottom: 24px;
-  overflow-x: auto;
-  /* hide scrollbar but keep scrollability */
-  scrollbar-width: none;
-}
-.tabs::-webkit-scrollbar { display: none; }
 
 /* ── Booking cards ── */
 .bookingCard {
-  border-radius: 14px;
+  border-radius: calc(var(--radius) * 1.2);
   overflow: hidden;
   display: flex;
   margin-bottom: 14px;
   box-shadow: var(--shadow-sm);
-  background: var(--surface-lowest);
-  border: 1px solid var(--outline-var);
-  transition: box-shadow 0.2s, transform 0.2s;
+  background: var(--card);
+  border: 1px solid var(--border);
+  transition: box-shadow 0.2s;
 }
 
-.bookingCard:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-md);
-}
+.bookingCard:hover { box-shadow: var(--shadow-md); }
 
 .bookingImg {
   position: relative;
@@ -100,7 +134,7 @@
 
 .bookingTitle {
   font-family: var(--font-headline);
-  font-size: 1.1rem;
+  font-size: var(--fs-lg);
   font-weight: 700;
   color: var(--on-surface);
   margin: 0 0 6px;
@@ -110,7 +144,7 @@
   font-family: var(--font-body);
   color: var(--on-surface-var);
   font-weight: 600;
-  font-size: 12px;
+  font-size: var(--fs-xs);
   display: flex;
   align-items: center;
   gap: 4px;
@@ -119,8 +153,22 @@
 
 .bookingActions {
   display: flex;
+  flex-wrap: wrap;
+  align-items: center;
   justify-content: flex-end;
+  gap: 10px;
   margin-top: 12px;
+}
+.calificar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-right: auto;
+}
+.calificarLabel {
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  color: var(--muted-foreground);
 }
 
 /* ── Message cards ── */
@@ -128,9 +176,9 @@
   display: flex;
   gap: 14px;
   padding: 16px 20px;
-  border-radius: 12px;
-  background: var(--surface-lowest);
-  border: 1px solid var(--outline-var);
+  border-radius: var(--radius);
+  background: var(--card);
+  border: 1px solid var(--border);
   margin-bottom: 10px;
   cursor: pointer;
   transition: box-shadow 0.2s;
@@ -139,20 +187,20 @@
 .messageCard:hover { box-shadow: var(--shadow-sm); }
 
 .messageCardUnread {
-  background: rgba(0,105,113,0.04);
-  border-color: rgba(0,105,113,0.14);
+  background: var(--accent);
+  border-color: color-mix(in srgb, var(--primary) 25%, transparent);
 }
 
 .messageAvatar {
   width: 40px;
   height: 40px;
   border-radius: 50%;
-  background: linear-gradient(135deg, var(--primary) 0%, #009aa5 100%);
+  background: var(--primary);
   display: grid;
   place-items: center;
-  color: #fff;
+  color: var(--primary-foreground);
   flex-shrink: 0;
-  font-size: 18px;
+  font-size: var(--fs-lg);
 }
 
 .messageBody { flex: 1; }
@@ -167,26 +215,26 @@
 .messageFrom {
   font-family: var(--font-body);
   font-weight: 700;
-  font-size: 13px;
+  font-size: var(--fs-sm);
   color: var(--on-surface);
   margin: 0;
 }
 
 .messageTime {
-  font-size: 11px;
+  font-size: var(--fs-xs);
   color: var(--on-surface-var);
 }
 
 .messageSubject {
   font-family: var(--font-body);
   font-weight: 600;
-  font-size: 13px;
+  font-size: var(--fs-sm);
   color: var(--on-surface);
   margin: 0 0 4px;
 }
 
 .messagePreview {
-  font-size: 12px;
+  font-size: var(--fs-xs);
   color: var(--on-surface-var);
   margin: 0;
 }
@@ -198,35 +246,6 @@
   background: var(--primary);
   flex-shrink: 0;
   margin-top: 6px;
-}
-
-/* ── Empty state ── */
-.emptyState {
-  padding: 40px 24px;
-  text-align: center;
-  border-radius: 12px;
-  background: var(--surface-container);
-}
-
-.emptyIcon {
-  font-size: 36px;
-  margin-bottom: 12px;
-  display: block;
-  opacity: 0.4;
-}
-
-.emptyTitle {
-  font-family: var(--font-headline);
-  font-weight: 600;
-  font-size: 1rem;
-  color: var(--on-surface);
-  margin-bottom: 6px;
-}
-
-.emptySub {
-  font-family: var(--font-body);
-  font-size: 13px;
-  color: var(--on-surface-var);
 }
 
 /* ── Responsive ── */
@@ -242,5 +261,9 @@
   .content { padding: 24px 16px 60px; }
   .bookingCard { flex-direction: column; }
   .bookingImg { width: 100%; height: 160px; }
-  .tabs { overflow-x: auto; }
+  .heroCorona { width: 7rem; right: 16px; bottom: 16px; }
 }
+
+/* Acciones de la sesión: en el flujo del banner (no absolutas: arriba quedarían
+   debajo de la barra fija de navegación) */
+.heroAcciones { position: relative; z-index: 1; display: flex; gap: 8px; flex-wrap: wrap; margin-top: 18px; }

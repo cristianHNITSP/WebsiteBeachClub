@@ -5,23 +5,33 @@
   left: 0;
   right: 0;
   z-index: 50;
-  height: 72px;
+  height: 76px;
   padding: 0 32px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  transition: all 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  transition: background-color 0.35s ease, box-shadow 0.35s ease, color 0.35s ease;
+}
+
+/* Vidrio con ALFA, no con backdrop-filter: la barra es fija y el contenido
+   hace scroll debajo (SISTEMA-DE-DISENO §1.1). */
+.sobreHero {
+  background: linear-gradient(to bottom, color-mix(in srgb, var(--noche) 55%, transparent), transparent);
+  color: var(--noche-fg);
+}
+.solida {
+  background: color-mix(in srgb, var(--background) 94%, transparent);
+  color: var(--foreground);
+  box-shadow: inset 0 -1px 0 var(--border), var(--shadow-sm);
 }
 
 /* ── Logo button ── */
 .logo {
-  background: transparent;
-  border: none;
   cursor: pointer;
   display: flex;
   align-items: center;
-  gap: 10px;
   flex-shrink: 0;
+  border-radius: var(--radius-md);
 }
 
 /* ── Desktop nav links ── */
@@ -30,9 +40,35 @@
   align-items: center;
   gap: 4px;
   list-style: none;
-  margin: 0;
-  padding: 0;
 }
+
+.link {
+  position: relative;
+  cursor: pointer;
+  display: inline-flex;
+  padding: 10px 14px;
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  opacity: 0.8;
+  transition: opacity 0.2s;
+}
+.link:hover { opacity: 1; }
+.linkActivo { opacity: 1; }
+.link:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; border-radius: var(--radius-md); }
+
+/* Raya del enlace activo (layoutId en Navbar.jsx) */
+.raya {
+  position: absolute;
+  left: 14px;
+  right: 14px;
+  bottom: 2px;
+  height: 2px;
+  border-radius: 2px;
+  background: currentColor;
+}
+.sobreHero .raya { background: var(--flor-dorado); }
+.solida .linkActivo { color: var(--primary); }
+.sobreHero .link { text-shadow: 0 1px 10px color-mix(in srgb, var(--noche) 60%, transparent); }
 
 /* ── Actions row ── */
 .actions {
@@ -40,107 +76,56 @@
   align-items: center;
   gap: 8px;
 }
+.iconBtn { color: inherit; }
+.iconBtn:hover { background: color-mix(in srgb, currentColor 12%, transparent); color: inherit; }
 
-/* "Reservar" pill button — hide text label on very small screens */
-.reservarBtn {
-  height: 38px;
-  padding: 0 20px;
-  border-radius: var(--radius-full);
-  border: none;
-  cursor: pointer;
-  background: linear-gradient(135deg, var(--primary) 0%, #009aa5 100%);
-  color: #fff;
-  font-family: var(--font-body);
-  font-weight: 700;
-  font-size: 12px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  box-shadow: 0 4px 16px rgba(0,105,113,0.4);
-  white-space: nowrap;
-}
+.reservarBtn { flex-shrink: 0; }
 
-/* ── Hamburger button — hidden on desktop ── */
-.hamburger {
-  display: none;
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  padding: 6px;
-  align-items: center;
-  justify-content: center;
-  border-radius: var(--radius-md);
-  transition: background 0.2s;
-  flex-shrink: 0;
-}
-.hamburger:hover { background: rgba(0,0,0,0.08); }
+/* ── Hamburger — solo en móvil ── */
+.hamburger { display: none; }
 
-/* ── Mobile dropdown menu ── */
-.mobileMenu {
-  display: none; /* JS controls open/close, CSS controls existence on breakpoint */
-  position: fixed;
-  top: 72px;
-  left: 0;
-  right: 0;
-  z-index: 49;
-  flex-direction: column;
-  padding: 12px 16px 20px;
-  gap: 4px;
-  border-bottom: 1px solid var(--outline-var);
-  background: var(--surface);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
-  box-shadow: 0 8px 32px rgba(0,0,0,0.12);
-  /* slide-in animation */
-  animation: slideDown 0.22s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-}
-.mobileMenuOpen { display: flex; }
-
-@keyframes slideDown {
-  from { opacity: 0; transform: translateY(-8px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-
+/* ── Menú móvil (dentro del Sheet) ── */
 .mobileItem {
-  background: transparent;
-  border: none;
   cursor: pointer;
   text-align: left;
-  padding: 13px 14px;
-  border-radius: var(--radius-md);
-  font-family: var(--font-body);
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--on-surface-var);
-  transition: background 0.18s, color 0.18s;
-}
-.mobileItem:hover { background: var(--surface-container-low); color: var(--on-surface); }
-.mobileItemActive { color: var(--primary); background: var(--surface-container-low); }
-
-.mobileReservar {
-  margin-top: 8px;
   padding: 14px;
+  min-height: 44px;
   border-radius: var(--radius-md);
-  background: linear-gradient(135deg, var(--primary) 0%, #009aa5 100%);
-  color: #fff;
-  border: none;
-  cursor: pointer;
-  font-family: var(--font-body);
-  font-weight: 700;
-  font-size: 15px;
-  text-align: center;
+  font-size: var(--fs-base);
+  font-weight: 600;
+  color: var(--muted-foreground);
+  transition: background-color 0.18s, color 0.18s;
 }
+.mobileItem:hover { background: var(--muted); color: var(--foreground); }
+.mobileItemActive { color: var(--primary); background: var(--accent); }
 
 /* ════════════════════════════════════════
    RESPONSIVE
    ════════════════════════════════════════ */
-@media (max-width: 768px) {
+@media (max-width: 860px) {
   .navbar { padding: 0 16px; }
   .desktopLinks { display: none; }
-  .reservarBtn { display: none; }
-  .hamburger { display: flex; }
+  .actions .reservarBtn { display: none; }
+  .hamburger { display: inline-flex; }
 }
 
 @media (max-width: 400px) {
-  .navbar { height: 60px; }
-  .mobileMenu { top: 60px; }
+  .navbar { height: 64px; }
 }
+
+/* Menú de la cuenta (va en un portal: no depende de .sobreHero/.solida) */
+.menuCabeza { display: flex; flex-direction: column; padding: 8px 10px 10px; margin-bottom: 4px; box-shadow: inset 0 -1px 0 var(--border); }
+.menuNombre { font-size: var(--fs-sm); font-weight: 700; color: var(--foreground); }
+.menuCorreo { font-size: var(--fs-xs); color: var(--muted-foreground); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.menuItem {
+  display: flex; align-items: center; gap: 10px;
+  width: 100%; min-height: 44px; padding: 0 10px;
+  border-radius: var(--radius-md);
+  font-size: var(--fs-sm); color: var(--foreground); text-align: left;
+  cursor: pointer; transition: background-color 0.15s;
+}
+.menuItem:hover, .menuItem:focus-visible { background: var(--accent); outline: none; }
+.menuSalir { color: var(--destructive); }
+.menuSalir:hover, .menuSalir:focus-visible { background: color-mix(in srgb, var(--destructive) 10%, var(--card)); }
+
+.huecoCuenta { display: inline-block; width: 36px; height: 36px; }

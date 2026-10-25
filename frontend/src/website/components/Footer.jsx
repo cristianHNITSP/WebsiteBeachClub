@@ -1,19 +1,23 @@
-import { motion } from 'framer-motion'
-import { Button, Icon } from '@/components/frida'
+import { ArrowUpIcon, EnvelopeSimpleIcon, FacebookLogoIcon, InstagramLogoIcon, MagnifyingGlassIcon, MapPinIcon, PhoneIcon, WhatsappLogoIcon } from '@phosphor-icons/react'
+import { Link } from 'react-router-dom'
+import { Button } from '@/components/ui/button'
+import { Separator } from '@/components/ui/separator'
+import { useTheme } from '@/context/ThemeContext'
+import Wordmark from '@/components/marca/Wordmark'
 import s from './Footer.module.css'
 
 const SOCIAL_LINKS = [
-  { icon: 'chat',         label: 'WhatsApp', href: 'https://wa.me/529991234567', color: '#25D366' },
-  { icon: 'photo_camera', label: 'Instagram', href: '#',                          color: '#E1306C' },
-  { icon: 'facebook',     label: 'Facebook',  href: '#',                          color: '#1877F2' },
+  { Icono: WhatsappLogoIcon,  label: 'WhatsApp',  href: 'https://wa.me/529991234567' },
+  { Icono: InstagramLogoIcon, label: 'Instagram', href: '#' },
+  { Icono: FacebookLogoIcon,  label: 'Facebook',  href: '#' },
 ]
 
 const NAV_LINKS = [
-  { label: 'Inicio',                  view: 'home' },
-  { label: 'Habitaciones',            view: 'search' },
-  { label: 'Cabañas Frida — Chelem',  view: 'search' },
-  { label: 'Casa Frida — Chuburná',   view: 'search' },
-  { label: 'Mis Reservas',            view: 'account' },
+  { label: 'Inicio',                   to: '/' },
+  { label: 'Habitaciones',             to: '/habitaciones' },
+  { label: 'Cabañas Frida, Chelem',    to: '/habitaciones?sucursal=chelem' },
+  { label: 'Casa Frida, Chuburná',     to: '/habitaciones?sucursal=chuburna' },
+  { label: 'Mis reservas',             to: '/mi-cuenta' },
 ]
 
 const LEGAL_LINKS = [
@@ -22,8 +26,8 @@ const LEGAL_LINKS = [
   'Política de cancelación',
 ]
 
-export default function Footer({ onNavigate }) {
-  const nav = (view) => (e) => { e.preventDefault(); onNavigate?.(view) }
+export default function Footer() {
+  const { reduceMotion } = useTheme()
 
   return (
     <footer className={s.footer}>
@@ -32,52 +36,31 @@ export default function Footer({ onNavigate }) {
         {/* ── Brand ── */}
         <div>
           <div className={s.logoRow}>
-            <div className={s.logoIcon}>
-              <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>waves</span>
-            </div>
-            <div>
-              <div className={s.logoName}>Hoteles Frida</div>
-              <div className={s.logoSub}>Yucatán · México</div>
-            </div>
+            <Wordmark tamano={1.9} subtitulo="Yucatán, México" />
           </div>
 
           <p className={s.desc}>
-            Dos propiedades únicas frente al Mar Caribe, donde la hospitalidad yucateca
-            se fusiona con el lujo contemporáneo.
+            Dos propiedades frente al Golfo de México, donde la hospitalidad yucateca
+            se encuentra con el color de Frida.
           </p>
 
-          {/* Social links */}
           <nav aria-label="Redes sociales">
             <ul className={s.socialList}>
-              {SOCIAL_LINKS.map(link => (
-                <li key={link.label}>
-                  <motion.a
-                    href={link.href}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    title={link.label}
-                    className={s.socialBtn}
-                    whileHover={{ scale: 1.12, y: -2 }}
-                    whileTap={{ scale: 0.95 }}
-                    onMouseEnter={e => {
-                      e.currentTarget.style.color = link.color
-                      e.currentTarget.style.borderColor = link.color
-                    }}
-                    onMouseLeave={e => {
-                      e.currentTarget.style.color = 'var(--on-surface-var)'
-                      e.currentTarget.style.borderColor = 'var(--outline-var)'
-                    }}
-                  >
-                    <span className="material-symbols-outlined" style={{ fontSize: '19px' }}>{link.icon}</span>
-                  </motion.a>
+              {SOCIAL_LINKS.map(({ Icono, label, href }) => (
+                <li key={label}>
+                  <a href={href} target="_blank" rel="noopener noreferrer" aria-label={label} className={s.socialBtn}>
+                    <Icono size={20} weight="fill" />
+                  </a>
                 </li>
               ))}
             </ul>
           </nav>
 
-          <Button variant="primary" onClick={nav('search')}>
-            <Icon name="search" size={16} />
-            Ver habitaciones
+          <Button asChild>
+            <Link to="/habitaciones">
+              <MagnifyingGlassIcon size={16} weight="bold" />
+              Ver habitaciones
+            </Link>
           </Button>
         </div>
 
@@ -87,7 +70,7 @@ export default function Footer({ onNavigate }) {
           <ul className={s.linkList}>
             {NAV_LINKS.map(link => (
               <li key={link.label}>
-                <button className={s.link} onClick={nav(link.view)}>{link.label}</button>
+                <Link className={s.link} to={link.to}>{link.label}</Link>
               </li>
             ))}
           </ul>
@@ -104,58 +87,59 @@ export default function Footer({ onNavigate }) {
         {/* ── Contacto ── */}
         <address style={{ fontStyle: 'normal' }}>
           <h2 className={s.colLabel}>Contacto</h2>
-          <p className={s.contactDesc}>Disponibles todos los días de 8am a 10pm.</p>
+          <p className={s.contactDesc}>Disponibles todos los días de 8 am a 10 pm.</p>
           <ul className={s.linkList}>
             <li>
               <span className={s.link} style={{ cursor: 'default' }}>
-                <Icon name="phone" size={14} />
+                <PhoneIcon size={15} aria-hidden="true" />
                 +52 (999) 123 4567
               </span>
             </li>
             <li>
               <span className={s.link} style={{ cursor: 'default' }}>
-                <Icon name="mail" size={14} />
+                <EnvelopeSimpleIcon size={15} aria-hidden="true" />
                 hola@hotelesfrida.mx
               </span>
             </li>
             <li>
               <span className={s.link} style={{ cursor: 'default' }}>
-                <Icon name="location_on" size={14} />
-                Chelem &amp; Chuburná, Yucatán
+                <MapPinIcon size={15} aria-hidden="true" />
+                Chelem y Chuburná, Yucatán
               </span>
             </li>
           </ul>
 
-          <motion.a
-            href="https://wa.me/529991234567"
-            target="_blank"
-            rel="noopener noreferrer"
-            whileHover={{ scale: 1.04 }}
-            whileTap={{ scale: 0.97 }}
-            style={{
-              display: 'inline-flex', alignItems: 'center', gap: '8px',
-              marginTop: '20px', fontSize: '13px', fontWeight: 700,
-              color: '#fff', background: '#25D366',
-              padding: '10px 18px', borderRadius: 'var(--radius-full)',
-              boxShadow: '0 4px 14px rgba(37,211,102,0.35)',
-              textDecoration: 'none',
-            }}
-          >
-            <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>chat</span>
-            Chatear en WhatsApp
-          </motion.a>
+          <Button asChild className={`${s.whatsapp} mt-5`}>
+            <a href="https://wa.me/529991234567" target="_blank" rel="noopener noreferrer">
+              <WhatsappLogoIcon size={18} weight="fill" />
+              Chatear en WhatsApp
+            </a>
+          </Button>
         </address>
       </div>
 
+      <Separator />
+
       {/* Bottom bar */}
       <div className={s.bottom}>
-        <span className={s.copyright}>© 2026 Hoteles Frida. Todos los derechos reservados.</span>
+        <div className={s.copyright}>
+          <span>© 2026 Hoteles Frida. Todos los derechos reservados.</span>
+          {/* Licencia CC BY-SA 2.0: crédito con autor, fuente y licencia */}
+          <span className={s.creditos}>
+            Fotos de portada: Marysol* en{' '}
+            <a href="https://commons.wikimedia.org/wiki/File:Chelem,_Yucat%C3%A1n_-_Playa,_Mar,_y_Barco.jpg" target="_blank" rel="noopener noreferrer">Chelem</a>,{' '}
+            <a href="https://commons.wikimedia.org/wiki/File:Chuburn%C3%A1_Puerto_-_Razi_Machay_-_01.jpg" target="_blank" rel="noopener noreferrer">Chuburná</a> y{' '}
+            <a href="https://commons.wikimedia.org/wiki/File:Chelem,_Yucat%C3%A1n_-_Muelle.jpg" target="_blank" rel="noopener noreferrer">el muelle</a>{' '}
+            (Wikimedia Commons,{' '}
+            <a href="https://creativecommons.org/licenses/by-sa/2.0/deed.es" target="_blank" rel="noopener noreferrer">CC BY-SA 2.0</a>; recortadas).
+          </span>
+        </div>
         <Button
           variant="outline"
-          style={{ fontSize: '12px', padding: '7px 16px' }}
-          onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+          size="sm"
+          onClick={() => window.scrollTo({ top: 0, behavior: reduceMotion ? 'auto' : 'smooth' })}
         >
-          <Icon name="arrow_upward" size={13} /> Volver arriba
+          <ArrowUpIcon size={13} weight="bold" /> Volver arriba
         </Button>
       </div>
     </footer>

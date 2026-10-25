@@ -1,0 +1,364 @@
+/* ============================================================================
+   Website: Tailwind + shadcn + paleta Frida (sacada del logo).
+
+   · SIN preflight: el reset global vive en index.css y el admin no usa
+     Tailwind. Preflight cambiaría tipografía y botones del admin.
+   · Utilidades SIN capa, a propósito: index.css (sin capa) pone
+     `* { margin:0; padding:0 }`, que ganaría a cualquier utilidad en capa.
+     Sin capa, `.p-4` (0,1,0) le gana por especificidad.
+   · La paleta vive en `body.site` (la pone WebsiteApp al montar), no en
+     :root: así el admin no cambia, y los portales de Radix (Select, Sheet,
+     Tooltip), que se montan en <body>, también la heredan.
+   Pares de contraste auditados a AA: docs/SISTEMA-DE-DISENO.md §2.
+   ========================================================================== */
+
+@layer theme, base, components;
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/utilities.css";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --font-sans: var(--font-body);
+  --font-heading: var(--font-headline);
+  --font-display: 'Chewy', var(--font-headline);
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+
+  /* Flores del logo: identidad, no estados. Texto encima: ver --flor-*-fg */
+  --color-flor-morado: var(--flor-morado);
+  --color-flor-dorado: var(--flor-dorado);
+  --color-flor-naranja: var(--flor-naranja);
+  --color-flor-rojo: var(--flor-rojo);
+  --color-flor-turquesa: var(--flor-turquesa);
+  --color-flor-orquidea: var(--flor-orquidea);
+  --color-flor-hoja: var(--flor-hoja);
+
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+
+  --animate-star-movement-bottom: star-movement-bottom linear infinite alternate;
+  --animate-star-movement-top: star-movement-top linear infinite alternate;
+
+  @keyframes star-movement-bottom {
+    0%   { transform: translate(0%, 0%);    opacity: 1; }
+    100% { transform: translate(-100%, 0%); opacity: 0; }
+  }
+  @keyframes star-movement-top {
+    0%   { transform: translate(0%, 0%);   opacity: 1; }
+    100% { transform: translate(100%, 0%); opacity: 0; }
+  }
+}
+
+/* ── Constantes de marca: iguales en todos los temas. En :root porque el
+   WebGL y el canvas las leen al primer render (antes de body.site). ── */
+:root {
+  /* Flores del logo (iguales en ambos modos: son identidad) */
+  --flor-morado:    #7A32C0;
+  --flor-dorado:    #E8A828;
+  --flor-naranja:   #F89010;
+  --flor-rojo:      #F5333A;
+  --flor-turquesa:  #4EC8BC;
+  --flor-orquidea:  #A848B8;
+  --flor-hoja:      #405818;
+  /* Texto sobre cada flor (AA): claras llevan tinta, oscuras blanco */
+  --flor-morado-fg:   #FFFFFF;
+  --flor-dorado-fg:   #1E1526;
+  --flor-naranja-fg:  #1E1526;
+  --flor-rojo-fg:     #1E1526;
+  --flor-turquesa-fg: #1E1526;
+  --flor-orquidea-fg: #FFFFFF;
+  --flor-hoja-fg:     #FFFFFF;
+  /* Noche del hero (fondo del Aurora) */
+  --noche:          #1A0F2E;
+  --noche-fg:       #FFFFFF;
+  --noche-fg-suave: #E9D8FF;
+  /* Marcas ajenas */
+  --marca-whatsapp:    #25D366;
+  --marca-whatsapp-fg: #1E1526;
+  /* Logo "G" de Google (colores oficiales, iguales en ambos temas) */
+  --marca-google-azul:     #4285F4;
+  --marca-google-verde:    #34A853;
+  --marca-google-amarillo: #FBBC05;
+  --marca-google-rojo:     #EA4335;
+}
+
+/* ── CLARO ─────────────────────────────────────────────────────────────── */
+body.site {
+  /* Tipografía: las familias del logo. Tres roles, sin excepciones:
+     Chewy        → SOLO el logotipo (FRIDA); decidido con el usuario
+     Oswald       → títulos, cifras, rótulos en mayúsculas ("CHELEM, YUCATAN")
+     Cabin        → todo el texto y la interfaz ("Beach Club")
+     Pisa --font-headline / --font-body de index.css solo dentro de la website. */
+  --font-headline: 'Oswald', 'Arial Narrow', sans-serif;
+  --font-body:     'Cabin', system-ui, sans-serif;
+
+  /* Escala única. Nada de tamaños sueltos en px/rem fuera de aquí. */
+  --fs-xs:   0.75rem;    /* 12: rótulos, notas, metadatos */
+  --fs-sm:   0.875rem;   /* 14: texto de interfaz, descripciones */
+  --fs-base: 1rem;       /* 16: texto corrido */
+  --fs-lg:   1.125rem;   /* 18: títulos de tarjeta, subtítulos */
+  --fs-xl:   1.375rem;   /* 22: títulos de panel, precios */
+  --fs-2xl:  1.75rem;    /* 28: títulos de página, cifras */
+  --fs-3xl:  clamp(2.25rem, 4.5vw, 3rem);
+  --fs-hero: clamp(2.5rem, 5.5vw, 4.75rem);
+  --tracking-rotulo: 0.12em;
+
+  /* shadcn */
+  --background:           #FFFBF5;
+  --foreground:           #1E1526;
+  --card:                 #FFFFFF;
+  --card-foreground:      #1E1526;
+  --popover:              #FFFFFF;
+  --popover-foreground:   #1E1526;
+  --primary:              #7A32C0;
+  --primary-foreground:   #FFFFFF;
+  --secondary:            #E8A828;
+  --secondary-foreground: #1E1526;
+  --muted:                #F7F0E6;
+  --muted-foreground:     #645A70;
+  --accent:               #F2E8FB;
+  --accent-foreground:    #5A2296;
+  --destructive:          #C4262E;
+  --destructive-foreground: #FFFFFF;
+  --border:               #E8DDD0;
+  --input:                #8A7D96;
+  --ring:                 #7A32C0;
+  --chart-1: var(--flor-morado);
+  --chart-2: var(--flor-turquesa);
+  --chart-3: var(--flor-dorado);
+  --chart-4: var(--flor-orquidea);
+  --chart-5: var(--flor-naranja);
+  --radius: 1rem;
+
+  /* Tokens heredados (index.css) que usan website.css y los *.module.css */
+  --primary-dark:              #5E2296;
+  --primary-container:         #EBDDFB;
+  --surface-tint:              #7A32C0;
+  --gold:                      #E8A828;
+  --gold-fixed:                #FCE7B2;
+  --gold-dark:                 #8A5A00;
+  --error:                     #C4262E;
+  --bg:                        #FFFBF5;
+  --surface:                   #FFFDF9;
+  --surface-lowest:            #FFFFFF;
+  --surface-container-low:     #F9F3EA;
+  --surface-container:         #F3EADF;
+  --surface-container-highest: #E8DDD0;
+  --surface-container-high:    #EEE4D8;
+  --secondary-container:       #FCE7B2;
+  --tertiary:                  #0B7A71;
+  --tertiary-fixed:            #D8F3EF;
+  --on-surface:                #1E1526;
+  --on-surface-var:            #645A70;
+  --on-surface-variant:        #645A70;
+  --outline:                   #8A7D96;
+  --outline-var:               #E8DDD0;
+  --outline-variant:           #E8DDD0;
+  --shadow-sm:      0 2px 8px rgba(46, 16, 80, 0.07);
+  --shadow-md:      0 10px 30px rgba(46, 16, 80, 0.12);
+  --shadow-lg:      0 24px 56px rgba(46, 16, 80, 0.18);
+  --shadow-primary: 0 10px 30px rgba(122, 50, 192, 0.30);
+}
+
+/* ── OSCURO: acentos claros con tinta encima (vía B de §2.3) ──────────── */
+.dark body.site {
+  --background:           #140F1A;
+  --foreground:           #F7F1FB;
+  --card:                 #1E1727;
+  --card-foreground:      #F7F1FB;
+  --popover:              #1E1727;
+  --popover-foreground:   #F7F1FB;
+  --primary:              #B98AF0;
+  --primary-foreground:   #1E1526;
+  --secondary:            #F2BC4A;
+  --secondary-foreground: #1E1526;
+  --muted:                #2A2134;
+  --muted-foreground:     #B8ADC6;
+  --accent:               #2E2140;
+  --accent-foreground:    #E4D2FA;
+  --destructive:          #FF6B70;
+  --destructive-foreground: #1E1526;
+  --border:               #3A2F47;
+  --input:                #85789A;
+  --ring:                 #B98AF0;
+
+  --primary-dark:              #A676E6;
+  --primary-container:         #3A2159;
+  --surface-tint:              #B98AF0;
+  --gold:                      #F2BC4A;
+  --gold-fixed:                #4A3A12;
+  --gold-dark:                 #F2BC4A;
+  --error:                     #FF6B70;
+  --bg:                        #140F1A;
+  --surface:                   #1B1522;
+  --surface-lowest:            #100C15;
+  --surface-container-low:     #211A2A;
+  --surface-container:         #2A2134;
+  --surface-container-highest: #3A2F47;
+  --surface-container-high:    #33293E;
+  --secondary-container:       #4A3A12;
+  --tertiary:                  #5FD6CA;
+  --tertiary-fixed:            #163B38;
+  --on-surface:                #F7F1FB;
+  --on-surface-var:            #B8ADC6;
+  --on-surface-variant:        #B8ADC6;
+  --outline:                   #85789A;
+  --outline-var:               #3A2F47;
+  --outline-variant:           #3A2F47;
+  --shadow-sm:      0 2px 8px rgba(0, 0, 0, 0.35);
+  --shadow-md:      0 10px 30px rgba(0, 0, 0, 0.45);
+  --shadow-lg:      0 24px 56px rgba(0, 0, 0, 0.55);
+  --shadow-primary: 0 10px 30px rgba(185, 138, 240, 0.25);
+}
+
+/* ── ALTO CONTRASTE (el oscuro va después y con más especificidad) ───── */
+.high-contrast body.site {
+  --foreground: #000000;
+  --muted-foreground: #2E2438;
+  --primary: #5E2296;
+  --ring: #5E2296;
+  --border: #5B4E68;
+  --input: #5B4E68;
+  --on-surface: #000000;
+  --on-surface-var: #2E2438;
+  --outline: #5B4E68;
+  --outline-var: #5B4E68;
+  --surface-tint: #5E2296;
+}
+.dark.high-contrast body.site {
+  --background: #000000;
+  --bg: #000000;
+  --foreground: #FFFFFF;
+  --muted-foreground: #E5DCF0;
+  --primary: #D4B5FA;
+  --ring: #D4B5FA;
+  --border: #B8ADC6;
+  --input: #B8ADC6;
+  --on-surface: #FFFFFF;
+  --on-surface-var: #E5DCF0;
+  --outline: #B8ADC6;
+  --outline-var: #B8ADC6;
+  --surface-tint: #D4B5FA;
+}
+
+/* ── Base mínima SOLO en la website (en capa: todo lo demás le gana) ─── */
+@layer base {
+  body.site {
+    background: var(--background);
+    color: var(--foreground);
+  }
+  /* Rótulo (overline): el mismo estilo en toda la website */
+  .site .rotulo {
+    font-family: var(--font-headline);
+    font-size: var(--fs-xs);
+    font-weight: 500;
+    letter-spacing: var(--tracking-rotulo);
+    text-transform: uppercase;
+  }
+  .site :where(button, input, select, textarea) {
+    color: inherit;
+    background-color: transparent;
+    border: 0 solid var(--border);
+  }
+  .site :where(*, ::before, ::after) {
+    border-color: var(--border);
+  }
+  .site :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+}
+
+/* ── Cambio de tema con círculo (src/lib/transicionTema.js) ─────────────
+   Se apaga el fundido por defecto de la View Transition: la revelación la
+   hace el clip-path animado desde JS. */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+/* La foto nueva nace oculta en el punto del clic y encima de la vieja; la
+   animación JS la abre. Evita el cuadro con el tema nuevo completo. */
+::view-transition-old(root) { z-index: 1; }
+::view-transition-new(root) {
+  z-index: 2;
+  clip-path: circle(0px at var(--tema-x, 50%) var(--tema-y, 0px));
+}
+
+/* ── Calendario (SelectorFechas): el día elegido "late" como los controles
+   de React Bits; el tramo se rellena; hover solo escala (sin translate). */
+[data-slot="calendar"] button[data-day] {
+  transition: transform 180ms cubic-bezier(0.34, 1.56, 0.64, 1), background-color 150ms ease, color 150ms ease;
+}
+@media (hover: hover) and (pointer: fine) {
+  [data-slot="calendar"] button[data-day]:not(:disabled):hover { transform: scale(1.1); }
+}
+[data-slot="calendar"] button[data-range-start="true"],
+[data-slot="calendar"] button[data-range-end="true"],
+[data-slot="calendar"] button[data-selected-single="true"] {
+  animation: dia-late 420ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+[data-slot="calendar"] button[data-range-middle="true"] {
+  animation: dia-tramo 300ms ease-out both;
+}
+@keyframes dia-late {
+  0%   { transform: scale(0.7); }
+  60%  { transform: scale(1.14); }
+  100% { transform: scale(1); }
+}
+@keyframes dia-tramo {
+  from { opacity: 0; transform: scale(0.85); }
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-slot="calendar"] button[data-day] { animation: none !important; transition: none; }
+}
+.reduce-motion [data-slot="calendar"] button[data-day] { animation: none !important; transition: none; }
+
+/* Pantalla de "Verificando tu sesión…" (components/marca/RutaProtegida.jsx) */
+.pantalla-verificando {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  background: var(--background);
+  color: var(--muted-foreground);
+  font-family: var(--font-body);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+}
+.pantalla-verificando__corona { display: block; width: 4.5rem; }
+.pantalla-verificando__corona svg { width: 100%; height: auto; }

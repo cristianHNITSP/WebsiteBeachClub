@@ -1,0 +1,24 @@
+/* Alta y edición del personal (página completa). Solo tokens; móvil primero. */
+.columnas { display: grid; gap: 16px; align-items: start; }
+@media (min-width: 900px) { .columnas { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.tarjeta {
+  display: grid; gap: 14px; padding: 20px; border-radius: var(--radius-xl); background: var(--card);
+  box-shadow: inset 0 0 0 1px var(--border), var(--shadow-sm);
+}
+.titulo { margin: 0; font-family: var(--font-headline); font-size: var(--fs-lg); color: var(--foreground); }
+.campo { display: grid; gap: 6px; margin: 0; padding: 0; border: 0; min-width: 0; }
+.ayuda { margin: 0; font-size: var(--fs-xs); color: var(--muted-foreground); }
+.casilla { display: flex; align-items: center; gap: 10px; min-height: 44px; font-size: var(--fs-sm); color: var(--foreground); cursor: pointer; }
+.casilla input { width: 18px; height: 18px; accent-color: var(--primary); }
+.error { grid-column: 1 / -1; margin: 0; font-size: var(--fs-sm); color: var(--destructive); }
+.clave { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.clave code {
+  flex: 1; min-width: 0; padding: 10px 14px; border-radius: var(--radius-md); background: var(--muted);
+  font-family: ui-monospace, monospace; font-size: var(--fs-lg); letter-spacing: 0.04em; color: var(--foreground); overflow-wrap: anywhere;
+}
+.botones { display: flex; flex-wrap: wrap; gap: 8px; }
+.vacio {
+  display: grid; justify-items: center; gap: 10px; padding: 32px 16px; text-align: center;
+  border-radius: var(--radius-xl); background: var(--card); box-shadow: inset 0 0 0 1px var(--border);
+  font-size: var(--fs-sm); color: var(--muted-foreground);
+}

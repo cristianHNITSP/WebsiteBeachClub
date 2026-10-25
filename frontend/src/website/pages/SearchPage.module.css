@@ -1,7 +1,7 @@
 /* ── Wrapper ── */
 .wrapper {
   min-height: 100vh;
-  padding-top: 72px;
+  padding-top: 76px;
 }
 
 .inner {
@@ -21,32 +21,19 @@
 /* ── Filter sidebar ── */
 .filterSidebar {
   position: sticky;
-  top: 88px; /* below fixed navbar */
+  top: 92px; /* debajo de la barra fija */
 }
 
 /* Mobile filter toggle — hidden on desktop */
 .filterToggle {
   display: none;
   width: 100%;
-  align-items: center;
-  gap: 8px;
-  padding: 11px 16px;
   margin-bottom: 10px;
-  background: var(--surface-container-low);
-  border: 1px solid var(--outline-var);
-  border-radius: var(--radius-md);
-  font-family: var(--font-body);
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--on-surface);
-  cursor: pointer;
-  transition: background 0.18s;
 }
-.filterToggle:hover { background: var(--surface-container); }
 
 .filterToggleCount {
   margin-left: auto;
-  font-size: 12px;
+  font-size: var(--fs-xs);
   color: var(--on-surface-var);
   font-weight: 500;
 }
@@ -71,7 +58,7 @@
 }
 
 @media (max-width: 768px) {
-  .wrapper { padding-top: 60px; }
+  .wrapper { padding-top: 76px; }
 
   .inner { padding: 16px 16px 56px; }
 

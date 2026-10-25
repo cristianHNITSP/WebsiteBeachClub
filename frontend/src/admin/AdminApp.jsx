@@ -1,141 +1,158 @@
-import { useState } from 'react'
-import { createPortal } from 'react-dom'
-import { motion, AnimatePresence } from 'framer-motion'
+import { Activity, useEffect, useState } from 'react'
+import { Navigate, useLocation, useNavigate, useParams } from 'react-router-dom'
 import AdminLayout from './AdminLayout'
-import LoginPage from './pages/LoginPage'
 import DashboardPage from './pages/DashboardPage'
 import RoomsPage from './pages/RoomsPage'
 import UsersPage from './pages/UsersPage'
 import CalendarPage from './pages/CalendarPage'
 import ShopPage from './pages/ShopPage'
 import SalesPage from './pages/SalesPage'
+import AvisosPage from './pages/AvisosPage'
+import RestaurantePosPage from './pages/RestaurantePosPage'
+import RestauranteTicketsPage from './pages/RestauranteTicketsPage'
+import RestauranteMenuPage from './pages/RestauranteMenuPage'
+import RestauranteEstadisticasPage from './pages/RestauranteEstadisticasPage'
 import AdminAccountPage from './pages/AdminAccountPage'
 import NuevaReservaPage from './pages/NuevaReservaPage'
-import NuevaHabitacionPage from './pages/NuevaHabitacionPage'
-import EditarHabitacionPage from './pages/EditarHabitacionPage'
+import HabitacionFormPage from './pages/HabitacionFormPage'
 import GestionFotosPage from './pages/GestionFotosPage'
+import AuditoriaPage from './pages/AuditoriaPage'
+import ExternasPage from './pages/ExternasPage'
+import HoyPage from './pages/HoyPage'
+import PersonaFormPage from './pages/PersonaFormPage'
 import ConfigPage from './pages/ConfigPage'
+import { deshabilitada, permitida } from './modulos'
+import { useSesion, esPersonal, rutaEntrar, rutaSalir } from '@/lib/sesion'
+import { PantallaVerificando } from '@/components/marca/RutaProtegida'
+import { usePaletaSitio } from '@/hooks/usePaletaSitio'
+import ConfirmarDescarte from '@/components/marca/ConfirmarDescarte'
 import './admin.css'
 
-/* Páginas que reemplazan el contenido completo */
-const FULL_PAGES = ['account', 'nueva-reserva', 'nueva-habitacion', 'editar-habitacion', 'gestionar-fotos', 'config']
+/*
+ * Páginas vivas: las últimas que se visitaron siguen montadas, ocultas con
+ * <Activity> (conservan estado y DOM, pero sin efectos ni escuchas: solo
+ * memoria), hasta VIDA_MS después de salir de ellas y como mucho MAX_VIVAS.
+ * Volver es instantáneo y sin esqueleto. Los formularios (FULL_PAGES) no se
+ * guardan: siempre abren limpios (lo descartado no debe reaparecer).
+ */
+const VIDA_MS = 5 * 60 * 1000
+const MAX_VIVAS = 4
 
-/* ── Nav-guard modal ── */
+/* Páginas que reemplazan el contenido completo */
+const FULL_PAGES = ['account', 'nueva-reserva', 'nueva-habitacion', 'editar-habitacion', 'gestionar-fotos', 'config', 'nueva-persona', 'editar-persona']
+
+/* ── Guardia de navegación: AlertDialog de shadcn (ConfirmarDescarte) ── */
 function NavGuardModal({ onConfirm, onCancel }) {
-  return createPortal(
-    <AnimatePresence>
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        style={{
-          position: 'fixed', inset: 0, zIndex: 9999,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          background: 'rgba(0,0,0,0.5)',
-          backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)',
-        }}
-        onClick={onCancel}
-      >
-        <motion.div
-          initial={{ opacity: 0, scale: 0.94, y: 14 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.96, y: 8 }}
-          transition={{ type: 'spring', stiffness: 420, damping: 34 }}
-          onClick={e => e.stopPropagation()}
-          style={{
-            background: 'var(--surface)',
-            border: '1px solid var(--outline-var)',
-            borderRadius: 'var(--radius-xl)',
-            padding: '32px', width: '100%', maxWidth: '400px',
-            boxShadow: 'var(--shadow-md)',
-          }}
-        >
-          <div style={{
-            width: '46px', height: '46px', borderRadius: '50%',
-            background: 'rgba(217,119,6,0.12)',
-            display: 'grid', placeItems: 'center', marginBottom: '18px',
-          }}>
-            <span className="material-symbols-outlined" style={{ fontSize: '22px', color: '#d97706' }}>
-              warning
-            </span>
-          </div>
-          <div style={{
-            fontFamily: 'var(--font-headline)', fontSize: '1.15rem',
-            color: 'var(--on-surface)', marginBottom: '8px',
-          }}>
-            ¿Descartar cambios?
-          </div>
-          <p style={{
-            fontFamily: 'var(--font-body)', fontSize: '13px',
-            color: 'var(--on-surface-var)', lineHeight: 1.65, marginBottom: '24px',
-          }}>
-            Tienes cambios sin guardar. Si cambias de sección ahora, toda la información capturada se perderá.
-          </p>
-          <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
-            <button
-              onClick={onCancel}
-              style={{
-                padding: '9px 18px', borderRadius: 'var(--radius-md)',
-                border: '1.5px solid var(--outline-var)', background: 'transparent',
-                color: 'var(--on-surface)', cursor: 'pointer',
-                fontFamily: 'var(--font-body)', fontSize: '13px', fontWeight: 700,
-                transition: 'background 0.15s',
-              }}
-              onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-container-low)'}
-              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-            >
-              Seguir editando
-            </button>
-            <button
-              onClick={onConfirm}
-              style={{
-                padding: '9px 18px', borderRadius: 'var(--radius-md)',
-                border: 'none', background: 'rgba(186,26,26,0.88)',
-                color: '#fff', cursor: 'pointer',
-                fontFamily: 'var(--font-body)', fontSize: '13px', fontWeight: 700,
-                transition: 'opacity 0.15s',
-              }}
-              onMouseEnter={e => e.currentTarget.style.opacity = '0.82'}
-              onMouseLeave={e => e.currentTarget.style.opacity = '1'}
-            >
-              Descartar y salir
-            </button>
-          </div>
-        </motion.div>
-      </motion.div>
-    </AnimatePresence>,
-    document.body,
+  return (
+    <ConfirmarDescarte
+      abierto
+      texto="Tienes cambios sin guardar. Si cambias de sección ahora, toda la información capturada se perderá."
+      onConfirmar={onConfirm}
+      onCancelar={onCancel}
+    />
   )
 }
 
+/*
+ * Pantalla del panel en la URL, con nombres en español: recargar deja al
+ * usuario donde estaba. Los ids internos (`rooms`, `calendar`…) no cambian;
+ * solo se traducen en la frontera con la URL.
+ *   /admin/tablero · /admin/habitaciones · /admin/editar-habitacion/3 …
+ */
+const SLUG = {
+  dashboard: 'tablero', rooms: 'habitaciones', users: 'usuarios', calendar: 'calendario',
+  shop: 'tienda', sales: 'ventas', housekeeping: 'limpieza', marketing: 'marketing',
+  account: 'mi-cuenta', config: 'configuracion', notifications: 'avisos',
+  restaurante: 'restaurante', 'restaurante-tickets': 'restaurante-tickets',
+  'restaurante-menu': 'restaurante-menu', 'restaurante-estadisticas': 'restaurante-estadisticas',
+  auditoria: 'auditoria', externas: 'otras-plataformas', hoy: 'llegadas-y-salidas',
+  'nueva-reserva': 'nueva-reserva', 'nueva-habitacion': 'nueva-habitacion',
+  'editar-habitacion': 'editar-habitacion', 'gestionar-fotos': 'gestionar-fotos',
+  'nueva-persona': 'nueva-persona', 'editar-persona': 'editar-persona',
+}
+const PAGINA = Object.fromEntries(Object.entries(SLUG).map(([id, slug]) => [slug, id]))
+// A dónde vuelve cada página completa si se llegó por URL (sin historial interno).
+const REGRESO = {
+  'editar-habitacion': 'rooms', 'gestionar-fotos': 'rooms', 'nueva-habitacion': 'rooms',
+  'nueva-persona': 'users', 'editar-persona': 'users',
+  'nueva-reserva': 'calendar', account: 'dashboard', config: 'dashboard',
+}
+// Páginas cuya URL lleva un id (/admin/editar-habitacion/<id>); sin él, vuelven a su lista.
+const CON_ID = ['editar-habitacion', 'gestionar-fotos', 'editar-persona']
+
 export default function AdminApp() {
-  const [page, setPage]           = useState('login')
-  const [prevPage, setPrevPage]   = useState('dashboard')
+  usePaletaSitio() // mismo sistema visual que la website (paleta floral, Oswald + Cabin)
+  const navigate = useNavigate()
+  const { '*': resto = '' } = useParams()
+  const [slug, idTexto] = resto.split('/')
+
+  const location = useLocation()
+  const { verificando, sesion } = useSesion()
+  const [prevPage, setPrevPage]   = useState(null)
   const [isDirty, setIsDirty]     = useState(false)
   const [pendingNav, setPendingNav] = useState(null)
   const [showNavGuard, setShowNavGuard] = useState(false)
-  const [editingRoom, setEditingRoom] = useState(null)
-  const [photosRoom,  setPhotosRoom]  = useState(null)
+  const [vivas, setVivas] = useState([])           // [{ page, salio }]
 
-  const doNavigate = (newPage) => {
+  // Página y habitación salen de la URL. La habitación la pide cada página a la
+  // API (si ya no existe, la página lo dice); sin id, a la lista.
+  let page = PAGINA[slug] ?? 'dashboard'
+  if (CON_ID.includes(page) && !idTexto) page = REGRESO[page]
+  if (deshabilitada(page)) page = 'dashboard' // módulo apagado (admin/modulos.js): la URL se corrige sola
+  if (sesion && !permitida(page, sesion)) page = 'dashboard' // sin el permiso de esa página
+  const backPage    = prevPage ?? REGRESO[page] ?? 'dashboard'
+  const actualViva  = FULL_PAGES.includes(page) ? null : page
+
+  // Al salir de una página, pasa a "viva" con la hora de salida. EN EL MISMO
+  // render (no en un efecto): si no, ese render ya no la incluiría, React la
+  // desmontaría y volvería a montarla limpia (con esqueleto) un instante después.
+  const [ultima, setUltima] = useState(actualViva)
+  if (ultima !== actualViva) {
+    setUltima(actualViva)
+    if (ultima) setVivas(v => [{ page: ultima, salio: Date.now() }, ...v.filter(x => x.page !== ultima && x.page !== actualViva)].slice(0, MAX_VIVAS))
+  }
+  // Las que pasan VIDA_MS fuera se liberan (se desmontan).
+  useEffect(() => {
+    if (!vivas.length) return
+    const t = setInterval(() => setVivas(v => {
+      const quedan = v.filter(x => Date.now() - x.salio < VIDA_MS)
+      return quedan.length === v.length ? v : quedan
+    }), 30_000)
+    return () => clearInterval(t)
+  }, [vivas.length])
+
+  // URL sin página válida (o /admin a secas) con sesión → al tablero.
+  const urlCanonica = `/admin/${SLUG[page]}${CON_ID.includes(page) ? `/${idTexto}` : ''}`
+  useEffect(() => {
+    if (esPersonal(sesion) && resto !== urlCanonica.slice('/admin/'.length)) navigate(urlCanonica, { replace: true })
+  }, [sesion, resto, urlCanonica, navigate])
+
+  const doNavigate = (newPage, conRoom) => {
     setIsDirty(false)
+    if (newPage === 'login') {            // "Cerrar sesión"
+      setPrevPage(null)
+      navigate(rutaSalir('/entrar'), { replace: true })
+      return
+    }
     if (FULL_PAGES.includes(newPage) && newPage !== page) setPrevPage(page)
-    setPage(newPage)
+    else if (!FULL_PAGES.includes(newPage)) setPrevPage(null)
+    navigate(`/admin/${SLUG[newPage] ?? SLUG.dashboard}${conRoom ? `/${conRoom.id}` : ''}`)
   }
 
-  const handleNavigate = (newPage) => {
+  const handleNavigate = (newPage, conRoom) => {
+    if (deshabilitada(newPage) || !permitida(newPage, sesion)) return
     /* Si estamos en un formulario con datos y el destino es otra sección → guardia */
     if (FULL_PAGES.includes(page) && isDirty && newPage !== page) {
-      setPendingNav(newPage)
+      setPendingNav({ page: newPage, room: conRoom })
       setShowNavGuard(true)
       return
     }
-    doNavigate(newPage)
+    doNavigate(newPage, conRoom)
   }
 
   const confirmNavGuard = () => {
     setShowNavGuard(false)
-    doNavigate(pendingNav)
+    doNavigate(pendingNav.page, pendingNav.room)
     setPendingNav(null)
   }
 
@@ -144,115 +161,42 @@ export default function AdminApp() {
     setPendingNav(null)
   }
 
-  const handleEditRoom = (room) => {
-    setEditingRoom(room)
-    handleNavigate('editar-habitacion')
-  }
+  const handleEditRoom = (r) => handleNavigate('editar-habitacion', r)
+  const handleGestionarFotos = (r) => handleNavigate('gestionar-fotos', r)
 
-  const handleGestionarFotos = (room) => {
-    setPhotosRoom(room)
-    handleNavigate('gestionar-fotos')
-  }
+  // Login único (/entrar): sin sesión se va a entrar y se vuelve aquí después;
+  // un huésped no tiene panel, va a su cuenta.
+  // (misma lógica que RutaProtegida, aquí dentro para usar la paleta del panel)
+  if (verificando) return <PantallaVerificando />
+  if (!sesion) return <Navigate to={rutaEntrar(location)} replace />
+  if (!esPersonal(sesion)) return <Navigate to="/mi-cuenta" replace />
 
-  if (page === 'login') {
-    return <LoginPage onLogin={() => setPage('dashboard')} />
-  }
+  const volver = () => doNavigate(backPage)
 
-  if (page === 'account') {
-    return (
-      <AdminLayout page={page} navPage={prevPage} onNavigate={handleNavigate}>
-        <AdminAccountPage onBack={() => doNavigate(prevPage)} />
-      </AdminLayout>
-    )
-  }
-
-  if (page === 'config') {
-    return (
-      <>
-        <AdminLayout page={page} navPage={prevPage} onNavigate={handleNavigate}>
-          <ConfigPage onBack={() => doNavigate(prevPage)} onDirtyChange={setIsDirty} />
-        </AdminLayout>
-        {showNavGuard && (
-          <NavGuardModal onConfirm={confirmNavGuard} onCancel={cancelNavGuard} />
-        )}
-      </>
-    )
-  }
-
-  if (page === 'nueva-reserva') {
-    return (
-      <>
-        <AdminLayout page={page} navPage={prevPage} onNavigate={handleNavigate}>
-          <NuevaReservaPage
-            onBack={() => doNavigate(prevPage)}
-            onDirtyChange={setIsDirty}
-          />
-        </AdminLayout>
-        {showNavGuard && (
-          <NavGuardModal onConfirm={confirmNavGuard} onCancel={cancelNavGuard} />
-        )}
-      </>
-    )
-  }
-
-  if (page === 'nueva-habitacion') {
-    return (
-      <>
-        <AdminLayout page={page} navPage={prevPage} onNavigate={handleNavigate}>
-          <NuevaHabitacionPage
-            onBack={() => doNavigate(prevPage)}
-            onDirtyChange={setIsDirty}
-          />
-        </AdminLayout>
-        {showNavGuard && (
-          <NavGuardModal onConfirm={confirmNavGuard} onCancel={cancelNavGuard} />
-        )}
-      </>
-    )
-  }
-
-  if (page === 'editar-habitacion') {
-    return (
-      <>
-        <AdminLayout page={page} navPage={prevPage} onNavigate={handleNavigate}>
-          <EditarHabitacionPage
-            room={editingRoom}
-            onBack={() => doNavigate(prevPage)}
-            onDirtyChange={setIsDirty}
-          />
-        </AdminLayout>
-        {showNavGuard && (
-          <NavGuardModal onConfirm={confirmNavGuard} onCancel={cancelNavGuard} />
-        )}
-      </>
-    )
-  }
-
-  if (page === 'gestionar-fotos') {
-    return (
-      <>
-        <AdminLayout page={page} navPage={prevPage} onNavigate={handleNavigate}>
-          <GestionFotosPage
-            room={photosRoom}
-            onBack={() => doNavigate(prevPage)}
-            onDirtyChange={setIsDirty}
-          />
-        </AdminLayout>
-        {showNavGuard && (
-          <NavGuardModal onConfirm={confirmNavGuard} onCancel={cancelNavGuard} />
-        )}
-      </>
-    )
-  }
-
-  const renderPage = () => {
-    switch (page) {
+  const renderPage = (pg = page) => {
+    switch (pg) {
+      case 'account':      return <AdminAccountPage onBack={volver} />
+      case 'config':       return <ConfigPage onBack={volver} onDirtyChange={setIsDirty} />
+      case 'nueva-reserva': return <NuevaReservaPage onBack={volver} onDirtyChange={setIsDirty} />
+      case 'nueva-habitacion': return <HabitacionFormPage onBack={volver} onDirtyChange={setIsDirty} />
+      case 'editar-habitacion': return <HabitacionFormPage key={idTexto} habitacionId={idTexto} onBack={volver} onDirtyChange={setIsDirty} />
+      case 'gestionar-fotos': return <GestionFotosPage habitacionId={idTexto} onBack={volver} onDirtyChange={setIsDirty} />
       case 'dashboard':    return <DashboardPage onNavigate={handleNavigate} />
       case 'rooms':        return <RoomsPage onNavigate={handleNavigate} onEditRoom={handleEditRoom} onGestionarFotos={handleGestionarFotos} />
-      case 'users':        return <UsersPage />
+      case 'users':        return <UsersPage onNavigate={handleNavigate} />
+      case 'nueva-persona': return <PersonaFormPage onBack={volver} onDirtyChange={setIsDirty} />
+      case 'editar-persona': return <PersonaFormPage key={idTexto} personaId={idTexto} onBack={volver} onDirtyChange={setIsDirty} />
       case 'calendar':     return <CalendarPage onNavigate={handleNavigate} />
       case 'shop':         return <ShopPage />
       case 'sales':        return <SalesPage />
+      case 'notifications': return <AvisosPage onNavigate={handleNavigate} />
+      case 'auditoria':    return <AuditoriaPage />
+      case 'externas':     return <ExternasPage />
+      case 'hoy':          return <HoyPage />
+      case 'restaurante':  return <RestaurantePosPage />
+      case 'restaurante-tickets': return <RestauranteTicketsPage />
+      case 'restaurante-menu': return <RestauranteMenuPage />
+      case 'restaurante-estadisticas': return <RestauranteEstadisticasPage />
       case 'housekeeping': return (
         <div>
           <span className="admin-page-eyebrow">Operaciones</span>
@@ -271,9 +215,21 @@ export default function AdminApp() {
     }
   }
 
+  // UN solo árbol para todas las páginas: si cada página completa devolviera su
+  // propio AdminLayout, React lo desmontaría al entrar o salir de ellas y las
+  // animaciones de la navegación arrancarían desde posiciones viejas.
   return (
-    <AdminLayout page={page} onNavigate={handleNavigate}>
-      {renderPage()}
-    </AdminLayout>
+    <>
+      <AdminLayout page={page} navPage={FULL_PAGES.includes(page) ? backPage : undefined} onNavigate={handleNavigate}>
+        {!actualViva && <div key={`form-${page}`} className="pagina-admin">{renderPage()}</div>}
+        {/* Orden estable (por nombre): mostrar u ocultar no mueve nodos del DOM */}
+        {[...new Set([...vivas.map(x => x.page), actualViva].filter(Boolean))].sort().map(pg => (
+          <Activity key={pg} mode={pg === actualViva ? 'visible' : 'hidden'}>
+            <div className="pagina-admin">{renderPage(pg)}</div>
+          </Activity>
+        ))}
+      </AdminLayout>
+      {showNavGuard && <NavGuardModal onConfirm={confirmNavGuard} onCancel={cancelNavGuard} />}
+    </>
   )
 }

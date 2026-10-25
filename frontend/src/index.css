@@ -254,3 +254,21 @@ textarea {
 .animate-float {
   animation: floatY 6s ease-in-out infinite;
 }
+/* ── Esqueleto global de imágenes (lib/esqueletoImagenes.js) ──
+   Mientras una <img> no carga: brillo de carga y sin texto alternativo a la
+   vista. Si falla: bloque neutro. Los tokens existen en el admin y en la web. */
+img:not([data-cargada]):not([data-sin-esqueleto]) {
+  color: transparent;
+  background: linear-gradient(90deg, var(--surface-container) 0%, var(--surface-container-highest) 48%, var(--surface-container) 100%);
+  background-size: 200% 100%;
+  animation: shimmer 1.6s linear infinite;
+}
+img[data-fallida] {
+  color: transparent;
+  background: var(--surface-container);
+  animation: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  img:not([data-cargada]) { animation: none; }
+}
+.reduce-motion img:not([data-cargada]) { animation: none; }

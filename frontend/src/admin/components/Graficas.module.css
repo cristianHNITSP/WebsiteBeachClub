@@ -1,0 +1,48 @@
+/* ===== GRÁFICAS (una serie, un color; texto con tokens de texto) =====
+ * Serie en --primary; "hoy" en --flor-rojo (igual que la línea de hoy de la
+ * Línea de tiempo). Par validado con scripts/validate_palette.js (claro y
+ * oscuro). En oscuro la serie baja a #A874EC: --primary (#B98AF0) queda fuera
+ * de la banda de luminosidad para marcas. */
+.figura { margin: 0; --serie: var(--primary); --hoy: var(--flor-rojo); }
+:global(.dark) .figura, :global(.dark) .barras { --serie: #A874EC; }
+
+.columnas {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px; /* separación de superficie entre barras */
+  box-shadow: inset 0 -1px 0 var(--border); /* línea base */
+}
+.columna { flex: 1; width: 100%; height: 100%; display: flex; align-items: flex-end; justify-content: center; outline-offset: 2px; border-radius: 4px; }
+.columna:hover .barra, .columna:focus-visible .barra { filter: brightness(1.15) saturate(1.1); }
+.barra {
+  width: 100%;
+  max-width: 56px;
+  border-radius: 4px 4px 0 0;
+  background: var(--serie);
+  transform-origin: bottom center;
+  transition: background-color 0.15s;
+}
+.marcada { background: var(--hoy); }
+
+.eje { display: flex; gap: 2px; margin-top: 6px; }
+.ejeEtiqueta {
+  flex: 1;
+  min-width: 0;
+  text-align: center;
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  color: var(--muted-foreground);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: visible;
+}
+.ejeHoy { color: var(--foreground); font-weight: 800; }
+
+.barras { --serie: var(--primary); list-style: none; display: flex; flex-direction: column; gap: 12px; }
+.barrasFila { display: flex; flex-direction: column; gap: 5px; }
+.barrasCabeza { display: flex; align-items: center; gap: 8px; font-size: var(--fs-sm); }
+.barrasIcono { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; flex-shrink: 0; }
+.barrasEtiqueta { flex: 1; min-width: 0; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.barrasValor { font-weight: 700; color: var(--muted-foreground); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.pistaBarra { height: 8px; border-radius: var(--radius-full); background: var(--muted); overflow: hidden; }
+.relleno { height: 100%; border-radius: var(--radius-full); background: var(--serie); transform-origin: left center; }

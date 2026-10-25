@@ -1,0 +1,162 @@
+/* ===== RESTAURANTE (punto de venta, tickets, menú, estadísticas) ===== */
+.fila { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.filtros { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin: 24px 0 16px; }
+/* Los chips (JellyRadio) no se parten en líneas: en móvil se deslizan en su propio carril */
+.filtros > [role='radiogroup'] { max-width: 100%; overflow-x: auto; scrollbar-width: none; }
+.resultado { margin-left: auto; font-size: var(--fs-xs); font-weight: 700; color: var(--muted-foreground); }
+.buscador { position: relative; width: 16rem; max-width: 100%; }
+.buscadorIcono { position: absolute; left: 11px; top: 50%; transform: translateY(-50%); color: var(--muted-foreground); pointer-events: none; }
+.panel {
+  background: var(--card);
+  border-radius: var(--radius-xl);
+  box-shadow: inset 0 0 0 1px var(--border), var(--shadow-sm);
+  padding: 20px;
+  min-width: 0;
+}
+.panelTitulo { font-family: var(--font-headline); font-size: var(--fs-lg); font-weight: 600; }
+.panelSub { font-size: var(--fs-xs); color: var(--muted-foreground); margin-top: 2px; }
+.panelCabeza { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 18px; }
+.vacio { display: grid; place-items: center; gap: 6px; min-height: 180px; text-align: center; color: var(--muted-foreground); font-size: var(--fs-sm); }
+.icono { width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; flex-shrink: 0; }
+
+/* ── Punto de venta ── */
+.pos { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 24px; align-items: start; }
+.carta { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; position: relative; }
+.platillo {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  width: 100%;
+  height: 100%;
+  padding: 14px;
+  border-radius: var(--radius-lg);
+  background: var(--card);
+  box-shadow: inset 0 0 0 1px var(--border), var(--shadow-sm);
+  text-align: left;
+  cursor: pointer;
+  transition: box-shadow 0.2s;
+}
+.platillo:hover { box-shadow: inset 0 0 0 1.5px var(--primary), var(--shadow-md); }
+.platillo:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+.platillo:disabled { cursor: not-allowed; opacity: 0.55; }
+.platilloNombre { font-weight: 700; font-size: var(--fs-sm); line-height: 1.3; }
+.platilloPrecio { margin-top: auto; font-family: var(--font-headline); font-size: var(--fs-lg); font-weight: 600; color: var(--primary); font-variant-numeric: tabular-nums; }
+.agotado { font-size: var(--fs-xs); font-weight: 700; color: var(--muted-foreground); margin-top: auto; }
+.enOrden {
+  position: absolute; top: 10px; right: 10px;
+  min-width: 24px; height: 24px; padding: 0 6px; border-radius: var(--radius-full);
+  display: grid; place-items: center;
+  font-size: var(--fs-xs); font-weight: 800;
+  background: var(--primary); color: var(--primary-foreground);
+}
+
+.orden { position: sticky; top: 88px; display: flex; flex-direction: column; gap: 16px; }
+.campo { display: flex; flex-direction: column; gap: 6px; }
+.lineas { list-style: none; display: flex; flex-direction: column; gap: 4px; position: relative; max-height: 320px; overflow-y: auto; margin: 0 -6px; padding: 0 6px; }
+.linea { display: flex; align-items: center; gap: 8px; padding: 8px 0; box-shadow: inset 0 -1px 0 var(--border); }
+.lineaNombre { flex: 1; min-width: 0; font-size: var(--fs-sm); font-weight: 600; }
+.lineaPrecio { font-size: var(--fs-xs); color: var(--muted-foreground); display: block; font-weight: 500; }
+.lineaImporte { font-weight: 700; font-size: var(--fs-sm); font-variant-numeric: tabular-nums; min-width: 72px; text-align: right; }
+.cantidad { display: flex; align-items: center; gap: 2px; }
+.cantidadValor { min-width: 22px; text-align: center; font-weight: 800; font-variant-numeric: tabular-nums; }
+.totales { display: flex; flex-direction: column; gap: 4px; font-size: var(--fs-sm); }
+.totales > div { display: flex; justify-content: space-between; color: var(--muted-foreground); font-variant-numeric: tabular-nums; }
+.totales .total { color: var(--foreground); font-family: var(--font-headline); font-size: var(--fs-xl); font-weight: 600; margin-top: 4px; }
+
+/* ── Ticket en pantalla ── */
+.ticket {
+  position: relative;
+  background: var(--card);
+  color: var(--foreground);
+  border-radius: var(--radius-lg);
+  box-shadow: inset 0 0 0 1px var(--border);
+  padding: 20px 20px 16px;
+  font-size: var(--fs-sm);
+  font-variant-numeric: tabular-nums;
+  /* borde dentado abajo, como papel cortado */
+  -webkit-mask: radial-gradient(6px at 50% 100%, #0000 98%, #000) 50% / 14px 100% repeat-x;
+  mask: radial-gradient(6px at 50% 100%, #0000 98%, #000) 50% / 14px 100% repeat-x;
+  padding-bottom: 26px;
+}
+.ticketCancelado { opacity: 0.8; }
+.ticketCabeza { display: flex; flex-direction: column; align-items: center; gap: 2px; text-align: center; color: var(--muted-foreground); font-size: var(--fs-xs); }
+.ticketCorona { width: 48px; height: auto; margin-bottom: 4px; }
+.ticketMarca { font-family: var(--font-headline); font-size: var(--fs-lg); font-weight: 600; color: var(--foreground); }
+.ticketDatos, .ticketTotales { display: flex; flex-direction: column; gap: 3px; margin: 14px 0; }
+.ticketDatos > div, .ticketTotales > div { display: flex; justify-content: space-between; gap: 12px; }
+.ticketDatos dt, .ticketTotales dt { color: var(--muted-foreground); }
+.ticketDatos dd { font-weight: 600; text-align: right; }
+.mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.ticketLineas { list-style: none; display: flex; flex-direction: column; gap: 6px; padding: 12px 0; border-block: 1px dashed var(--input); }
+.ticketLineas li { display: flex; gap: 8px; }
+.ticketCant { font-weight: 800; min-width: 26px; }
+.ticketNombre { flex: 1; min-width: 0; }
+.ticketTotal { font-family: var(--font-headline); font-size: var(--fs-xl); font-weight: 600; color: var(--foreground); padding-top: 6px; border-top: 1px dashed var(--input); margin-top: 4px; }
+.ticketTotal dt { color: var(--foreground) !important; }
+.ticketPie { display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: var(--fs-xs); color: var(--muted-foreground); }
+.ticketSello {
+  font-family: var(--font-headline); font-size: var(--fs-lg); text-transform: uppercase; letter-spacing: var(--tracking-rotulo);
+  color: var(--destructive); border: 2px solid currentColor; border-radius: var(--radius-md); padding: 2px 12px; transform: rotate(-4deg);
+}
+
+/* ── Tickets (lista) ── */
+.tabla { list-style: none; position: relative; }
+.tablaFila {
+  display: grid;
+  grid-template-columns: 110px minmax(0, 1.3fr) minmax(0, 1.6fr) 120px 110px 96px;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 12px;
+  border-radius: var(--radius-lg);
+  text-align: left;
+  font-size: var(--fs-sm);
+  cursor: pointer;
+  transition: background-color 0.15s;
+}
+.tablaFila:hover { background: var(--muted); }
+.tablaFila:focus-visible { outline: 2px solid var(--ring); outline-offset: -2px; }
+.tablaCabeza { cursor: default; font-family: var(--font-headline); font-size: var(--fs-xs); font-weight: 500; letter-spacing: var(--tracking-rotulo); text-transform: uppercase; color: var(--muted-foreground); }
+.tablaCabeza:hover { background: none; }
+.folio { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-weight: 700; display: block; }
+.hora { font-size: var(--fs-xs); color: var(--muted-foreground); }
+.destino { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.recorte { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; color: var(--muted-foreground); }
+.importe { font-weight: 800; text-align: right; font-variant-numeric: tabular-nums; }
+.estado { justify-self: end; font-size: var(--fs-xs); font-weight: 700; padding: 3px 10px; border-radius: var(--radius-full); display: inline-flex; align-items: center; gap: 4px; }
+.pagado { background: color-mix(in srgb, var(--flor-hoja) 14%, var(--card)); color: var(--flor-hoja); }
+.cancelado { background: color-mix(in srgb, var(--destructive) 12%, var(--card)); color: var(--destructive); }
+:global(.dark) .pagado { color: color-mix(in srgb, var(--flor-hoja) 40%, var(--noche-fg)); }
+.hoja { padding: 0 20px 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 16px; }
+
+/* ── Menú ── */
+.menuSeccion { margin-bottom: 28px; }
+.menuSeccionTitulo { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+.menuGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; position: relative; }
+.menuTarjeta { composes: panel; display: flex; flex-direction: column; gap: 8px; padding: 16px; height: 100%; }
+.menuDesc { font-size: var(--fs-xs); color: var(--muted-foreground); line-height: 1.5; }
+.menuPie { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: auto; padding-top: 8px; }
+.menuVendidos { font-size: var(--fs-xs); color: var(--muted-foreground); font-weight: 600; }
+.switch { display: flex; align-items: center; gap: 8px; font-size: var(--fs-xs); font-weight: 700; color: var(--muted-foreground); cursor: pointer; }
+.formulario { display: flex; flex-direction: column; gap: 14px; margin: 16px 0; }
+.formError { font-size: var(--fs-sm); color: var(--destructive); font-weight: 600; }
+
+/* ── Estadísticas ── */
+.graficas { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; margin-top: 24px; }
+.ancha { grid-column: 1 / -1; }
+
+@media (max-width: 1100px) {
+  .pos { grid-template-columns: minmax(0, 1fr); }
+  .orden { position: static; }
+  .graficas { grid-template-columns: 1fr; }
+  .tablaFila { grid-template-columns: 96px minmax(0, 1fr) 110px 90px; }
+  .ocultable { display: none; }
+}
+@media (max-width: 640px) {
+  .buscador { width: 100%; }
+  .resultado { margin-left: 0; }
+  .tablaFila { grid-template-columns: minmax(0, 1fr) auto; }
+  .tablaFila > .enMovilOculta { display: none; }
+}

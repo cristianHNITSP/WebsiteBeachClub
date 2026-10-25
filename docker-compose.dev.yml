@@ -1,0 +1,108 @@
+# ============================================================================
+# DESARROLLO. Nunca en el servidor: deploy.sh solo usa docker-compose.yml.
+#
+#   cp backend/.env.example backend/.env    # una vez, y cambia las contraseñas
+#   docker compose -f docker-compose.dev.yml up -d --build
+#
+#   Panel (Vite + HMR):  http://localhost:5176
+#   API (FastAPI):       http://localhost:8000/api/docs   (también vía Vite en /api)
+#
+#   DEV="docker compose -f docker-compose.dev.yml exec"
+#   $DEV frontend-dev npm install <paquete>
+#   $DEV api uv run pytest -q                 # pruebas del backend
+#   $DEV api uv run alembic upgrade head      # migraciones
+#   $DEV api uv add <paquete>                 # dependencia nueva (y rebuild)
+# ============================================================================
+name: beachclub-dev
+
+# Ajustes NO secretos: fijos aquí. Los secretos (contraseñas, JWT) solo en backend/.env.
+x-ajustes-backend: &ajustes-backend
+  ENTORNO: desarrollo
+  DB_HOST: postgres
+  POSTGRES_DB: beachclub
+  POSTGRES_DB_PRUEBAS: beachclub_pruebas
+  POSTGRES_USER: beachclub_migraciones
+  API_DB_USUARIO: beachclub_api
+  REDIS_URL: redis://redis:6379/0
+  FOTOS_DIR: /datos/fotos
+
+x-backend: &backend
+  build:
+    context: ./backend
+    target: dev
+  env_file: backend/.env
+  environment: *ajustes-backend
+  volumes:
+    - ./backend:/app
+    - fotos:/datos/fotos  # las mismas fotos para api y celery
+  depends_on:
+    postgres: { condition: service_healthy }
+    redis: { condition: service_healthy }
+  restart: unless-stopped
+
+services:
+  frontend-dev:
+    build:
+      context: ./frontend
+      target: dev
+    environment:
+      # Destino del proxy /api de Vite (vite.config.js). Nunca un literal en el código.
+      API_DESTINO: http://api:8000
+    volumes:
+      - ./frontend:/app
+      - node_modules:/app/node_modules
+    ports:
+      - "127.0.0.1:5176:5173"
+    restart: unless-stopped
+
+  api:
+    <<: *backend
+    ports:
+      - "127.0.0.1:8000:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health', timeout=2)"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  celery:
+    <<: *backend
+    # El estado de beat va a /tmp, no al código montado (no debe acabar en git).
+    # watchfiles: reinicia el worker al cambiar el código (como --reload de uvicorn).
+    # Sin esto, Celery seguía corriendo el código viejo hasta reiniciarlo a mano.
+    command: ["watchfiles", "--filter", "python", "celery -A app.tareas worker --beat --schedule /tmp/celerybeat-schedule -Q default --loglevel INFO", "app"]
+
+  postgres:
+    image: postgres:18.6-alpine
+    env_file: backend/.env
+    environment: *ajustes-backend
+    volumes:
+      - postgres:/var/lib/postgresql
+      - ./backend/docker/postgres:/docker-entrypoint-initdb.d:ro
+    # Sin puerto publicado: solo la alcanzan los contenedores de la red interna
+    # (psql: docker compose -f docker-compose.dev.yml exec postgres psql -U beachclub_migraciones beachclub).
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  redis:
+    image: redis:8.10-alpine
+    # Caché con TTL siempre; volatile-lru nunca desaloja la cola de Celery (PLAN-BACKEND §12).
+    command: ["redis-server", "--maxmemory", "256mb", "--maxmemory-policy", "volatile-lru", "--appendonly", "yes"]
+    volumes:
+      - redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+volumes:
+  node_modules:
+  postgres:
+  redis:
+  fotos:

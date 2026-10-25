@@ -1,321 +1,139 @@
-#version: "3.9"
+# ============================================================================
+# BeachClub / Hoteles Frida — PRODUCCIÓN (5 contenedores, PLAN-BACKEND §2)
+#
+#   frontend  Nginx: TLS, el panel compilado, proxy y microcaché de /api
+#   api       FastAPI (uvicorn)            ┐ la misma imagen
+#   celery    worker + beat (UN solo)      ┘ beachclub-backend
+#   postgres  la verdad (volumen propio)
+#   redis     caché, cola de Celery, pub/sub, límites
+#
+# Desarrollo NO pasa por aquí: docker-compose.dev.yml.
+#
+#     ./scripts/deploy.sh             # lo que corre el despliegue automático
+#
+# Secretos: .env en la raíz (lo regenera el workflow desde los Secrets de
+# GitHub). Lo que no es secreto va fijo aquí. Ver docs/deploy-config-REFERENCIA.md.
+# Solo `frontend` publica puertos: lo demás solo se alcanza por la red interna.
+# ============================================================================
+name: beachclub
 
-#COMANDOS PARA LEVANTAR Y DETENER LOS SERVICIOS DOCKER CON DOCKER COMPOSE:
-#LEVANTA LOS SERIVICIOS SIN GENERAR LOGS EN CONSOLA
-# dev:    sudo docker compose --profile dev  up --build -d
-# prod:   sudo docker compose --profile prod up --build -d
-# down:   sudo docker compose down --remove-orphans
+# Ajustes NO secretos del backend (los mismos nombres que en desarrollo).
+x-ajustes-backend: &ajustes-backend
+  ENTORNO: produccion
+  DB_HOST: postgres
+  POSTGRES_DB: beachclub
+  POSTGRES_USER: beachclub_migraciones
+  API_DB_USUARIO: beachclub_api
+  REDIS_URL: redis://redis:6379/0
+  FOTOS_DIR: /datos/fotos
+  # Fail-fast: sin estos en .env, Compose ni siquiera compone (y la API, además,
+  # se niega a arrancar con un valor de relleno o corto).
+  POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Falta POSTGRES_PASSWORD en .env (ver docs/deploy-config-REFERENCIA.md)}
+  API_DB_CLAVE: ${API_DB_CLAVE:?Falta API_DB_CLAVE en .env}
+  JWT_SECRETO: ${JWT_SECRETO:?Falta JWT_SECRETO en .env}
+  CLAVE_WEBHOOKS: ${CLAVE_WEBHOOKS:?Falta CLAVE_WEBHOOKS en .env}
+  # Opcional: sin ella el bot no busca y lo dice en el panel.
+  BRAVE_SEARCH_CLAVE: ${BRAVE_SEARCH_CLAVE:-}
 
-#----------------------------------------------------------------------------------------
-# COMANDOS PARA SEMBRAR DATOS DE PRUEBA EN LOS SERVICIOS:
-
-#COMANDOS PROD
-#sudo docker exec -it beachclub-users-service-prod node src/seed/seed-users.js
-#sudo docker exec -it beachclub-reservas-service-prod node src/seed/seed-data.js
-
-#COMANDOS DEV
-#sudo docker exec -it beachclub-users-service-dev node src/seed/seed-users.js
-#sudo docker exec -it beachclub-users-service-dev node src/seed/seed-sedes.js
-#sudo docker exec -it beachclub-reservas-service-dev node src/seed/seed-data.js
-#sudo docker exec -it beachclub-shop-service-dev node src/seed/seed-shop.js
-
-#COMANDOS PROD
-#sudo docker exec -it beachclub-users-service-prod node src/seed/seed-users.js
-#sudo docker exec -it beachclub-users-service-prod node src/seed/seed-sedes.js
-#sudo docker exec -it beachclub-reservas-service-prod node src/seed/seed-data.js
-#sudo docker exec -it beachclub-shop-service-prod node src/seed/seed-shop.js
-
-#----------------------------------------------------------------------------------------
-# VER LOS LOGS DE LOS SERVICIOS:
-# sudo docker logs -f beachclub-users-service-dev
-# sudo docker logs rsboapp-inventory
-# sudo docker logs -f rsboapp-auth
+x-backend: &backend
+  build:
+    context: ./backend
+    target: prod
+  # Nombre fijo: deploy.sh revierte re-etiquetando la imagen anterior con ESTE nombre.
+  image: beachclub-backend:latest
+  environment: *ajustes-backend
+  volumes:
+    - fotos:/datos/fotos  # las escriben api y celery; Nginx solo las lee
+  depends_on:
+    postgres: { condition: service_healthy }
+    redis: { condition: service_healthy }
+  restart: unless-stopped
+  deploy:
+    resources:
+      limits:
+        memory: 512M
 
 services:
-  # =========================
-  # FRIDA APP (DEV - Vite)
-  # =========================
-  frida-app-dev:
-    image: node:22-alpine
-    container_name: frida-app-dev
-    working_dir: /app
-    volumes:
-      - ./frida-app:/app
-      - /app/node_modules
-    ports:
-      - "127.0.0.1:5175:5173"   
-    environment:
-      NODE_ENV: development
-      VITE_RESERVAS_TARGET: "http://beachclub-reservas-service:4002"
-      VITE_USERS_TARGET: "http://beachclub-users-service:4001"
-      VITE_EVENTS_TARGET: "http://host.docker.internal:5050"
-      VITE_RESERVAS_WS_URL: "http://localhost:4102"
-      VITE_SHOP_TARGET: "http://beachclub-shop-service:4003"
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    command: sh -c "npm install && npm run dev -- --host 0.0.0.0 --port 5173"
-    restart: unless-stopped
-    profiles: ["dev"]
-    networks:
-      - beachclub-net
-
-  # =========================
-  # FRIDA APP (PROD - Nginx)
-  #  - Solo local (127.0.0.1) para publicarlo con Nginx del host (80/443)
-  # =========================
-  frida-app:
-    build:
-      context: ./frida-app
-      dockerfile: Dockerfile
-      target: prod
-    container_name: frida-app-prod
-    ports:
-      - "127.0.0.1:4200:80"
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    restart: unless-stopped
-    profiles: ["prod"]
-    networks:
-      - beachclub-net
-    healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/ >/dev/null 2>&1 || exit 1"]
-      interval: 20s
-      timeout: 5s
-      retries: 10
-
-  # =========================
-  # FRONTEND (DEV - Vite)
-  # =========================
-  frontend-dev:
-    image: node:22-alpine
-    container_name: frontend-dev
-    working_dir: /app
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
-    ports:
-      - "127.0.0.1:5176:5173"
-    environment:
-      NODE_ENV: development
-      VITE_RESERVAS_TARGET: "http://beachclub-reservas-service:4002"
-      VITE_USERS_TARGET: "http://beachclub-users-service:4001"
-      VITE_SHOP_TARGET: "http://beachclub-shop-service:4003"
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    command: sh -c "npm install && npm run dev -- --host 0.0.0.0 --port 5173"
-    restart: unless-stopped
-    profiles: ["dev"]
-    networks:
-      - beachclub-net
-
-  # =========================
-  # FRONTEND (PROD - Nginx)
-  # =========================
   frontend:
     build:
       context: ./frontend
-      dockerfile: Dockerfile
       target: prod
-    container_name: frontend-prod
+    # Nombre fijo de imagen: deploy.sh revierte re-etiquetando la anterior con
+    # ESTE nombre. Con un nombre distinto, `up` volvería a usar la imagen rota.
+    image: beachclub-frontend:latest
+    environment:
+      # Fail-fast: sin DOMINIO en .env, Compose ni siquiera compone.
+      BEACHCLUB_DOMINIO: ${DOMINIO:?Falta DOMINIO en .env (ver docs/deploy-config-REFERENCIA.md)}
     ports:
-      - "127.0.0.1:4201:80"
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+      - /var/www/certbot:/var/www/certbot:ro
+      # Fotos de las habitaciones: las escribe la API, Nginx solo las lee (PLAN-BACKEND §18).
+      - fotos:/datos/fotos:ro
     restart: unless-stopped
-    profiles: ["prod"]
-    networks:
-      - beachclub-net
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+
+  api:
+    <<: *backend
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/ >/dev/null 2>&1 || exit 1"]
-      interval: 20s
-      timeout: 5s
-      retries: 10
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health', timeout=2)"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
 
-  # =========================
-  # MongoDB BeachClub
-  # =========================
-  beachclub-mongo:
-    image: mongo:6
-    container_name: beachclub-mongo
-    ports:
-      - "127.0.0.1:27029:27017"
+  celery:
+    <<: *backend
+    # Beat dentro del worker: hay UN solo contenedor celery (dos beats lanzarían
+    # cada tarea dos veces, PLAN-BACKEND §2). Su estado, fuera del código.
+    command: ["celery", "-A", "app.tareas", "worker", "--beat", "--schedule", "/tmp/celerybeat-schedule", "-Q", "default", "--concurrency", "2", "--loglevel", "INFO"]
+
+  postgres:
+    image: postgres:18.6-alpine
     environment:
-      MONGO_INITDB_ROOT_USERNAME: root
-      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD}
+      POSTGRES_DB: beachclub
+      POSTGRES_USER: beachclub_migraciones
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Falta POSTGRES_PASSWORD en .env}
+      # Para 01-usuarios.sh (solo la PRIMERA vez que se crea el volumen).
+      API_DB_USUARIO: beachclub_api
+      API_DB_CLAVE: ${API_DB_CLAVE:?Falta API_DB_CLAVE en .env}
     volumes:
-      - beachclub-mongo-data:/data/db
-    restart: always
-    networks:
-      - beachclub-net
+      - postgres:/var/lib/postgresql
+      - ./backend/docker/postgres:/docker-entrypoint-initdb.d:ro
     healthcheck:
-      test: ["CMD-SHELL", "mongosh --quiet --eval 'db.runCommand({ ping: 1 })' || exit 1"]
-      interval: 20s
-      timeout: 10s
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
       retries: 10
-
-  # =========================
-  # Mongo Express (DEV only)
-  # =========================
-  beachclub-mongo-express:
-    image: mongo-express
-    container_name: beachclub-mongo-express
-    ports:
-      - "127.0.0.1:18082:8081"
-    environment:
-      ME_CONFIG_MONGODB_URL: mongodb://root:${MONGO_PASSWORD}@beachclub-mongo:27017/
-      ME_CONFIG_BASICAUTH_USERNAME: beachclubapp
-      ME_CONFIG_BASICAUTH_PASSWORD: ${ME_PASSWORD:-change_me}
-      ME_CONFIG_SITE_BASEURL: "/"
-    depends_on:
-      - beachclub-mongo
     restart: unless-stopped
-    networks:
-      - beachclub-net
-    profiles: ["dev"]
+    deploy:
+      resources:
+        limits:
+          memory: 1G
 
-  # ======================================================
-  # USERS SERVICE (DEV) -> alias: beachclub-users-service
-  # ======================================================
-  beachclub-users-service-dev:
-    build:
-      context: ./users-service
-    container_name: beachclub-users-service-dev
-    env_file:
-      - ./users-service/.env
-    environment:
-      NODE_ENV: development
-      MONGO_URI: "mongodb://root:${MONGO_PASSWORD}@beachclub-mongo:27017/beachclub_auth?authSource=admin"
-    depends_on:
-      - beachclub-mongo
-    ports:
-      - "4101:4001"
+  redis:
+    image: redis:8.10-alpine
+    # Caché con TTL siempre; volatile-lru nunca desaloja la cola de Celery (PLAN-BACKEND §12).
+    command: ["redis-server", "--maxmemory", "256mb", "--maxmemory-policy", "volatile-lru", "--appendonly", "yes"]
     volumes:
-      - ./users-service:/app
-      - /app/node_modules
-    command: sh -c "npm run dev"
+      - redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
     restart: unless-stopped
-    profiles: ["dev"]
-    networks:
-      beachclub-net:
-        aliases:
-          - beachclub-users-service
-
-  # ==========================================
-  # USERS SERVICE (PROD)
-  # ==========================================
-  beachclub-users-service:
-    build:
-      context: ./users-service
-    container_name: beachclub-users-service-prod
-    env_file:
-      - ./users-service/.env
-    environment:
-      NODE_ENV: production
-      MONGO_URI: "mongodb://root:${MONGO_PASSWORD}@beachclub-mongo:27017/beachclub_auth?authSource=admin"
-    depends_on:
-      - beachclub-mongo
-    ports:
-      - "127.0.0.1:4101:4001"
-    restart: unless-stopped
-    profiles: ["prod"]
-    networks:
-      - beachclub-net
-
-  # ==========================================================
-  # RESERVAS SERVICE (DEV) -> alias: beachclub-reservas-service
-  # ==========================================================
-  beachclub-reservas-service-dev:
-    build:
-      context: ./reservas-service
-    container_name: beachclub-reservas-service-dev
-    env_file:
-      - ./reservas-service/.env
-    environment:
-      NODE_ENV: development
-      MONGO_URI: "mongodb://root:${MONGO_PASSWORD}@beachclub-mongo:27017/beachclub_reservas?authSource=admin"
-    depends_on:
-      - beachclub-mongo
-    ports:
-      - "4102:4002"
-    volumes:
-      - ./reservas-service:/app
-      - /app/node_modules
-    command: sh -c "npm run dev"
-    restart: unless-stopped
-    profiles: ["dev"]
-    networks:
-      beachclub-net:
-        aliases:
-          - beachclub-reservas-service
-
-  # ==========================================
-  # RESERVAS SERVICE (PROD)
-  # ==========================================
-  beachclub-reservas-service:
-    build:
-      context: ./reservas-service
-    container_name: beachclub-reservas-service-prod
-    env_file:
-      - ./reservas-service/.env
-    environment:
-      NODE_ENV: production
-      MONGO_URI: "mongodb://root:${MONGO_PASSWORD}@beachclub-mongo:27017/beachclub_reservas?authSource=admin"
-    depends_on:
-      - beachclub-mongo
-    ports:
-      - "127.0.0.1:4102:4002"
-    restart: unless-stopped
-    profiles: ["prod"]
-    networks:
-      - beachclub-net
-
-  beachclub-shop-service-dev:
-    build:
-      context: ./shop-service
-    container_name: beachclub-shop-service-dev
-    env_file:
-      - ./shop-service/.env
-    environment:
-      NODE_ENV: development
-      MONGO_URI: "mongodb://root:${MONGO_PASSWORD}@beachclub-mongo:27017/beachclub_shop?authSource=admin"
-    depends_on:
-      - beachclub-mongo
-    ports:
-      - "4103:4003"
-    volumes:
-      - ./shop-service:/app
-      - /app/node_modules
-    command: sh -c "npm run dev"
-    restart: unless-stopped
-    profiles: ["dev"]
-    networks:
-      beachclub-net:
-        aliases:
-          - beachclub-shop-service
-  
-  # ==========================================
-  # SHOP SERVICE (PROD)
-  # ==========================================
-  beachclub-shop-service:
-    build:
-      context: ./shop-service
-    container_name: beachclub-shop-service-prod
-    env_file:
-      - ./shop-service/.env
-    environment:
-      NODE_ENV: production
-      MONGO_URI: "mongodb://root:${MONGO_PASSWORD}@beachclub-mongo:27017/beachclub_shop?authSource=admin"
-    depends_on:
-      - beachclub-mongo
-    ports:
-      - "127.0.0.1:4103:4003"
-    restart: unless-stopped
-    profiles: ["prod"]
-    networks:
-      - beachclub-net
-
-networks:
-  beachclub-net:
-    driver: bridge
+    deploy:
+      resources:
+        limits:
+          memory: 320M
 
 volumes:
-  beachclub-mongo-data:
-    driver: local
+  # Fotos (WebP). Entran en los respaldos junto con la base (scripts/respaldo.sh).
+  fotos:
+  postgres:
+  redis:

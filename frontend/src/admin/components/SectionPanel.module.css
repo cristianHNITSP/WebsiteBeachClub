@@ -1,40 +1,16 @@
-/* ── Title group: back button + text ── */
+/* ── Título: botón volver + textos ── */
 .titleGroup {
   display: flex;
   align-items: flex-start;
   gap: 16px;
 }
-
-.backBtn {
-  margin-top: 4px;
-  width: 38px;
-  height: 38px;
-  flex-shrink: 0;
-  border-radius: var(--radius-md);
-  border: 1.5px solid var(--outline-var);
-  background: var(--surface-container-low);
-  cursor: pointer;
-  display: grid;
-  place-items: center;
-  color: var(--on-surface-var);
-  transition: background 0.15s, color 0.15s, border-color 0.15s;
-}
-
-.backBtn:hover {
-  background: var(--surface-container);
-  color: var(--on-surface);
-  border-color: var(--outline);
-}
-
+.backBtn { margin-top: 4px; flex-shrink: 0; }
 .subtitle {
-  font-family: var(--font-body);
-  font-size: 13px;
-  color: var(--on-surface-var);
+  font-size: var(--fs-sm);
+  color: var(--muted-foreground);
   margin-top: 6px;
 }
 
-/* ── Responsive ── */
 @media (max-width: 480px) {
   .titleGroup { gap: 10px; }
-  .backBtn    { width: 34px; height: 34px; }
 }

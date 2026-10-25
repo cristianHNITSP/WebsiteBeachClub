@@ -12,18 +12,18 @@ export const BOOKINGS_DATA = [
 ]
 
 export const ROOMS_DATA = [
-  { id:  1, name: 'Suite Coral Grande',         type: 'Suite',         status: 'active',      rate: 3200, img: 'https://placehold.co/600x400/003b41/006971?text=Suite+Coral+Grande' },
-  { id:  2, name: 'Cabaña del Manglar',          type: 'Cabaña',        status: 'active',      rate: 2100, img: 'https://placehold.co/600x400/1a4a2e/2d7a4f?text=Cabaña+del+Manglar' },
-  { id:  3, name: 'Suite Horizonte Azul',        type: 'Suite Premium', status: 'maintenance', rate: 4800, img: 'https://placehold.co/600x400/003b41/006971?text=Suite+Horizonte+Azul' },
-  { id:  4, name: 'Villa Chuburná Sunset',       type: 'Villa',         status: 'active',      rate: 3900, img: 'https://placehold.co/600x400/5c3200/a05a00?text=Villa+Chuburná+Sunset' },
-  { id:  5, name: 'Cabaña Brisa Marina',         type: 'Cabaña',        status: 'active',      rate: 2400, img: 'https://placehold.co/600x400/1a4a2e/2d7a4f?text=Cabaña+Brisa+Marina' },
-  { id:  6, name: 'Suite Frida Clásica',         type: 'Suite',         status: 'active',      rate: 2900, img: 'https://placehold.co/600x400/4a0030/8a005a?text=Suite+Frida+Clásica' },
-  { id:  7, name: 'Estudio Palapa Norte',        type: 'Estudio',       status: 'active',      rate: 1600, img: 'https://placehold.co/600x400/003b41/006971?text=Estudio+Palapa+Norte' },
-  { id:  8, name: 'Villa Flamingo Rosado',       type: 'Villa',         status: 'active',      rate: 4200, img: 'https://placehold.co/600x400/5c1a3a/a02060?text=Villa+Flamingo+Rosado' },
-  { id:  9, name: 'Habitación Familiar Arena',   type: 'Familiar',      status: 'active',      rate: 2600, img: 'https://placehold.co/600x400/5c4a00/a08800?text=Hab.+Familiar+Arena' },
-  { id: 10, name: 'Suite Cenote Esmeralda',      type: 'Suite Premium', status: 'maintenance', rate: 5200, img: 'https://placehold.co/600x400/003b2e/006b52?text=Suite+Cenote+Esmeralda' },
-  { id: 11, name: 'Cabaña Selva Profunda',       type: 'Cabaña',        status: 'active',      rate: 1900, img: 'https://placehold.co/600x400/1a4a2e/2d7a4f?text=Cabaña+Selva+Profunda' },
-  { id: 12, name: 'Estudio Frida Clásico',       type: 'Estudio',       status: 'active',      rate: 1450, img: 'https://placehold.co/600x400/4a0030/8a005a?text=Estudio+Frida+Clásico' },
+  { id:  1, name: 'Suite Coral Grande',         type: 'Suite',         status: 'active',      rate: 3200, img: 'https://picsum.photos/seed/admin-hab-1/800/520' },
+  { id:  2, name: 'Cabaña del Manglar',          type: 'Cabaña',        status: 'active',      rate: 2100, img: 'https://picsum.photos/seed/admin-hab-2/800/520' },
+  { id:  3, name: 'Suite Horizonte Azul',        type: 'Suite Premium', status: 'maintenance', rate: 4800, img: 'https://picsum.photos/seed/admin-hab-3/800/520' },
+  { id:  4, name: 'Villa Chuburná Sunset',       type: 'Villa',         status: 'active',      rate: 3900, img: 'https://picsum.photos/seed/admin-hab-4/800/520' },
+  { id:  5, name: 'Cabaña Brisa Marina',         type: 'Cabaña',        status: 'active',      rate: 2400, img: 'https://picsum.photos/seed/admin-hab-5/800/520' },
+  { id:  6, name: 'Suite Frida Clásica',         type: 'Suite',         status: 'active',      rate: 2900, img: 'https://picsum.photos/seed/admin-hab-6/800/520' },
+  { id:  7, name: 'Estudio Palapa Norte',        type: 'Estudio',       status: 'active',      rate: 1600, img: 'https://picsum.photos/seed/admin-hab-7/800/520' },
+  { id:  8, name: 'Villa Flamingo Rosado',       type: 'Villa',         status: 'active',      rate: 4200, img: 'https://picsum.photos/seed/admin-hab-8/800/520' },
+  { id:  9, name: 'Habitación Familiar Arena',   type: 'Familiar',      status: 'active',      rate: 2600, img: 'https://picsum.photos/seed/admin-hab-9/800/520' },
+  { id: 10, name: 'Suite Cenote Esmeralda',      type: 'Suite Premium', status: 'maintenance', rate: 5200, img: 'https://picsum.photos/seed/admin-hab-10/800/520' },
+  { id: 11, name: 'Cabaña Selva Profunda',       type: 'Cabaña',        status: 'active',      rate: 1900, img: 'https://picsum.photos/seed/admin-hab-11/800/520' },
+  { id: 12, name: 'Estudio Frida Clásico',       type: 'Estudio',       status: 'active',      rate: 1450, img: 'https://picsum.photos/seed/admin-hab-12/800/520' },
 ]
 
 export const USERS_DATA = [
@@ -40,44 +40,6 @@ export const USERS_DATA = [
   { id: 11, name: 'Natalia Guerrero',   email: 'natalia@hotelesfrida.mx',    role: 'Curator',  lastActive: 'Hace 15 min',   avatar: 'https://placehold.co/56x56/7e469a/ffffff?text=NG' },
   { id: 12, name: 'Tomás Ibáñez',       email: 'tomas@hotelesfrida.mx',      role: 'Artisan',  lastActive: 'Hace 2 días',   avatar: 'https://placehold.co/56x56/003b41/ffffff?text=TI' },
   { id: 13, name: 'Fernanda Ortega',    email: 'fernanda@hotelesfrida.mx',   role: 'Steward',  lastActive: 'Hace 1 día',    avatar: 'https://placehold.co/56x56/735c00/ffffff?text=FO' },
-]
-
-export const CALENDAR_DATA = [
-  {
-    roomId: 1,
-    roomName: 'Suite Coral Grande',
-    roomType: 'Suite',
-    bookings: [
-      { guestName: 'Ana Martínez', startDay: 0, span: 3, type: 'primary', avatar: 'https://placehold.co/44x44/003b41/ffffff?text=AM' },
-      { guestName: 'Elena Castro', startDay: 5, span: 2, type: 'secondary', avatar: 'https://placehold.co/44x44/7e469a/ffffff?text=EC' },
-    ]
-  },
-  {
-    roomId: 2,
-    roomName: 'Cabaña del Manglar',
-    roomType: 'Cabaña',
-    bookings: [
-      { guestName: 'Carlos R.', startDay: 1, span: 2, type: 'secondary', avatar: 'https://placehold.co/44x44/7e469a/ffffff?text=CR' },
-      { guestName: 'MANTENIMIENTO', startDay: 4, span: 1, type: 'blocked', avatar: null },
-    ]
-  },
-  {
-    roomId: 3,
-    roomName: 'Suite Horizonte Azul',
-    roomType: 'Suite Premium',
-    bookings: [
-      { guestName: 'Sofia H.', startDay: 2, span: 4, type: 'primary', avatar: 'https://placehold.co/44x44/003b41/ffffff?text=SH' },
-    ]
-  },
-  {
-    roomId: 4,
-    roomName: 'Villa Chuburná Sunset',
-    roomType: 'Villa',
-    bookings: [
-      { guestName: 'Laura J.', startDay: 0, span: 2, type: 'secondary', avatar: 'https://placehold.co/44x44/7e469a/ffffff?text=LJ' },
-      { guestName: 'Patricia L.', startDay: 4, span: 3, type: 'primary', avatar: 'https://placehold.co/44x44/003b41/ffffff?text=PL' },
-    ]
-  },
 ]
 
 export const SHOP_BRANCHES = [

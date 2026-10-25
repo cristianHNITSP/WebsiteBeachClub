@@ -49,6 +49,17 @@ logs/
 log.txt
 
 # =========================
+# Python (backend)
+# =========================
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+.hypothesis/
+celerybeat-schedule*
+
+# =========================
 # Configuración / Secretos
 # =========================
 
@@ -57,10 +68,10 @@ log.txt
 .env.local
 .env.*.local
 
-# Entornos por servicio
-users-service/.env
-reservas-service/.env
 **/.env
+
+# Valores REALES del despliegue (IP, claves). Nunca al repo.
+docs/deploy-config.local.md
 
 # JWT u otras claves (si las dejas en archivos separados)
 *.secret
@@ -120,6 +131,5 @@ test-results/
 cypress/videos/
 cypress/screenshots/
 
-# Uploads del reservas-service (multer)
-reservas-service/src/uploads/
-reservas-service/src/uploads/**
+# Respaldos de producción (scripts/respaldo.sh): datos de huéspedes, nunca a git.
+respaldos/

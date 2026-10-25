@@ -1,0 +1,115 @@
+name: CI
+
+on:
+  push:
+    branches: [main, development]
+  pull_request:
+    branches: [main]
+
+jobs:
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 26
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run build
+
+      - name: Auditoría de dependencias (avisa, no bloquea)
+        run: npm audit --omit=dev --audit-level=high || echo "::warning::npm audit encontró vulnerabilidades altas"
+
+      - name: Build de la imagen de producción
+        run: docker build --target prod -t beachclub-frontend:ci .
+
+  backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    # Postgres y Redis de verdad (nunca SQLite: la exclusión por rango, uuidv7()
+    # y citext no existen ahí). Las contraseñas son de estos contenedores
+    # efímeros de CI, que mueren con el job: no son secretos.
+    services:
+      postgres:
+        image: postgres:18.6-alpine
+        env:
+          POSTGRES_USER: beachclub_migraciones
+          POSTGRES_PASSWORD: ci-migraciones-7f3a9c2e
+          POSTGRES_DB: beachclub_pruebas
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U beachclub_migraciones -d beachclub_pruebas"
+          --health-interval 5s --health-timeout 3s --health-retries 10
+      redis:
+        image: redis:8.10-alpine
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s --health-timeout 3s --health-retries 10
+    env:
+      DB_HOST: localhost
+      POSTGRES_DB_PRUEBAS: beachclub_pruebas
+      POSTGRES_USER: beachclub_migraciones
+      POSTGRES_PASSWORD: ci-migraciones-7f3a9c2e
+      API_DB_USUARIO: beachclub_api
+      API_DB_CLAVE: ci-api-4b8d1e6f-0c2a
+      JWT_SECRETO: ci-jwt-solo-para-este-job-9d3e7a1c5b8f2e4a6c0d
+      CLAVE_WEBHOOKS: ci-webhooks-solo-para-este-job-3f7b2a9e1c6d
+      REDIS_URL: redis://localhost:6379/0
+      FOTOS_DIR: /tmp/fotos-ci
+    steps:
+      - uses: actions/checkout@v7
+
+      # Versión completa: Astral no publica la etiqueta flotante `v10`.
+      - uses: astral-sh/setup-uv@v10.3.0
+        with:
+          version: "0.13.0"
+          python-version: "3.14"
+
+      - run: uv sync --frozen
+
+      # Lo mismo que hace docker/postgres/01-usuarios.sh en desarrollo.
+      - name: Usuario de la API con privilegio mínimo
+        env:
+          PGPASSWORD: ci-migraciones-7f3a9c2e
+        run: >-
+          psql -h localhost -U beachclub_migraciones -d beachclub_pruebas -v ON_ERROR_STOP=1
+          -c "CREATE ROLE beachclub_api LOGIN PASSWORD 'ci-api-4b8d1e6f-0c2a' NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT"
+          -c "ALTER ROLE beachclub_api SET statement_timeout = '5s'"
+          -c "GRANT CONNECT ON DATABASE beachclub_pruebas TO beachclub_api"
+
+      - run: uv run ruff check .
+      - run: uv run ruff format --check .
+      - run: uv run pytest -q
+
+      # 1 millón de reservas (~4 min): solo antes de llegar a main (PR o push),
+      # no en cada push a development. Falla si el tablero pasa de 100 ms.
+      - name: Prueba de carga
+        if: github.ref == 'refs/heads/main' || github.event_name == 'pull_request'
+        run: uv run pytest -q -m carga
+
+      # Bloquea: con una vulnerabilidad conocida en las dependencias no se despliega.
+      - name: Auditoría de dependencias
+        run: uv run pip-audit
+
+      - name: Build de la imagen de producción
+        run: docker build --target prod -t beachclub-backend:ci .
+
+  # El despliegue es un job MÁS de este workflow (`needs:`), no un workflow
+  # aparte con `workflow_run`: ese trigger no reacciona a la misma corrida en
+  # la que se agrega. Solo push a main; development y los PR solo prueban.
+  deploy:
+    needs: [frontend, backend]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    uses: ./.github/workflows/deploy.yml
+    secrets: inherit

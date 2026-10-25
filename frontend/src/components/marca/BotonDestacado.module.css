@@ -1,0 +1,90 @@
+/* Botón destacado (Magnet de React Bits + Button de shadcn + resorte). Plano,
+   solo tokens. El imán es la única excepción a "hover solo por sombra": es la
+   acción principal, se mueve 5 px como mucho y se apaga con reducir movimiento. */
+.iman { position: relative; display: inline-flex; }
+.imanInterior { display: flex; width: 100%; }
+.resorte { display: flex; width: 100%; }
+
+.boton {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  width: 100%;
+  border: 0;
+  border-radius: var(--radius-full);
+  font-family: var(--font-body);
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  color: var(--primary-foreground);
+  background: var(--primary);
+  box-shadow: 0 6px 16px -10px color-mix(in srgb, var(--primary) 70%, transparent);
+  cursor: pointer;
+  transition: box-shadow 0.3s ease;
+}
+.boton:hover { box-shadow: 0 14px 28px -12px color-mix(in srgb, var(--primary) 85%, transparent); }
+.boton:focus-visible { outline: 2px solid var(--ring); outline-offset: 4px; }
+.boton:disabled { cursor: not-allowed; opacity: 0.5; box-shadow: none; }
+
+/* Relleno: círculo que crece desde el punto de entrada del cursor.
+   Morado → orquídea: el texto sigue pasando AA en claro y en oscuro. */
+.relleno {
+  position: absolute;
+  z-index: -1;
+  left: var(--x, 50%);
+  top: var(--y, 50%);
+  width: 260%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--primary) 45%, var(--flor-orquidea)); /* AA: 5.74 claro, 4.75 oscuro */
+  transform: translate(-50%, -50%) scale(0);
+  transition: transform 0.55s cubic-bezier(0.22, 1, 0.36, 1);
+  pointer-events: none;
+}
+.boton:not(:disabled):hover .relleno { transform: translate(-50%, -50%) scale(1); }
+
+.contenido { position: relative; display: inline-flex; align-items: center; gap: 8px; }
+.icono { display: inline-flex; flex-shrink: 0; }
+
+/* Iconos vivos: cada uno se mueve según lo que significa. En reposo, un ciclo
+   con pausa larga (llama la atención sin cansar); al pasar, el mismo gesto
+   seguido. Solo se mueve el icono, nunca el texto. */
+.avanzar { animation: icono-avanzar 2.6s cubic-bezier(0.45, 0, 0.2, 1) infinite; }
+.girar   { animation: icono-girar 3s cubic-bezier(0.34, 1.56, 0.64, 1) infinite; }
+.rebote  { animation: icono-rebote 2.8s ease-in-out infinite; }
+.latido  { animation: icono-latido 2.8s ease-in-out infinite; }
+.boton:not(:disabled):hover .icono { animation-duration: 1s; }
+.boton:disabled .icono { animation: none; }
+
+@keyframes icono-avanzar {   /* empuja hacia adelante dos veces */
+  0%, 55%, 100% { transform: translateX(0); }
+  66% { transform: translateX(5px); }
+  76% { transform: translateX(0); }
+  86% { transform: translateX(3px); }
+  93% { transform: translateX(0); }
+}
+@keyframes icono-girar {     /* un cuarto de vuelta con rebote: el + se ve igual al terminar */
+  0%, 60% { transform: rotate(0deg); }
+  85%, 100% { transform: rotate(90deg); }
+}
+@keyframes icono-rebote {    /* salta y se aplasta al caer */
+  0%, 55%, 100% { transform: translateY(0) scale(1, 1); }
+  68% { transform: translateY(-4px) scale(0.96, 1.06); }
+  80% { transform: translateY(0) scale(1.08, 0.92); }
+  88% { transform: translateY(-1px) scale(1, 1); }
+}
+@keyframes icono-latido {
+  0%, 60%, 100% { transform: scale(1); }
+  72% { transform: scale(1.18); }
+  84% { transform: scale(0.96); }
+}
+
+.sm { height: 36px; padding: 0 16px; font-size: var(--fs-xs); }
+.md { height: 42px; padding: 0 22px; font-size: var(--fs-sm); }
+.lg { height: 48px; padding: 0 28px; font-size: var(--fs-base); }
+
+/* Reducir movimiento (del sistema o de la app): sin animaciones de iconos */
+.sinMovimiento .icono, .sinMovimiento .relleno { animation: none !important; transition: none; }
+@media (prefers-reduced-motion: reduce) {
+  .icono, .relleno { animation: none !important; transition: none; }
+}

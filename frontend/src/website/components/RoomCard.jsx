@@ -1,30 +1,30 @@
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Badge, Icon, Button } from '@/components/frida'
+import { ArrowRightIcon, EyeIcon, MapPinIcon, RulerIcon, StarIcon } from '@phosphor-icons/react'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import PulseHeart from '@/components/bits/PulseHeart'
 import s from './RoomCard.module.css'
 
 function StarRating({ rating }) {
   const full = Math.round(rating)
   return (
-    <span style={{ color: 'var(--gold)', letterSpacing: '1px' }}>
-      {'★'.repeat(full)}{'☆'.repeat(5 - full)}
+    <span className="inline-flex text-secondary" aria-hidden="true">
+      {[0, 1, 2, 3, 4].map(i => <StarIcon key={i} size={14} weight={i < full ? 'fill' : 'regular'} />)}
     </span>
   )
 }
 
 export default function RoomCard({ room, onSelect, isFav, onToggleFav, vertical = true }) {
   const [hovered, setHovered] = useState(false)
-  const locationLabel = room.location === 'chelem' ? 'Cabañas Frida — Chelem' : 'Casa Frida — Chuburná'
+  const locationLabel = room.location === 'chelem' ? 'Cabañas Frida, Chelem' : 'Casa Frida, Chuburná'
 
   return (
-    <motion.article
+    <article
       onClick={() => onSelect(room)}
-      onHoverStart={() => setHovered(true)}
-      onHoverEnd={() => setHovered(false)}
-      whileHover={{ y: -6 }}
-      transition={{ duration: 0.3, ease: [0.25, 0.46, 0.45, 0.94] }}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
       className={`${s.card} ${!vertical ? s.cardHorizontal : ''}`}
-      style={{ boxShadow: hovered ? 'var(--shadow-md)' : 'var(--shadow-sm)' }}
     >
       {/* ── Image ── */}
       <figure className={s.figure}>
@@ -32,8 +32,8 @@ export default function RoomCard({ room, onSelect, isFav, onToggleFav, vertical 
           src={room.img}
           alt={room.title}
           loading="lazy"
-          animate={{ scale: hovered ? 1.06 : 1 }}
-          transition={{ duration: 0.5, ease: [0.25, 0.46, 0.45, 0.94] }}
+          animate={{ scale: hovered ? 1.05 : 1 }}
+          transition={{ duration: 0.6, ease: [0.25, 0.46, 0.45, 0.94] }}
           className={s.img}
         />
 
@@ -46,51 +46,44 @@ export default function RoomCard({ room, onSelect, isFav, onToggleFav, vertical 
               transition={{ duration: 0.2 }}
               className={s.overlay}
             >
-              <motion.span
-                initial={{ y: 10, opacity: 0 }}
-                animate={{ y: 0, opacity: 1 }}
-                exit={{ y: 6, opacity: 0 }}
-                transition={{ delay: 0.05 }}
-                className={s.overlayBtn}
-              >
-                <span className="material-symbols-outlined" style={{ fontSize: '15px' }}>visibility</span>
+              <span className={s.overlayBtn}>
+                <EyeIcon size={16} weight="bold" />
                 Ver detalle
-              </motion.span>
+              </span>
             </motion.div>
           )}
         </AnimatePresence>
 
         <div className={s.badgePos}>
           {room.hasDiscount
-            ? <Badge variant="discount">-{room.discountPercent}%</Badge>
-            : <Badge variant="tag">{room.tag}</Badge>
+            ? <Badge className="bg-flor-rojo text-[var(--flor-rojo-fg)] font-bold">-{room.discountPercent}%</Badge>
+            : <Badge className="bg-primary text-primary-foreground">{room.tag}</Badge>
           }
         </div>
 
-        <figcaption style={{ position: 'absolute', width: '1px', height: '1px', overflow: 'hidden', clip: 'rect(0,0,0,0)', whiteSpace: 'nowrap' }}>
-          {room.title}
-        </figcaption>
-
-        <motion.button
-          onClick={e => { e.stopPropagation(); onToggleFav(room.id) }}
-          title={isFav ? 'Quitar de favoritos' : 'Agregar a favoritos'}
-          whileHover={{ scale: 1.15 }}
-          whileTap={{ scale: 0.9 }}
-          className={s.favBtn}
-          style={{
-            background: isFav ? '#ef4444' : 'rgba(255,255,255,0.9)',
-            color: isFav ? '#fff' : '#888',
-          }}
-        >
-          {isFav ? '♥' : '♡'}
-        </motion.button>
+        {/* PulseHeart (React Bits): se contrae a un punto, cambia de color y late.
+            El span corta el clic para que no abra la tarjeta. */}
+        <span className={s.favBtn} onClick={e => e.stopPropagation()}>
+          <PulseHeart
+            liked={isFav}
+            onChange={() => onToggleFav(room.id)}
+            showCount={false}
+            size={20}
+            corner={999}
+            label={isFav ? 'Quitar de favoritos' : 'Agregar a favoritos'}
+            likedColor="var(--flor-rojo)"
+            idleColor="var(--muted-foreground)"
+            pillColor="var(--card)"
+            textColor="var(--card-foreground)"
+          />
+        </span>
       </figure>
 
       {/* ── Body ── */}
       <div className={s.body}>
         <div>
           <div className={s.location}>
-            <span className="material-symbols-outlined" style={{ fontSize: '11px' }}>location_on</span>
+            <MapPinIcon size={12} weight="fill" aria-hidden="true" />
             {locationLabel}
           </div>
 
@@ -105,10 +98,10 @@ export default function RoomCard({ room, onSelect, isFav, onToggleFav, vertical 
           <p className={s.desc}>{room.desc}</p>
 
           {room.size && (
-            <div className={s.sizeBadge}>
-              <span className="material-symbols-outlined" style={{ fontSize: '12px' }}>straighten</span>
+            <Badge variant="outline" className="mt-3 gap-1 text-muted-foreground">
+              <RulerIcon size={12} aria-hidden="true" />
               {room.size}
-            </div>
+            </Badge>
           )}
         </div>
 
@@ -123,15 +116,11 @@ export default function RoomCard({ room, onSelect, isFav, onToggleFav, vertical 
               <span className={s.priceLabel}>MXN / noche</span>
             </div>
           </div>
-          <Button
-            variant="primary"
-            style={{ fontSize: '12px', padding: '9px 18px' }}
-            onClick={e => { e.stopPropagation(); onSelect(room) }}
-          >
-            Ver detalle <Icon name="arrow_forward" size={14} />
+          <Button onClick={e => { e.stopPropagation(); onSelect(room) }}>
+            Ver detalle <ArrowRightIcon size={14} weight="bold" />
           </Button>
         </div>
       </div>
-    </motion.article>
+    </article>
   )
 }

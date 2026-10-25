@@ -1,157 +1,152 @@
 import { useState } from 'react'
-import Icon from '@/components/frida/Icon'
+import { motion } from 'framer-motion'
+import {
+  SquaresFourIcon, CalendarDotsIcon, BedIcon, UsersThreeIcon, StorefrontIcon, ReceiptIcon,
+  GearSixIcon, DoorOpenIcon, FingerprintIcon, GlobeHemisphereWestIcon, UserIcon, BellIcon, SignOutIcon, CashRegisterIcon, TicketIcon, BookOpenTextIcon, ChartBarIcon,
+} from '@phosphor-icons/react'
+import { Button } from '@/components/ui/button'
+import Selector from '@/components/marca/Selector'
+import { CoronaFlores } from '@/components/marca/Wordmark'
+import { useTheme } from '@/context/ThemeContext'
+import { useAvisos } from '../avisos'
+import { deshabilitada, permitida } from '../modulos'
+import { usePropiedadActual, elegirPropiedad } from '../propiedadActual'
+import { useSesion } from '@/lib/sesion'
+import Pista from '@/components/marca/Pista'
+import ConfirmarSalida from '@/components/marca/ConfirmarSalida'
 import s from './SideNav.module.css'
 
-/* ── Navigation groups ── */
+/* ── Grupos de navegación (mismos que antes) ── */
 const NAV_GROUPS = [
   {
     label: 'Principal',
     items: [
-      { key: 'dashboard', label: 'Tablero',      icon: 'grid_view',        badge: null },
-      { key: 'calendar',  label: 'Reservaciones', icon: 'calendar_month',   badge: 3 },
+      { key: 'dashboard', label: 'Tablero',       Icono: SquaresFourIcon,  badge: null },
+      { key: 'hoy',       label: 'Llegadas y salidas', Icono: DoorOpenIcon, badge: null },
+      { key: 'calendar',  label: 'Reservaciones', Icono: CalendarDotsIcon, badge: null },
+      { key: 'notifications', label: 'Avisos',    Icono: BellIcon,         badge: 'avisos' },
     ],
   },
   {
     label: 'Operaciones',
     items: [
-      { key: 'rooms',        label: 'Habitaciones', icon: 'bed',               badge: null },
-      //{ key: 'housekeeping', label: 'Limpieza',      icon: 'cleaning_services', badge: 2 },
-      { key: 'users',        label: 'Usuarios',      icon: 'group',             badge: null },
+      { key: 'rooms', label: 'Habitaciones', Icono: BedIcon,        badge: null },
+      { key: 'users', label: 'Personal',     Icono: UsersThreeIcon, badge: null },
+      { key: 'externas', label: 'Otras plataformas', Icono: GlobeHemisphereWestIcon, badge: null },
+      { key: 'auditoria', label: 'Auditoría', Icono: FingerprintIcon, badge: null },
+    ],
+  },
+  {
+    label: 'Restaurante',
+    items: [
+      { key: 'restaurante',              label: 'Punto de venta', Icono: CashRegisterIcon, badge: null },
+      { key: 'restaurante-tickets',      label: 'Tickets',        Icono: TicketIcon,       badge: null },
+      { key: 'restaurante-menu',         label: 'Menú',           Icono: BookOpenTextIcon, badge: null },
+      { key: 'restaurante-estadisticas', label: 'Estadísticas',   Icono: ChartBarIcon,     badge: null },
     ],
   },
   {
     label: 'Gestión',
     items: [
-      { key: 'shop',      label: 'Tienda',  icon: 'storefront',   badge: null },
-      { key: 'sales',     label: 'Ventas',    icon: 'receipt_long', badge: null },
-      //{ key: 'marketing', label: 'Marketing', icon: 'campaign',     badge: null },
+      { key: 'shop',  label: 'Tienda', Icono: StorefrontIcon, badge: null },
+      { key: 'sales', label: 'Ventas', Icono: ReceiptIcon,    badge: null },
     ],
   },
 ]
 
-const PROPERTIES = [
-  { id: 'Chelem',    name: 'Cabañas Frida',     location: 'Chelem, Yucatán' },
-  { id: 'chuburna', name: 'Casa Frida',      location: 'Chuburná, Yucatán' },
-]
-
-/* ── Single nav item ── */
-function SideItem({ item, active, onClick }) {
+/* ── Un ítem: el fondo activo es UNO solo que se desliza (layoutId) ── */
+function SideItem({ item, active, onClick, reduceMotion }) {
+  // Módulo apagado (admin/modulos.js): visible en gris, sin navegar. aria-disabled
+  // y no `disabled`, para que la pista siga apareciendo al pasar el cursor.
+  if (deshabilitada(item.key)) {
+    return (
+      <Pista contenido="Módulo deshabilitado: hoy el panel es solo el motor de reservas" lado="right" className="w-full">
+        <button type="button" className={`${s.navItem} ${s.navItemApagado}`} aria-disabled="true" onClick={e => e.preventDefault()}>
+          <span className={s.navItemIcon}><item.Icono size={18} aria-hidden="true" /></span>
+          <span className={s.navItemLabel}>{item.label}</span>
+        </button>
+      </Pista>
+    )
+  }
   return (
-    <button
-      onClick={onClick}
-      className={`${s.navItem} ${active ? s.navItemActive : ''}`}
-    >
-      {active && <span className={s.activeIndicator} />}
+    <button onClick={onClick} className={`${s.navItem} ${active ? s.navItemActive : ''}`} aria-current={active ? 'page' : undefined}>
+      {active && (
+        <motion.span
+          layoutId="sidenav-activo"
+          className={s.activeBg}
+          transition={reduceMotion ? { duration: 0 } : { type: 'spring', stiffness: 420, damping: 34 }}
+        />
+      )}
       <span className={s.navItemIcon}>
-        <Icon name={item.icon} size={17} />
+        <item.Icono size={18} weight={active ? 'fill' : 'regular'} aria-hidden="true" />
       </span>
       <span className={s.navItemLabel}>{item.label}</span>
       {item.badge != null && (
-        <span className={`${s.badge} ${active ? s.badgeActive : ''}`}>
-          {item.badge}
-        </span>
+        <span className={`${s.badge} ${active ? s.badgeActive : ''}`}>{item.badge}</span>
       )}
     </button>
   )
 }
 
 export default function SideNav({ page, onNavigate, isOpen }) {
-  const [propertyOpen, setPropertyOpen] = useState(false)
-  const [selectedProperty, setSelectedProperty] = useState(PROPERTIES[0])
+  const { reduceMotion } = useTheme()
+  const { valor: propiedad, opciones: propiedades } = usePropiedadActual()
+  const { sinLeer } = useAvisos()
+  const [confirmarSalida, setConfirmarSalida] = useState(false)
+  const { sesion } = useSesion()
 
   return (
-    <aside className={`${s.sidenav} ${isOpen ? s.sidenavOpen : ''}`}>
+    /* layoutRoot + layoutScroll: el aside es fijo y tiene scroll propio. Sin esto,
+       framer-motion mide el fondo activo en coordenadas de página y, si la página
+       tenía scroll al navegar, lo anima desde donde estaba "antes" (fantasma). */
+    <motion.aside layoutRoot layoutScroll className={`${s.sidenav} ${isOpen ? s.sidenavOpen : ''}`}>
 
-      {/* ── Property switcher ── */}
+      {/* ── Propiedad: GlideSelect (React Bits) ── */}
       <div className={s.propertySection}>
-        <button
-          className={s.propertyBtn}
-          onClick={() => setPropertyOpen(o => !o)}
-        >
-          <span className={s.propertyIcon}>
-            <span className="material-symbols-outlined" style={{ color: '#fff', fontSize: '16px' }}>hotel</span>
-          </span>
-          <div className={s.propertyInfo}>
-            <div className={s.propertyName}>{selectedProperty.name}</div>
-            <div className={s.propertyLocation}>{selectedProperty.location}</div>
-          </div>
-          <span className={`material-symbols-outlined ${s.chevron} ${propertyOpen ? s.chevronOpen : ''}`}>
-            expand_more
-          </span>
-        </button>
-
-        {propertyOpen && (
-          <div className={s.dropdown}>
-            {PROPERTIES.map(p => (
-              <button
-                key={p.id}
-                className={s.dropdownItem}
-                onClick={() => { setSelectedProperty(p); setPropertyOpen(false) }}
-              >
-                <span className="material-symbols-outlined" style={{
-                  fontSize: '14px',
-                  color: selectedProperty.id === p.id ? 'var(--primary)' : 'var(--outline)',
-                }}>
-                  {selectedProperty.id === p.id ? 'radio_button_checked' : 'radio_button_unchecked'}
-                </span>
-                <div>
-                  <div className={s.dropdownItemName}>{p.name}</div>
-                  <div className={s.dropdownItemLocation}>{p.location}</div>
-                </div>
-              </button>
-            ))}
-            <button className={s.dropdownAdd}>
-              <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>add_circle</span>
-              Agregar propiedad
-            </button>
-          </div>
-        )}
+        <div className={s.propertyHead}>
+          <CoronaFlores className={s.propertyCorona} />
+          <span className="rotulo">Propiedad</span>
+        </div>
+        <Selector ariaLabel="Propiedad" value={propiedad} onChange={elegirPropiedad} opciones={propiedades} />
       </div>
 
-      {/* ── Navigation groups ── */}
-      <nav className={s.nav} aria-label="Navegación lateral">
-        {NAV_GROUPS.map((group, gi) => (
-          <div key={gi} className={s.navGroup}>
-            <p className={s.groupLabel}>{group.label}</p>
+      {/* ── Grupos ── */}
+      <motion.nav layoutScroll className={s.nav} aria-label="Navegación lateral">
+        {NAV_GROUPS.map(group => (
+          <div key={group.label} className={s.navGroup}>
+            <p className={`rotulo ${s.groupLabel}`}>{group.label}</p>
             <ul className={s.navList}>
-              {group.items.map(item => (
+              {group.items.filter(item => permitida(item.key, sesion)).map(item => (
                 <li key={item.key}>
-                  <SideItem
-                    item={item}
-                    active={page === item.key}
-                    onClick={() => onNavigate(item.key)}
-                  />
+                  <SideItem item={item.badge === 'avisos' ? { ...item, badge: sinLeer || null } : item} active={page === item.key} onClick={() => onNavigate(item.key)} reduceMotion={reduceMotion} />
                 </li>
               ))}
             </ul>
           </div>
         ))}
-      </nav>
+      </motion.nav>
 
-      {/* ── Profile footer ── */}
+      {/* ── Pie: configuración, cerrar sesión (pregunta antes) y perfil ── */}
       <div className={s.profileSection}>
         <div className={s.quickActions}>
-          <button className={s.quickBtn} onClick={() => onNavigate('config')}>
-            <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>settings</span>
-            Config.
-          </button>
-          <button className={`${s.quickBtn} ${s.quickBtnDanger}`} onClick={() => onNavigate('login')}>
-            <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>logout</span>
-            Salir
-          </button>
+          <Button variant="outline" size="sm" className={s.quickBtn} onClick={() => onNavigate('config')}>
+            <GearSixIcon size={15} weight="bold" /> Config.
+          </Button>
+          <Button variant="outline" size="sm" className={`${s.quickBtn} ${s.salir}`} onClick={() => setConfirmarSalida(true)}>
+            <SignOutIcon size={15} weight="bold" /> Cerrar sesión
+          </Button>
         </div>
 
-        <div className={s.profileRow} onClick={() => onNavigate('config')}>
-          <div className={s.avatar}>
-            <span className="material-symbols-outlined" style={{ color: '#fff', fontSize: '17px' }}>person</span>
-          </div>
-          <div className={s.profileInfo}>
-            <div className={s.profileName}>Gerente General</div>
-            <div className={s.profileEmail}>admin@hoteles-frida.mx</div>
-          </div>
-          <span className={s.onlineDot} />
-        </div>
+        <button className={s.profileRow} onClick={() => onNavigate('config')}>
+          <span className={s.avatar}><UserIcon size={17} weight="bold" /></span>
+          <span className={s.profileInfo}>
+            <span className={s.profileName}>{sesion?.nombre}</span>
+            <span className={s.profileEmail}>{sesion?.correo}</span>
+          </span>
+          <span className={s.onlineDot} aria-label="En línea" />
+        </button>
       </div>
-    </aside>
+      <ConfirmarSalida abierto={confirmarSalida} onCambiar={setConfirmarSalida} onSalir={() => onNavigate('login')} />
+    </motion.aside>
   )
 }

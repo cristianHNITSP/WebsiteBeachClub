@@ -26,9 +26,9 @@
 /* ── Hero image ── */
 .hero {
   position: relative;
-  border-radius: 16px;
+  border-radius: calc(var(--radius) * 1.4);
   overflow: hidden;
-  height: 400px;
+  height: 420px;
   box-shadow: var(--shadow-lg);
   margin-bottom: 16px;
 }
@@ -43,49 +43,53 @@
 .heroOverlay {
   position: absolute;
   inset: 0;
-  background: linear-gradient(to top, rgba(0,0,0,0.42) 0%, transparent 55%);
+  background: linear-gradient(to top, color-mix(in srgb, var(--noche) 45%, transparent) 0%, transparent 55%);
 }
 
 .heroPrice {
   position: absolute;
-  bottom: 20px;
-  right: 20px;
+  bottom: 18px;
+  right: 18px;
   text-align: right;
+  padding: 10px 16px;
+  border-radius: var(--radius);
+  background: var(--card);
+  color: var(--card-foreground);
+  box-shadow: var(--shadow-md);
 }
 
 .heroPriceOriginal {
-  font-size: 11px;
-  color: rgba(255,255,255,0.6);
-  text-decoration: line-through;
+  font-size: var(--fs-xs);
+  color: var(--muted-foreground);
+  display: block;
   margin-bottom: 2px;
 }
 
 .heroPriceAmount {
   font-family: var(--font-headline);
-  font-size: 1.625rem;
+  font-size: var(--fs-2xl);
   font-weight: 700;
-  color: #fff;
+  color: var(--primary);
 }
 
 .heroPriceLabel {
-  font-size: 11px;
-  color: rgba(255,255,255,0.75);
+  font-size: var(--fs-xs);
+  color: var(--muted-foreground);
   font-weight: 500;
 }
 
 /* ── Info cards ── */
 .infoCard {
-  padding: 22px 24px;
   margin-bottom: 16px;
 }
 
 .cardLabel {
-  font-family: var(--font-body);
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.1em;
+  font-size: var(--fs-xs);
+  font-weight: 500;
+  letter-spacing: var(--tracking-rotulo);
   color: var(--on-surface-var);
   text-transform: uppercase;
+  font-family: var(--font-headline); /* rótulo */
   margin-bottom: 8px;
   display: flex;
   align-items: center;
@@ -94,7 +98,7 @@
 
 .cardTitle {
   font-family: var(--font-headline);
-  font-size: 1.5rem;
+  font-size: var(--fs-xl);
   font-weight: 700;
   color: var(--on-surface);
   margin: 0 0 10px;
@@ -111,27 +115,19 @@
 .ratingNum {
   font-family: var(--font-body);
   font-weight: 700;
-  font-size: 14px;
+  font-size: var(--fs-sm);
   color: var(--on-surface);
 }
 
 .ratingCount {
-  font-size: 12px;
+  font-size: var(--fs-xs);
   color: var(--on-surface-var);
 }
 
-.sizeBadge {
-  padding: 2px 10px;
-  border-radius: var(--radius-full);
-  background: var(--surface-container);
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--on-surface-var);
-}
 
 .desc {
   font-family: var(--font-body);
-  font-size: 14px;
+  font-size: var(--fs-sm);
   color: var(--on-surface-var);
   line-height: 1.75;
   margin: 0 0 14px;
@@ -146,18 +142,6 @@
   padding: 0;
 }
 
-.amenityItem {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 14px;
-  border-radius: var(--radius-full);
-  background: var(--surface-container);
-  font-family: var(--font-body);
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--on-surface-var);
-}
 
 /* Policies grid */
 .policiesGrid {
@@ -173,18 +157,29 @@
   align-items: flex-start;
 }
 
+.policyIcon {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  background: var(--accent);
+  color: var(--accent-foreground);
+}
+
 .policyLabel {
-  font-family: var(--font-body);
-  font-size: 10px;
-  font-weight: 700;
+  font-size: var(--fs-xs);
+  font-weight: 500;
   color: var(--on-surface-var);
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  font-family: var(--font-headline); /* rótulo */
+  letter-spacing: var(--tracking-rotulo);
 }
 
 .policyValue {
   font-family: var(--font-body);
-  font-size: 13px;
+  font-size: var(--fs-sm);
   font-weight: 600;
   color: var(--on-surface);
   margin-top: 2px;
@@ -192,14 +187,13 @@
 
 /* ── Booking sidebar ── */
 .summaryCard {
-  padding: 22px;
   position: sticky;
-  top: 84px;
+  top: 92px;
 }
 
 .summaryTitle {
   font-family: var(--font-headline);
-  font-size: 1.15rem;
+  font-size: var(--fs-lg);
   font-weight: 700;
   color: var(--on-surface);
   margin: 0 0 16px;
@@ -214,14 +208,14 @@
 
 .summaryLabel {
   font-family: var(--font-body);
-  font-size: 13px;
+  font-size: var(--fs-sm);
   color: var(--on-surface-var);
   font-weight: 600;
 }
 
 .summaryValue {
   font-family: var(--font-body);
-  font-size: 13px;
+  font-size: var(--fs-sm);
   color: var(--on-surface);
   font-weight: 700;
 }
@@ -230,21 +224,19 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-top: 18px;
-  padding-top: 18px;
-  border-top: 1px solid var(--outline-var);
+  margin-top: 14px;
 }
 
 .summaryTotalLabel {
   font-family: var(--font-body);
-  font-size: 14px;
+  font-size: var(--fs-sm);
   font-weight: 700;
   color: var(--on-surface);
 }
 
 .summaryTotalAmount {
   font-family: var(--font-headline);
-  font-size: 1.5rem;
+  font-size: var(--fs-xl);
   font-weight: 700;
   color: var(--primary);
 }
@@ -255,7 +247,7 @@
   border-radius: var(--radius-md);
   background: var(--surface-container);
   font-family: var(--font-body);
-  font-size: 12px;
+  font-size: var(--fs-xs);
   color: var(--on-surface-var);
   text-align: center;
 }
@@ -264,7 +256,7 @@
   margin-top: 14px;
   text-align: center;
   font-family: var(--font-body);
-  font-size: 11px;
+  font-size: var(--fs-xs);
   color: var(--on-surface-var);
   display: flex;
   align-items: center;
@@ -291,4 +283,35 @@
   .inner { padding: 0 16px 60px; }
   .hero { height: 260px; }
   .policiesGrid { grid-template-columns: 1fr; }
+}
+
+/* ── Paso 2 del Stepper: huéspedes y extras ── */
+.huespedes {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.huespedesLabel {
+  font-size: var(--fs-xs);
+  font-weight: 500;
+  letter-spacing: var(--tracking-rotulo);
+  text-transform: uppercase;
+  font-family: var(--font-headline); /* rótulo */
+  color: var(--muted-foreground);
+}
+.huespedesControl {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+.extra {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.extraDetalle {
+  padding-left: 34px; /* alinea con el texto del SpringCheck (caja 22 + hueco) */
+  font-size: var(--fs-xs);
+  color: var(--muted-foreground);
 }

@@ -1,0 +1,51 @@
+name: Deploy a producción
+
+# Lo llama ci.yml tras pasar las pruebas. `workflow_dispatch` queda para
+# redesplegar sin commit nuevo (p. ej. tras cambiar un Secret).
+on:
+  workflow_call:
+  workflow_dispatch:
+
+# Nunca dos despliegues a la vez; el segundo espera, no cancela al primero.
+concurrency:
+  group: deploy-produccion
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      # Sin checkout: el servidor trae el código con SU Deploy Key (solo
+      # lectura, generada en el servidor). Este job solo entra y da la orden.
+      - name: Desplegar por SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          timeout: 30s
+          command_timeout: 15m
+          script: |
+            set -euo pipefail
+            cd /opt/beachclub
+
+            # .env se REGENERA desde los Secrets en cada despliegue: rotar un
+            # valor es cambiarlo en GitHub y volver a desplegar (salvo las
+            # contraseñas de la base, que además piden ALTER ROLE: ver
+            # docs/deploy-config-REFERENCIA.md). 'ENVEOF' entre comillas: un `$`
+            # dentro de un secreto no lo expande el shell del servidor.
+            umask 077
+            cat > .env <<'ENVEOF'
+            DOMINIO=${{ secrets.DOMINIO }}
+            POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
+            API_DB_CLAVE=${{ secrets.API_DB_CLAVE }}
+            JWT_SECRETO=${{ secrets.JWT_SECRETO }}
+            CLAVE_WEBHOOKS=${{ secrets.CLAVE_WEBHOOKS }}
+            BRAVE_SEARCH_CLAVE=${{ secrets.BRAVE_SEARCH_CLAVE }}
+            ENVEOF
+            chmod 600 .env
+
+            git fetch origin
+            git reset --hard origin/main
+
+            ./scripts/deploy.sh

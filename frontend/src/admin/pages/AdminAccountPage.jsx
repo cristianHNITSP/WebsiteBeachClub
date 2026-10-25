@@ -1,56 +1,72 @@
-import Button from '@/components/frida/Button'
-import { SurfaceCard } from '@/components/frida/Card'
-import Badge from '@/components/frida/Badge'
-import Icon from '@/components/frida/Icon'
+import { ArrowLeftIcon, BuildingsIcon, ClockIcon, EnvelopeSimpleIcon, IdentificationBadgeIcon, ShieldCheckIcon, PersonArmsSpreadIcon } from '@phosphor-icons/react'
+import { useNavigate } from 'react-router-dom'
+import { Button } from '@/components/ui/button'
+import { useSesion } from '@/lib/sesion'
 import s from './AdminAccountPage.module.css'
 
-const INFO_ITEMS = [
-  { icon: 'badge',       label: 'Rol',       value: 'Gerente General' },
-  { icon: 'location_on', label: 'Propiedad', value: 'Grand Oasis' },
-  { icon: 'mail',        label: 'Correo',    value: 'admin@hotelesfrida.mx' },
-]
+/*
+ * Mi cuenta: quién soy en el panel, tal como lo dice la sesión (GET /api/auth/yo).
+ * Nombre, correo, rol y propiedades los cambia un gerente en Personal; la
+ * contraseña y las sesiones, uno mismo en Configuración → Seguridad.
+ */
+
+const ROL = { gerente: 'Gerente', recepcion: 'Recepción', restaurante: 'Restaurante' }
+const iniciales = nombre => nombre.split(/\s+/).filter(Boolean).slice(0, 2).map(p => p[0].toUpperCase()).join('')
+const hora = iso => new Date(iso).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })
+
+/** Los datos de la cuenta (la sesión): Mi cuenta y Configuración → Perfil. */
+export function DatosCuenta() {
+  const { sesion } = useSesion()
+  if (!sesion) return null // RutaProtegida no monta el panel sin sesión
+  const datos = [
+    { Icono: IdentificationBadgeIcon, label: 'Usuario', value: sesion.usuario },
+    { Icono: EnvelopeSimpleIcon, label: 'Correo', value: sesion.correo },
+    { Icono: ShieldCheckIcon, label: 'Rol', value: ROL[sesion.rol] ?? sesion.rol },
+    {
+      Icono: BuildingsIcon,
+      label: sesion.propiedades.length === 1 ? 'Propiedad' : 'Propiedades',
+      value: sesion.todas_las_propiedades ? 'Todas' : sesion.propiedades.map(p => p.nombre).join(', '),
+    },
+    { Icono: ClockIcon, label: 'Esta sesión', value: `Termina a las ${hora(sesion.vence)} (12 h como máximo)` },
+  ]
+  return (
+    <>
+      <dl className={s.datos}>
+        {datos.map(({ Icono, label, value }) => (
+          <div key={label} className={s.dato}>
+            <Icono size={22} weight="duotone" className={s.icono} aria-hidden="true" />
+            <dt className={s.etiqueta}>{label}</dt>
+            <dd className={s.valor}>{value}</dd>
+          </div>
+        ))}
+      </dl>
+      <p className={s.nota}>Tu nombre, correo, rol y propiedades los cambia un gerente en Personal.</p>
+    </>
+  )
+}
 
 export default function AdminAccountPage({ onBack }) {
+  const { sesion } = useSesion()
+  const navigate = useNavigate()
+  if (!sesion) return null
+  const ir = pestana => navigate(`/admin/configuracion?pestana=${pestana}`)
   return (
-    <div>
-      <Button variant="ghost" onClick={onBack} style={{ marginBottom: '24px' }}>
-        <Icon name="arrow_back" size={20} /> Regresar
-      </Button>
-
-      {/* Perfil */}
-      <div className={s.profileRow}>
-        <img
-          src="https://placehold.co/96x96/003b41/ffffff?text=A"
-          alt="Avatar"
-          className={s.avatar}
-        />
+    <div className={s.pagina}>
+      <Button variant="ghost" onClick={onBack} className="h-11 w-fit"><ArrowLeftIcon size={18} /> Regresar</Button>
+      <div className={s.perfil}>
+        <span className={s.avatar} aria-hidden="true">{iniciales(sesion.nombre)}</span>
         <div>
-          <Badge variant="outline" style={{ marginBottom: '8px' }}>Mi Cuenta</Badge>
-          <h1 style={{
-            fontFamily: 'var(--font-headline)', fontSize: '28px',
-            fontWeight: 700, color: 'var(--on-surface)', marginBottom: '4px',
-          }}>
-            Administrador
-          </h1>
-          <p style={{ fontSize: '14px', color: 'var(--on-surface-var)' }}>
-            Gerente · Grand Oasis · Hoteles Frida
-          </p>
+          <span className="admin-page-eyebrow">Mi cuenta</span>
+          <h1 className="admin-page-title">{sesion.nombre}</h1>
         </div>
       </div>
-
-      {/* Info cards */}
-      <div className={s.infoGrid}>
-        {INFO_ITEMS.map((item, i) => (
-          <SurfaceCard key={i} style={{ padding: '20px' }}>
-            <Icon name={item.icon} size={24} style={{ color: 'var(--primary)', display: 'block', marginBottom: '8px' }} />
-            <div style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--on-surface-var)', marginBottom: '4px' }}>
-              {item.label}
-            </div>
-            <div style={{ fontSize: '14px', fontWeight: 600, color: 'var(--on-surface)' }}>
-              {item.value}
-            </div>
-          </SurfaceCard>
-        ))}
+      {sesion.debe_cambiar_clave && (
+        <p className={s.aviso} role="status">Estás usando una contraseña temporal. Cámbiala en Seguridad.</p>
+      )}
+      <DatosCuenta />
+      <div className={s.acciones}>
+        <Button variant="outline" className="h-11" onClick={() => ir('seguridad')}><ShieldCheckIcon size={18} /> Contraseña y sesiones</Button>
+        <Button variant="outline" className="h-11" onClick={() => ir('accesibilidad')}><PersonArmsSpreadIcon size={18} /> Accesibilidad</Button>
       </div>
     </div>
   )

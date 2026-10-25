@@ -1,0 +1,32 @@
+.paginador {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 24px;
+}
+.numeros { display: flex; align-items: center; gap: 4px; list-style: none; }
+.numero {
+  position: relative;
+  min-width: 40px;
+  height: 40px;
+  padding: 0 8px;
+  border-radius: var(--radius-full);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted-foreground);
+  cursor: pointer;
+  transition: color 0.2s, background-color 0.2s;
+}
+.numero:hover { background: var(--muted); color: var(--foreground); }
+.activo, .activo:hover { background: transparent; color: var(--primary-foreground); }
+.marca {
+  position: absolute;
+  inset: 0;
+  border-radius: var(--radius-full);
+  background: var(--primary);
+  box-shadow: var(--shadow-sm);
+}
+.texto { position: relative; }
+.hueco { min-width: 24px; text-align: center; color: var(--muted-foreground); }

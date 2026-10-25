@@ -1,528 +1,246 @@
-import { useState, useEffect } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
-import { USERS_DATA } from '../../data/admin'
-import SectionPanel from '../components/SectionPanel'
-import DataTable from '../../components/frida/DataTable'
-import ConfirmButton from '../../components/frida/ConfirmButton'
-import Skeleton from '../../components/frida/Skeleton'
-import { Field, Input, Select } from '../../components/frida/Field'
+import { useEffect, useState } from 'react'
+import { toast } from 'sonner'
+import { AnimatePresence, motion } from 'framer-motion'
+import {
+  UserPlusIcon, MagnifyingGlassIcon, PencilSimpleIcon, KeyIcon, UserMinusIcon, UserCheckIcon,
+  CopyIcon, ArrowsClockwiseIcon, WarningCircleIcon, UsersThreeIcon,
+} from '@phosphor-icons/react'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { SkeletonCard } from '@/components/frida/Skeleton'
+import JellyRadio from '@/components/bits/JellyRadio'
+import BotonDestacado from '@/components/marca/BotonDestacado'
+import ConfirmarDescarte from '@/components/marca/ConfirmarDescarte'
+import Paginador from '@/components/marca/Paginador'
+import Selector from '@/components/marca/Selector'
+import Pista, { GrupoPistas } from '@/components/marca/Pista'
+import { useParametros } from '@/hooks/useParametros'
+import { usePedido } from '@/hooks/usePedido'
+import { useSesion } from '@/lib/sesion'
+import { animacionItem } from '@/lib/animacionListas'
+import { personalApi, claveTemporal, opcionesDeRol, rolProximamente } from '../personal'
+import s from './UsersPage.module.css'
 
-/* ── Role definitions ── */
-const ROLES = [
-  {
-    key: 'Curator',
-    title: 'Curator',
-    desc: 'Gestiona la experiencia del huésped, coordina servicios especiales y mantiene los estándares de lujo de la propiedad.',
-    icon: 'auto_awesome',
-    iconBg: 'rgba(126,70,154,0.12)',
-    iconColor: 'var(--secondary)',
-    badgeClass: 'badge--secondary',
-    permissions: ['Gestión de reservas', 'Acceso a perfiles de huéspedes', 'Configuración de servicios', 'Reportes de satisfacción'],
-  },
-  {
-    key: 'Artisan',
-    title: 'Artisan',
-    desc: 'Responsable de la operación diaria de habitaciones, housekeeping y mantenimiento de los espacios de la propiedad.',
-    icon: 'build',
-    iconBg: 'rgba(0,59,65,0.12)',
-    iconColor: 'var(--primary)',
-    badgeClass: 'badge--primary',
-    permissions: ['Gestión de habitaciones', 'Asignación de housekeeping', 'Reporte de mantenimiento', 'Inventario de suministros'],
-  },
-  {
-    key: 'Steward',
-    title: 'Steward',
-    desc: 'Supervisa los ingresos, facturación y análisis financiero de la operación hotelera con enfoque en optimización.',
-    icon: 'bar_chart',
-    iconBg: 'rgba(115,92,0,0.12)',
-    iconColor: 'var(--gold)',
-    badgeClass: 'badge--tertiary',
-    permissions: ['Reportes financieros', 'Gestión de tarifas', 'Análisis de ocupación', 'Exportación de datos'],
-  },
+/*
+ * Personal del hotel (fase 3e). Todo contra la API: alta y edición en su propia
+ * página (PersonaFormPage, nunca en un modal), alta con contraseña
+ * temporal (la persona la cambia al entrar), edición de rol y propiedades
+ * (cierra sus sesiones para que rija ya), baja y reactivación, y restablecer
+ * contraseña. Filtros, búsqueda y página en la URL.
+ */
+
+const POR_PAGINA = 12
+const ESTADOS = [
+  { value: 'activos', label: 'Activos' },
+  { value: 'bajas', label: 'Dados de baja' },
+  { value: 'todos', label: 'Todos' },
 ]
+const fecha = iso => (iso ? new Date(iso).toLocaleString('es-MX', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : 'Nunca')
+const iniciales = n => n.split(' ').filter(Boolean).map(p => p[0]).slice(0, 2).join('').toUpperCase()
 
-const badgeClassMap = {
-  Curator: 'badge--secondary',
-  Artisan: 'badge--primary',
-  Steward: 'badge--tertiary',
-}
+export default function UsersPage({ onNavigate }) {
+  const { sesion } = useSesion()
+  const gestiona = sesion?.permisos?.includes('usuarios.gestionar')
+  const propiedades = sesion?.propiedades ?? []
+  const nombreProp = id => propiedades.find(p => p.id === id)?.nombre ?? 'Propiedad'
 
-const EMPTY_FORM = { name: '', email: '', role: 'Curator' }
-
-/* ── User form (inside SectionPanel) ── */
-function UserForm({ initial = EMPTY_FORM, onSave, onBack }) {
-  const [form, setForm] = useState(initial)
-  const set = (k) => (e) => setForm(f => ({ ...f, [k]: e.target.value }))
-
-  const dirty =
-    form.name !== initial.name ||
-    form.email !== initial.email ||
-    form.role !== initial.role
-
-  const isNew = !initial.id
-  const valid = form.name.trim() && form.email.trim()
-
-  return (
-    <SectionPanel
-      eyebrow="Gestión de Usuarios"
-      title={isNew ? <>Nuevo <em>Miembro</em></> : <>Editar <em>Usuario</em></>}
-      subtitle={isNew
-        ? 'Completa la información para agregar un nuevo miembro al equipo.'
-        : `Editando el perfil de ${initial.name}.`}
-      onBack={onBack}
-      dirty={dirty}
-      actions={
-        <button
-          className="btn-primary"
-          onClick={() => onSave(form)}
-          disabled={!valid}
-          style={{ opacity: valid ? 1 : 0.5, cursor: valid ? 'pointer' : 'not-allowed' }}
-        >
-          <span className="material-symbols-outlined" style={{ fontSize: '15px' }}>save</span>
-          {isNew ? 'Crear miembro' : 'Guardar cambios'}
-        </button>
-      }
-    >
-      <div className="user-form-grid">
-        <Field label="Nombre completo">
-          <Input
-            placeholder="Ej. Valeria Montoya"
-            value={form.name}
-            onChange={set('name')}
-          />
-        </Field>
-
-        <Field label="Correo electrónico">
-          <Input
-            type="email"
-            placeholder="Ej. valeria@hotelesfrida.mx"
-            value={form.email}
-            onChange={set('email')}
-          />
-        </Field>
-
-        <Field label="Rol de acceso">
-          <Select value={form.role} onChange={set('role')}>
-            {ROLES.map(r => (
-              <option key={r.key} value={r.key}>{r.title}</option>
-            ))}
-          </Select>
-        </Field>
-      </div>
-
-      {/* Role description hint */}
-      <div className="user-form-role-hint">
-        {ROLES.filter(r => r.key === form.role).map(r => (
-          <div key={r.key} style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
-            <div style={{
-              width: '36px', height: '36px', borderRadius: '50%',
-              background: r.iconBg, display: 'grid', placeItems: 'center', flexShrink: 0,
-            }}>
-              <span className="material-symbols-outlined" style={{ fontSize: '18px', color: r.iconColor }}>
-                {r.icon}
-              </span>
-            </div>
-            <div>
-              <div style={{ fontFamily: 'var(--font-body)', fontSize: '13px', fontWeight: 700, color: 'var(--on-surface)', marginBottom: '4px' }}>
-                {r.title}
-              </div>
-              <div style={{ fontFamily: 'var(--font-body)', fontSize: '13px', color: 'var(--on-surface-var)', lineHeight: 1.55 }}>
-                {r.desc}
-              </div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '10px' }}>
-                {r.permissions.map((p, i) => (
-                  <span key={i} style={{
-                    fontSize: '11px', fontWeight: 700, padding: '3px 10px',
-                    borderRadius: 'var(--radius-full)',
-                    background: 'var(--surface-container)',
-                    color: 'var(--on-surface-var)',
-                    fontFamily: 'var(--font-body)',
-                  }}>
-                    {p}
-                  </span>
-                ))}
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
-    </SectionPanel>
-  )
-}
-
-/* ── Main page ── */
-export default function UsersPage() {
-  const PAGE_SIZE = 5
-
-  const [users, setUsers] = useState(USERS_DATA)
-  const [search, setSearch] = useState('')
-  const [roleFilter, setRoleFilter] = useState('all')
-  const [page, setPage] = useState(1)
-  const [loading, setLoading] = useState(true)
-  const [view, setView] = useState('list')  // 'list' | 'new' | 'edit'
-  const [editTarget, setEditTarget] = useState(null)
-  const [direction, setDirection] = useState(1) // 1 = forward, -1 = back
-
-  /* Roles section collapsed state — persisted */
-  const [rolesCollapsed, setRolesCollapsed] = useState(() => {
-    return localStorage.getItem('frida-roles-collapsed') === 'true'
-  })
-
-  const toggleRoles = () => {
-    const next = !rolesCollapsed
-    setRolesCollapsed(next)
-    localStorage.setItem('frida-roles-collapsed', String(next))
-  }
-
-  /* Simulate loading */
+  const [{ q, rol, estado, pagina }, set] = useParametros({ q: '', rol: 'todos', estado: 'activos', pagina: 1 })
+  const [texto, setTexto] = useState(q)
   useEffect(() => {
-    const t = setTimeout(() => setLoading(false), 1800)
+    if (texto === q) return
+    const t = setTimeout(() => set({ q: texto, pagina: 1 }), 300)
     return () => clearTimeout(t)
-  }, [])
+  }, [texto]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const filteredUsers = users.filter(u => {
-    if (roleFilter !== 'all' && u.role !== roleFilter) return false
-    if (search && !u.name.toLowerCase().includes(search.toLowerCase()) && !u.email.toLowerCase().includes(search.toLowerCase())) return false
-    return true
-  })
+  const roles = usePedido(senal => personalApi.roles(senal), [])
+  const lista = usePedido(
+    senal => personalApi.listar({
+      q, rol: rol === 'todos' ? null : rol, activo: estado === 'todos' ? null : estado === 'activos', pagina, por_pagina: POR_PAGINA,
+    }, senal),
+    [q, rol, estado, pagina],
+  )
+  const items = lista.datos?.items ?? []
 
-  const totalPages = Math.max(1, Math.ceil(filteredUsers.length / PAGE_SIZE))
-  const safePage   = Math.min(page, totalPages)
-  const pagedUsers = filteredUsers.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
+  const [clave, setClave] = useState(null)       // { persona, valor } tras restablecer
+  const [aRestablecer, setARestablecer] = useState(null)
+  const [aBaja, setABaja] = useState(null)
 
-  const changeFilter = (r) => { setRoleFilter(r); setPage(1) }
-  const changeSearch = (v) => { setSearch(v);     setPage(1) }
+  const opcionesRol = [{ value: 'todos', label: 'Todos los roles' }, ...opcionesDeRol(roles.datos ?? [])]
 
-  const goTo = (nextView, target = null) => {
-    setDirection(nextView === 'list' ? -1 : 1)
-    setEditTarget(target)
-    setView(nextView)
+  const baja = async p => {
+    setABaja(null)
+    try {
+      await personalApi.desactivar(p.id)
+      toast.success(`${p.nombre} ya no tiene acceso`, { description: 'Se cerraron todas sus sesiones.' })
+      lista.recargar()
+    } catch (e) { toast.error(e.message) }
   }
-
-  useEffect(() => {
-    window.scrollTo({ top: 0, behavior: 'smooth' })
-  }, [view])
-
-  const handleSave = (form) => {
-    if (editTarget) {
-      setUsers(prev => prev.map(u => u.id === editTarget.id ? { ...u, ...form } : u))
-    } else {
-      const initials = form.name.split(' ').slice(0, 2).map(s => s[0]).join('').toUpperCase()
-      const newUser = {
-        id: Date.now(),
-        ...form,
-        lastActive: 'Ahora mismo',
-        avatar: `https://placehold.co/56x56/006971/ffffff?text=${initials}`,
-      }
-      setUsers(prev => [...prev, newUser])
-    }
-    goTo('list')
+  const reactivar = async p => {
+    try {
+      await personalApi.reactivar(p.id)
+      toast.success(`${p.nombre} vuelve a tener acceso`)
+      lista.recargar()
+    } catch (e) { toast.error(e.message) }
   }
-
-  const handleRemove = (id) => {
-    setUsers(prev => prev.filter(u => u.id !== id))
-  }
-
-  /* ── Table columns ── */
-  const columns = [
-    {
-      key: 'user',
-      label: 'Usuario',
-      skeleton: () => (
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <Skeleton variant="circle" width="36px" height="36px" />
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-            <Skeleton variant="text" width="130px" height="13px" />
-            <Skeleton variant="text" width="90px" height="10px" />
-          </div>
-        </div>
-      ),
-      render: (row) => (
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <div className="user-item__avatar">
-            <img src={row.avatar} alt={row.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-          </div>
-          <div>
-            <div className="dt-user-name">{row.name}</div>
-            <div className="dt-user-email">{row.email}</div>
-          </div>
-        </div>
-      ),
-    },
-    {
-      key: 'role',
-      label: 'Rol',
-      width: '120px',
-      skeleton: () => <Skeleton variant="text" width="72px" height="22px" style={{ borderRadius: 'var(--radius-full)' }} />,
-      render: (row) => (
-        <span className={`badge ${badgeClassMap[row.role] ?? 'badge--primary'}`}>
-          {row.role}
-        </span>
-      ),
-    },
-    {
-      key: 'lastActive',
-      label: 'Último acceso',
-      width: '160px',
-      skeleton: () => <Skeleton variant="text" width="90px" height="13px" />,
-      render: (row) => (
-        <span style={{ fontFamily: 'var(--font-body)', fontSize: '13px', color: 'var(--on-surface-var)', fontWeight: 500 }}>
-          {row.lastActive}
-        </span>
-      ),
-    },
-    {
-      key: 'actions',
-      label: '',
-      width: '110px',
-      align: 'right',
-      skeleton: () => (
-        <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-          <Skeleton variant="text" width="56px" height="30px" style={{ borderRadius: 'var(--radius-full)' }} />
-          <Skeleton variant="circle" width="34px" height="34px" />
-        </div>
-      ),
-      render: (row) => (
-        <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', alignItems: 'center' }}>
-          <button
-            className="btn-outline"
-            style={{ height: '32px', padding: '0 14px', fontSize: '11px' }}
-            onClick={() => goTo('edit', row)}
-          >
-            Editar
-          </button>
-          <ConfirmButton
-            onConfirm={() => handleRemove(row.id)}
-            label="¿Eliminar este usuario?"
-            confirmLabel="Eliminar"
-            cancelLabel="Cancelar"
-            align="right"
-            title="Eliminar usuario"
-          >
-            <span className="material-symbols-outlined" style={{ fontSize: '15px' }}>delete</span>
-          </ConfirmButton>
-        </div>
-      ),
-    },
-  ]
-
-  // custom(dir): dir=1 → forward (panel slides in from right)
-  //              dir=-1 → back   (list slides in from top, panel exits right)
-  const panelVariants = {
-    initial: (dir) => ({ opacity: 0, x: dir * 44 }),
-    animate: { opacity: 1, x: 0, transition: { duration: 0.28, ease: [0.16, 1, 0.3, 1] } },
-    exit:    (dir) => ({ opacity: 0, x: dir * -30, transition: { duration: 0.18, ease: 'easeIn' } }),
-  }
-
-  // List always enters top→down, exits upward
-  const listVariants = {
-    initial: { opacity: 0, y: -18 },
-    animate: { opacity: 1, y: 0,  transition: { duration: 0.28, ease: [0.16, 1, 0.3, 1] } },
-    exit:    { opacity: 0, y: -10, transition: { duration: 0.16, ease: 'easeIn' } },
+  const restablecer = async p => {
+    setARestablecer(null)
+    const valor = claveTemporal()
+    try {
+      await personalApi.restablecerClave(p.id, valor)
+      setClave({ persona: p, valor })
+      lista.recargar()
+    } catch (e) { toast.error(e.message) }
   }
 
   return (
-    <AnimatePresence mode="wait" custom={direction}>
-      {/* ── Panel views ── */}
-      {view === 'new' && (
-        <motion.div key="new" custom={direction} variants={panelVariants} initial="initial" animate="animate" exit="exit">
-          <UserForm
-            initial={EMPTY_FORM}
-            onSave={handleSave}
-            onBack={() => goTo('list')}
-          />
-        </motion.div>
-      )}
-
-      {view === 'edit' && editTarget && (
-        <motion.div key="edit" custom={direction} variants={panelVariants} initial="initial" animate="animate" exit="exit">
-          <UserForm
-            initial={editTarget}
-            onSave={handleSave}
-            onBack={() => goTo('list')}
-          />
-        </motion.div>
-      )}
-
-      {/* ── List view ── */}
-      {view === 'list' && (
-      <motion.div key="list" variants={listVariants} initial="initial" animate="animate" exit="exit">
     <div>
-      {/* Page header */}
       <div className="admin-page-header">
         <div>
-          <span className="admin-page-eyebrow">Gestión de personal</span>
-          <h1 className="admin-page-title">
-            Usuarios &<br />
-            <em>Roles de Acceso</em>
-          </h1>
+          <span className="admin-page-eyebrow">Equipo</span>
+          <h1 className="admin-page-title">Personal del <em>hotel</em></h1>
         </div>
-      </div>
-
-      {/* Search + filters */}
-      <div className="users-toolbar">
-        <div className="users-search">
-          <span className="material-symbols-outlined" style={{ fontSize: '16px', color: 'var(--outline)', flexShrink: 0 }}>search</span>
-          <input
-            type="text"
-            placeholder="Buscar por nombre o correo..."
-            value={search}
-            onChange={e => changeSearch(e.target.value)}
-            style={{
-              border: 'none', background: 'transparent', outline: 'none',
-              fontFamily: 'var(--font-body)', fontSize: '13px',
-              color: 'var(--on-surface)', width: '100%',
-            }}
-          />
-        </div>
-        <div className="users-filters">
-          {['all', 'Curator', 'Artisan', 'Steward'].map(r => (
-            <button
-              key={r}
-              onClick={() => changeFilter(r)}
-              className={`users-filter-chip${roleFilter === r ? ' users-filter-chip--active' : ''}`}
-            >
-              {r === 'all' ? 'Todos' : r}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Collapsible roles section */}
-      <div className="collapsible-section" style={{ marginBottom: '40px' }}>
-        <button className="collapsible-toggle" onClick={toggleRoles}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <span className="material-symbols-outlined" style={{ fontSize: '18px', color: 'var(--primary)' }}>
-              manage_accounts
-            </span>
-            <div>
-              <div style={{ fontFamily: 'var(--font-headline)', fontSize: '1rem', color: 'var(--on-surface)' }}>
-                Roles de Acceso
-              </div>
-              <div style={{ fontFamily: 'var(--font-body)', fontSize: '11px', color: 'var(--on-surface-var)', fontWeight: 500 }}>
-                {ROLES.map(r => `${USERS_DATA.filter(u => u.role === r.key).length} ${r.key}`).join(' · ')}
-              </div>
-            </div>
-          </div>
-          <motion.span
-            className="material-symbols-outlined"
-            animate={{ rotate: rolesCollapsed ? 0 : 180 }}
-            transition={{ duration: 0.22 }}
-            style={{ fontSize: '20px', color: 'var(--outline)', display: 'block' }}
-          >
-            expand_more
-          </motion.span>
-        </button>
-
-        <AnimatePresence initial={false}>
-          {!rolesCollapsed && (
-            <motion.div
-              key="roles-content"
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: 'auto', opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              transition={{ duration: 0.28, ease: 'easeInOut' }}
-              style={{ overflow: 'hidden' }}
-            >
-              <div className="role-grid" style={{ marginTop: '16px', marginBottom: 0 }}>
-                {ROLES.map((role) => {
-                  const count = users.filter(u => u.role === role.key).length
-                  return (
-                    <div key={role.key} className="role-card">
-                      <div className="role-card__icon-wrap" style={{ background: role.iconBg }}>
-                        <span className="material-symbols-outlined" style={{ fontSize: '22px', color: role.iconColor }}>
-                          {role.icon}
-                        </span>
-                      </div>
-                      <h3 className="role-card__title">{role.title}</h3>
-                      <p className="role-card__desc">{role.desc}</p>
-                      <div>
-                        {role.permissions.map((perm, i) => (
-                          <div key={i} className="role-card__perm">
-                            <span className="material-symbols-outlined" style={{ fontSize: '14px', color: role.iconColor }}>
-                              check_circle
-                            </span>
-                            {perm}
-                          </div>
-                        ))}
-                      </div>
-                      <div style={{ marginTop: '24px' }}>
-                        <span className={`badge ${role.badgeClass}`}>
-                          {count} miembro{count !== 1 ? 's' : ''}
-                        </span>
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
-
-      {/* Directory section */}
-      <div style={{ marginBottom: '64px' }}>
-        <div className="users-dir-header">
-          <div>
-            <span className="admin-page-eyebrow" style={{ marginBottom: '4px' }}>Directorio</span>
-            <h2 className="admin-section-title" style={{ marginBottom: 0 }}>Equipo de Trabajo</h2>
-          </div>
-          <button className="btn-primary" onClick={() => goTo('new')}>
-            <span className="material-symbols-outlined" style={{ fontSize: '15px' }}>person_add</span>
-            Nuevo miembro
-          </button>
-        </div>
-
-        <DataTable
-          columns={columns}
-          data={pagedUsers}
-          loading={loading}
-          fixedRows={PAGE_SIZE}
-          emptyMessage="No se encontraron usuarios con ese criterio."
-          style={{ marginTop: '20px' }}
-        />
-
-        {/* Pagination */}
-        {!loading && totalPages > 1 && (
-          <div className="users-pagination">
-            <span className="users-pagination__info">
-              {(safePage - 1) * PAGE_SIZE + 1}–{Math.min(safePage * PAGE_SIZE, filteredUsers.length)} de {filteredUsers.length}
-            </span>
-            <div className="users-pagination__controls">
-              <button
-                className="users-pagination__btn"
-                onClick={() => setPage(p => Math.max(1, p - 1))}
-                disabled={safePage === 1}
-                aria-label="Página anterior"
-              >
-                <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>chevron_left</span>
-              </button>
-
-              {Array.from({ length: totalPages }, (_, i) => i + 1).map(n => (
-                <button
-                  key={n}
-                  onClick={() => setPage(n)}
-                  className={`users-pagination__btn${n === safePage ? ' users-pagination__btn--active' : ''}`}
-                >
-                  {n}
-                </button>
-              ))}
-
-              <button
-                className="users-pagination__btn"
-                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                disabled={safePage === totalPages}
-                aria-label="Página siguiente"
-              >
-                <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>chevron_right</span>
-              </button>
-            </div>
+        {gestiona && (
+          <div className="admin-page-header-actions">
+            <BotonDestacado onClick={() => onNavigate('nueva-persona')}>
+              <UserPlusIcon size={16} weight="bold" /> Nueva persona
+            </BotonDestacado>
           </div>
         )}
       </div>
-    </div>
-      </motion.div>
+
+      <ClaveMostrada clave={clave} onCerrar={() => setClave(null)} />
+
+      {/* Roles: qué puede hacer cada uno (los permisos reales de la API) */}
+      <section className={s.roles} aria-label="Roles">
+        {(roles.datos ?? []).map(r => (
+          <article key={r.clave} className={`${s.rol} ${rolProximamente(r.clave) ? s.rolProximamente : ''}`}>
+            <h2 className={s.rolNombre}>{r.nombre}</h2>
+            <p className={s.rolPermisos}>
+              {rolProximamente(r.clave) ? 'Próximamente.' : r.permisos.length ? `${r.permisos.length} permisos: ${r.permisos.slice(0, 4).map(p => p.descripcion.toLowerCase()).join(', ')}${r.permisos.length > 4 ? '…' : '.'}` : 'Sin permisos (módulo apagado).'}
+            </p>
+          </article>
+        ))}
+        {roles.cargando && [0, 1, 2].map(i => <SkeletonCard key={i} height="96px" />)}
+      </section>
+
+      <div className={s.filtros}>
+        <div className={s.buscador}>
+          <MagnifyingGlassIcon size={17} className={s.buscadorIcono} aria-hidden="true" />
+          <Input type="search" aria-label="Buscar persona" placeholder="Buscar por nombre, usuario o correo" maxLength={120}
+            value={texto} onChange={e => setTexto(e.target.value)} className="h-10 pl-10" />
+        </div>
+        <div className={s.selectorRol}>
+          <Selector ariaLabel="Rol" value={rol} onChange={v => set({ rol: v, pagina: 1 })} opciones={opcionesRol} />
+        </div>
+        <JellyRadio items={ESTADOS} value={estado} onChange={v => set({ estado: v, pagina: 1 })} ariaLabel="Estado"
+          size="md" chipColor="var(--muted)" activeColor="var(--primary)" textColor="var(--muted-foreground)" activeTextColor="var(--primary-foreground)" />
+      </div>
+
+      {lista.cargando ? (
+        <div className={s.lista}>{[0, 1, 2, 3].map(i => <SkeletonCard key={i} height="88px" />)}</div>
+      ) : lista.error ? (
+        <div className={s.vacio} role="alert">
+          <WarningCircleIcon size={28} aria-hidden="true" />
+          <p>{lista.error.message}</p>
+          <Button variant="outline" size="sm" onClick={lista.recargar}>Reintentar</Button>
+        </div>
+      ) : items.length === 0 ? (
+        <div className={s.vacio} role="status">
+          <UsersThreeIcon size={28} aria-hidden="true" />
+          <p>No hay personas con esos filtros.</p>
+        </div>
+      ) : (
+        <GrupoPistas>
+          <ul className={s.lista} aria-busy={lista.actualizando}>
+            <AnimatePresence initial={false} mode="popLayout">
+              {items.map(p => (
+                <motion.li key={p.id} layout {...animacionItem} className={`${s.persona} ${p.activo ? '' : s.personaBaja}`}>
+                  <span className={s.avatar} aria-hidden="true">{iniciales(p.nombre)}</span>
+                  <div className={s.datos}>
+                    <div className={s.nombre}>
+                      {p.nombre}
+                      {p.usuario === sesion?.usuario && <span className={s.etiqueta}>Tú</span>}
+                      {!p.activo && <span className={`${s.etiqueta} ${s.etiquetaBaja}`}>Dado de baja</span>}
+                      {p.activo && p.debe_cambiar_clave && <span className={`${s.etiqueta} ${s.etiquetaAviso}`}>Contraseña temporal</span>}
+                    </div>
+                    <div className={s.sub}>{p.usuario}, {p.correo}</div>
+                    <div className={s.sub}>
+                      {p.rol_nombre}. {p.todas_las_propiedades ? 'Todas las propiedades' : p.propiedades.length ? p.propiedades.map(nombreProp).join(', ') : 'Sin propiedades'}. Último acceso: {fecha(p.ultimo_acceso)}
+                    </div>
+                  </div>
+                  {gestiona && (
+                    <div className={s.acciones}>
+                      <Pista contenido="Editar">
+                        <Button variant="outline" size="icon" aria-label={`Editar a ${p.nombre}`} onClick={() => onNavigate('editar-persona', p)}><PencilSimpleIcon size={16} weight="bold" /></Button>
+                      </Pista>
+                      {p.activo && (
+                        <Pista contenido="Contraseña temporal">
+                          <Button variant="outline" size="icon" aria-label={`Restablecer la contraseña de ${p.nombre}`} onClick={() => setARestablecer(p)}><KeyIcon size={16} weight="bold" /></Button>
+                        </Pista>
+                      )}
+                      {p.activo ? (
+                        <Pista contenido="Dar de baja">
+                          <Button variant="destructive" size="icon" aria-label={`Dar de baja a ${p.nombre}`} onClick={() => setABaja(p)}><UserMinusIcon size={16} weight="bold" /></Button>
+                        </Pista>
+                      ) : (
+                        <Pista contenido="Reactivar">
+                          <Button variant="outline" size="icon" aria-label={`Reactivar a ${p.nombre}`} onClick={() => reactivar(p)}><UserCheckIcon size={16} weight="bold" /></Button>
+                        </Pista>
+                      )}
+                    </div>
+                  )}
+                </motion.li>
+              ))}
+            </AnimatePresence>
+          </ul>
+        </GrupoPistas>
       )}
-    </AnimatePresence>
+
+      <div className={s.paginas}>
+        <Paginador pagina={pagina} total={lista.datos?.meta.paginas ?? 0} onCambiar={n => set({ pagina: n }, { historial: true })} etiqueta="Páginas del personal" />
+      </div>
+
+      <ConfirmarDescarte
+        abierto={!!aBaja}
+        titulo="¿Dar de baja?"
+        texto={aBaja ? `${aBaja.nombre} deja de tener acceso al panel y se cierran sus sesiones al instante. Su historial se conserva y se puede reactivar.` : ''}
+        accion="Dar de baja"
+        cancelar="Cancelar"
+        onConfirmar={() => baja(aBaja)}
+        onCancelar={() => setABaja(null)}
+      />
+      <ConfirmarDescarte
+        abierto={!!aRestablecer}
+        titulo="¿Poner una contraseña temporal?"
+        texto={aRestablecer ? `Se cierran las sesiones de ${aRestablecer.nombre} y tendrá que entrar con una contraseña nueva que verás una sola vez. Al entrar, se le pedirá cambiarla.` : ''}
+        accion="Generar contraseña"
+        cancelar="Cancelar"
+        onConfirmar={() => restablecer(aRestablecer)}
+        onCancelar={() => setARestablecer(null)}
+      />
+    </div>
+  )
+}
+
+/** La contraseña temporal recién restablecida: arriba de la lista, UNA vez
+ *  (no se guarda en ningún lado del panel). Sin modales: así es todo el panel. */
+function ClaveMostrada({ clave, onCerrar }) {
+  if (!clave) return null
+  const copiar = async () => {
+    try { await navigator.clipboard.writeText(clave.valor); toast.success('Contraseña copiada') } catch { toast.error('No se pudo copiar: cópiala a mano') }
+  }
+  return (
+    <section className={s.panelClave} role="status" aria-labelledby="clave-titulo">
+      <h2 className={s.panelTitulo} id="clave-titulo"><KeyIcon size={18} weight="bold" aria-hidden="true" /> Contraseña temporal de {clave.persona.nombre}</h2>
+      <p className={s.ayuda}>
+        Dásela en persona o por un medio seguro. Solo la verás ahora: al cerrar este aviso no se puede volver a mostrar. Al entrar, se le pedirá cambiarla.
+        Usuario: <strong>{clave.persona.usuario}</strong>.
+      </p>
+      <div className={s.clave}>
+        <code aria-label="Contraseña temporal">{clave.valor}</code>
+        <Button type="button" variant="outline" className="h-11" onClick={copiar}><CopyIcon size={16} weight="bold" /> Copiar</Button>
+        <Button type="button" className="h-11" onClick={onCerrar}><ArrowsClockwiseIcon size={16} weight="bold" /> Ya se la di</Button>
+      </div>
+    </section>
   )
 }

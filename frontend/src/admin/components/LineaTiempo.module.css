@@ -1,0 +1,231 @@
+/* ===== LÍNEA DE TIEMPO (Gantt de reservas) ===== */
+.contenedor { display: flex; flex-direction: column; gap: 14px; margin-bottom: 24px; }
+
+/* Barra de herramientas */
+.barra {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: var(--radius-xl);
+  background: var(--card);
+  box-shadow: inset 0 0 0 1px var(--border), var(--shadow-sm);
+}
+.barraFila { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.nav { display: flex; gap: 6px; }
+.rango {
+  font-family: var(--font-headline);
+  font-size: var(--fs-lg);
+  font-weight: 600;
+  text-transform: capitalize;
+}
+.agrupar { margin-left: auto; width: 13rem; }
+.buscador { position: relative; margin-left: auto; width: 16rem; max-width: 100%; }
+.buscadorIcono {
+  position: absolute; left: 11px; top: 50%; transform: translateY(-50%);
+  color: var(--muted-foreground); pointer-events: none;
+}
+
+/* Rejilla: scroll horizontal PROPIO (a propósito), no de la página */
+.scroll {
+  overflow-x: auto;
+  border-radius: var(--radius-xl);
+  background: var(--card);
+  box-shadow: inset 0 0 0 1px var(--border), var(--shadow-sm);
+}
+.rejilla { --col: 220px; width: calc(var(--col) + var(--ancho)); min-width: 100%; position: relative; }
+
+.columnaHab {
+  position: sticky;
+  left: 0;
+  z-index: 3;
+  width: var(--col);
+  flex-shrink: 0;
+  padding: 0 14px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  background: var(--card);
+  box-shadow: inset -1px 0 0 var(--border);
+}
+
+/* Cabecera */
+.cabecera { display: flex; position: sticky; top: 0; z-index: 4; background: var(--card); box-shadow: inset 0 -1px 0 var(--border); }
+.cabeceraHab { height: 64px; color: var(--muted-foreground); }
+.dias { display: flex; position: relative; width: var(--ancho); }
+.dia {
+  width: var(--celda);
+  flex-shrink: 0;
+  height: 64px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  box-shadow: inset -1px 0 0 color-mix(in srgb, var(--border) 60%, transparent);
+  position: relative;
+}
+.diaMes {
+  position: absolute; top: 4px; left: 6px;
+  font-family: var(--font-headline); font-size: var(--fs-xs); font-weight: 500;
+  letter-spacing: var(--tracking-rotulo); text-transform: uppercase; color: var(--primary);
+}
+.diaNombre {
+  font-family: var(--font-headline); font-size: var(--fs-xs); font-weight: 500;
+  letter-spacing: var(--tracking-rotulo); text-transform: uppercase; color: var(--muted-foreground);
+}
+.diaNum { font-family: var(--font-headline); font-size: var(--fs-lg); font-weight: 600; font-variant-numeric: tabular-nums; }
+.diaHoy .diaNum {
+  color: var(--primary-foreground);
+  background: var(--primary);
+  border-radius: var(--radius-full);
+  min-width: 30px;
+  text-align: center;
+}
+.finde { background: color-mix(in srgb, var(--muted) 55%, transparent); }
+.hoyCabeza {
+  position: absolute; bottom: -5px; width: 10px; height: 10px; margin-left: -5px;
+  border-radius: 50%; background: var(--flor-rojo); z-index: 2;
+}
+
+/* Grupos */
+.grupo { box-shadow: inset 0 -1px 0 var(--border); }
+.grupoFila { display: flex; background: var(--muted); }
+.grupoTitulo {
+  height: 48px;
+  flex-direction: row;
+  justify-content: flex-start;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  background: var(--muted);
+  text-align: left;
+}
+.grupoTitulo:hover { background: var(--accent); }
+.chevron { display: inline-flex; color: var(--muted-foreground); }
+.grupoNombre { font-family: var(--font-headline); font-size: var(--fs-sm); font-weight: 600; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.grupoCuenta {
+  min-width: 22px; height: 22px; padding: 0 6px; border-radius: var(--radius-full);
+  display: grid; place-items: center; font-size: var(--fs-xs); font-weight: 700;
+  background: var(--card); color: var(--muted-foreground);
+}
+.ocupCelda { width: var(--celda); height: 48px; flex-shrink: 0; display: flex !important; }
+.ocupCaja {
+  flex: 1;
+  margin: 10px 6px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--card) 70%, transparent);
+  display: flex;
+  align-items: flex-end;
+  overflow: hidden;
+  outline-offset: 2px;
+}
+.ocupBarra { width: 100%; height: 100%; transform-origin: bottom; border-radius: 6px; background: var(--flor-turquesa); }
+.ocupBarra[data-nivel='medio'] { background: var(--secondary); }
+.ocupBarra[data-nivel='alto'] { background: var(--primary); }
+
+/* Filas */
+.fila { display: flex; height: 60px; box-shadow: inset 0 -1px 0 color-mix(in srgb, var(--border) 60%, transparent); }
+.habNombre { font-size: var(--fs-sm); font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.habTipo { display: flex; align-items: center; gap: 4px; font-size: var(--fs-xs); color: var(--muted-foreground); }
+.pista { position: relative; display: flex; width: var(--ancho); cursor: copy; }
+.celda { width: var(--celda); flex-shrink: 0; box-shadow: inset -1px 0 0 color-mix(in srgb, var(--border) 60%, transparent); }
+.celda:hover { background: color-mix(in srgb, var(--accent) 60%, transparent); }
+.celdaHoy { background: color-mix(in srgb, var(--primary) 6%, transparent); }
+.hoyLinea { position: absolute; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: var(--flor-rojo); z-index: 1; pointer-events: none; }
+
+/* Reservas */
+.reserva {
+  position: absolute;
+  top: 9px;
+  height: 42px;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 10px 0 6px;
+  border-radius: var(--radius-full);
+  font-size: var(--fs-xs);
+  text-align: left;
+  cursor: grab;
+  touch-action: none;
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+  transition: box-shadow 0.2s, opacity 0.2s;
+}
+.reserva:hover { box-shadow: var(--shadow-md); }
+.reserva:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+.arrastrando { cursor: grabbing; z-index: 5; box-shadow: var(--shadow-lg); opacity: 0.92; }
+.cortaIzq { border-top-left-radius: 4px; border-bottom-left-radius: 4px; }
+.cortaDer { border-top-right-radius: 4px; border-bottom-right-radius: 4px; }
+.atenuada { opacity: 0.22; }
+.resaltada { box-shadow: 0 0 0 2px var(--background), 0 0 0 4px var(--flor-rojo); }
+
+.est-confirmada { background: var(--primary); color: var(--primary-foreground); }
+.est-pendiente  { background: var(--secondary); color: var(--secondary-foreground); }
+.est-en-curso   { background: var(--flor-turquesa); color: var(--flor-turquesa-fg); }
+.est-completada { background: var(--muted); color: var(--muted-foreground); cursor: default; box-shadow: inset 0 0 0 1px var(--border); }
+.est-bloqueo {
+  background: repeating-linear-gradient(-45deg, var(--muted) 0 8px, color-mix(in srgb, var(--muted) 40%, var(--card)) 8px 16px);
+  color: var(--foreground);
+  box-shadow: inset 0 0 0 1.5px var(--input);
+}
+
+.avatar {
+  width: 30px; height: 30px; border-radius: 50%; flex-shrink: 0;
+  display: grid; place-items: center;
+  font-size: var(--fs-xs); font-weight: 800;
+  background: color-mix(in srgb, currentColor 18%, transparent);
+}
+.reservaTexto { display: flex; flex-direction: column; min-width: 0; line-height: 1.2; }
+.reservaNombre { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.reservaSub { opacity: 0.85; }
+.asa {
+  position: absolute; right: 0; top: 0; bottom: 0; width: 12px;
+  cursor: ew-resize;
+}
+.asa::after {
+  content: ''; position: absolute; right: 5px; top: 13px; bottom: 13px; width: 2px;
+  border-radius: 2px; background: currentColor; opacity: 0.45;
+}
+
+/* Detalle (popover) */
+.detalle { display: flex; flex-direction: column; gap: 4px; align-items: flex-start; }
+.detalleNombre { font-family: var(--font-headline); font-size: var(--fs-lg); font-weight: 600; margin-top: 6px; }
+.detalleDato { font-size: var(--fs-sm); color: var(--muted-foreground); }
+.detalleTotal { font-family: var(--font-headline); font-size: var(--fs-xl); font-weight: 600; color: var(--primary); margin-top: 4px; }
+.detalleAyuda { font-size: var(--fs-xs); color: var(--muted-foreground); margin-top: 6px; line-height: 1.5; }
+
+/* Leyenda */
+.leyenda { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; font-size: var(--fs-xs); font-weight: 700; color: var(--muted-foreground); }
+.leyendaItem { display: inline-flex; align-items: center; gap: 8px; }
+.muestra { width: 24px; height: 12px; border-radius: var(--radius-full); display: inline-block; }
+.leyendaAyuda { margin-left: auto; font-weight: 500; }
+
+/* Diálogos */
+.cambio { display: flex; flex-direction: column; gap: 8px; margin-top: 6px; font-size: var(--fs-sm); }
+.cambio > div { display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; border-radius: var(--radius-md); background: var(--muted); color: var(--foreground); }
+.formulario { display: flex; flex-direction: column; gap: 16px; margin: 18px 0; }
+.formFila { display: flex; gap: 16px; align-items: flex-end; }
+.contador { display: flex; align-items: center; gap: 10px; }
+.contadorValor { min-width: 28px; text-align: center; font-family: var(--font-headline); font-size: var(--fs-xl); font-weight: 600; font-variant-numeric: tabular-nums; }
+.formAyuda { font-size: var(--fs-sm); color: var(--muted-foreground); }
+.formError { font-size: var(--fs-sm); color: var(--destructive); font-weight: 600; }
+
+@media (max-width: 760px) {
+  .rejilla { --col: 150px; }
+  .agrupar, .buscador { margin-left: 0; width: 100%; }
+  .leyendaAyuda { margin-left: 0; }
+}
+
+/* Reservas de otras plataformas (iCal): rayadas, de solo lectura (no se arrastran). */
+.externa {
+  /* Encima de las propias: si se cruzan (posible doble venta) es lo que hay que ver. */
+  position: absolute; top: 9px; height: 42px; z-index: 3;
+  display: flex; flex-direction: column; justify-content: center; padding: 0 12px; min-width: 0;
+  border-radius: var(--radius-full); font-size: var(--fs-xs); line-height: 1.2; color: var(--foreground); cursor: default;
+  background: repeating-linear-gradient(135deg, var(--muted) 0 6px, color-mix(in srgb, var(--muted) 55%, var(--card)) 6px 12px);
+  box-shadow: inset 0 0 0 1px var(--border);
+}
+.externa .reservaNombre, .externa .reservaSub { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.externaChoca { box-shadow: inset 0 0 0 2px var(--destructive); }

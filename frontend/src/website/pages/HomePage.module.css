@@ -1,12 +1,5 @@
 /* ===== HOME PAGE ===== */
 
-/* Hero search — inner date grid */
-.dateGrid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
-}
-
 /* Section header + filter row */
 .sectionHeaderRow {
   display: flex;
@@ -23,12 +16,6 @@
   align-items: flex-end;
 }
 
-.filterChips {
-  display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-}
 
 /* Experience section */
 .experienceGrid {
@@ -53,15 +40,13 @@
   display: grid;
   place-items: center;
   margin-bottom: 20px;
-  color: #fff;
-  font-size: 26px;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.18);
+  box-shadow: var(--shadow-sm);
   flex-shrink: 0;
 }
 
 .experienceTitle {
   font-family: var(--font-headline);
-  font-size: 1.15rem;
+  font-size: var(--fs-lg);
   font-weight: 700;
   color: var(--on-surface);
   margin-bottom: 10px;
@@ -69,7 +54,7 @@
 }
 
 .experienceDesc {
-  font-size: 14px;
+  font-size: var(--fs-sm);
   color: var(--on-surface-var);
   line-height: 1.7;
   margin: 0;
@@ -83,11 +68,6 @@
 @media (max-width: 768px) {
   .sectionHeaderRow { flex-direction: column; }
   .filterGroup { align-items: flex-start; }
-  .filterChips { justify-content: flex-start; }
   .experienceGrid { grid-template-columns: 1fr; }
 }
 
-@media (max-width: 390px) {
-  /* Stack date inputs vertically on very small phones */
-  .dateGrid { grid-template-columns: 1fr; }
-}

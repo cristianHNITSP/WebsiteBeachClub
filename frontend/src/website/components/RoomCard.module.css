@@ -2,14 +2,18 @@
 .card {
   display: flex;
   flex-direction: column;
-  border-radius: 16px;
+  border-radius: calc(var(--radius) * 1.2);
   overflow: hidden;
-  background: var(--surface-lowest);
-  border: 1px solid var(--outline-var);
+  background: var(--card);
+  color: var(--card-foreground);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-sm);
   cursor: pointer;
   height: 100%;
   transition: box-shadow 0.3s ease;
 }
+/* Elevación SOLO por sombra (sin translate) */
+.card:hover { box-shadow: var(--shadow-lg); }
 
 .cardHorizontal {
   flex-direction: row;
@@ -42,7 +46,7 @@
 .overlay {
   position: absolute;
   inset: 0;
-  background: linear-gradient(to top, rgba(0,30,35,0.72) 0%, rgba(0,0,0,0.12) 100%);
+  background: linear-gradient(to top, color-mix(in srgb, var(--noche) 78%, transparent) 0%, transparent 100%);
   display: flex;
   align-items: flex-end;
   justify-content: center;
@@ -50,20 +54,19 @@
 }
 
 .overlayBtn {
-  background: rgba(255,255,255,0.15);
-  border: 1px solid rgba(255,255,255,0.35);
-  backdrop-filter: blur(8px);
-  color: #fff;
-  font-family: var(--font-body);
-  font-weight: 700;
-  font-size: 12px;
-  letter-spacing: 0.08em;
+  background: var(--card);
+  color: var(--card-foreground);
+  font-weight: 500;
+  font-size: var(--fs-xs);
+  letter-spacing: var(--tracking-rotulo);
   text-transform: uppercase;
-  padding: 8px 20px;
+  font-family: var(--font-headline); /* rótulo */
+  padding: 9px 20px;
   border-radius: var(--radius-full);
   display: flex;
   align-items: center;
   gap: 6px;
+  box-shadow: var(--shadow-md);
 }
 
 .badgePos {
@@ -76,17 +79,8 @@
   position: absolute;
   top: 12px;
   right: 12px;
-  width: 34px;
-  height: 34px;
   border-radius: var(--radius-full);
-  border: none;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 16px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-  transition: background 0.2s, color 0.2s;
+  box-shadow: var(--shadow-sm);
 }
 
 /* ── Body ── */
@@ -102,10 +96,11 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  font-size: 10px;
-  font-weight: 700;
+  font-size: var(--fs-xs);
+  font-weight: 500;
   text-transform: uppercase;
-  letter-spacing: 0.1em;
+  font-family: var(--font-headline); /* rótulo */
+  letter-spacing: var(--tracking-rotulo);
   color: var(--primary);
   margin-bottom: 6px;
 }
@@ -113,7 +108,7 @@
 .title {
   font-family: var(--font-headline);
   font-weight: 700;
-  font-size: 19px;
+  font-size: var(--fs-lg);
   color: var(--on-surface);
   margin-bottom: 10px;
   line-height: 1.2;
@@ -123,23 +118,23 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 13px;
+  font-size: var(--fs-sm);
   margin-bottom: 12px;
 }
 
 .ratingNum {
   font-weight: 700;
   color: var(--on-surface);
-  font-size: 13px;
+  font-size: var(--fs-sm);
 }
 
 .ratingCount {
   color: var(--on-surface-var);
-  font-size: 12px;
+  font-size: var(--fs-xs);
 }
 
 .desc {
-  font-size: 13.5px;
+  font-size: var(--fs-sm);
   color: var(--on-surface-var);
   line-height: 1.65;
   display: -webkit-box;
@@ -148,18 +143,6 @@
   overflow: hidden;
 }
 
-.sizeBadge {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  margin-top: 10px;
-  padding: 3px 10px;
-  border-radius: var(--radius-full);
-  background: var(--surface-container);
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--on-surface-var);
-}
 
 /* ── Price footer ── */
 .footer {
@@ -168,11 +151,11 @@
   justify-content: space-between;
   margin-top: 18px;
   padding-top: 16px;
-  border-top: 1px solid var(--outline-var);
+  border-top: 1px solid var(--border);
 }
 
 .priceOriginal {
-  font-size: 12px;
+  font-size: var(--fs-xs);
   color: var(--on-surface-var);
   margin-bottom: 1px;
   display: block;
@@ -186,13 +169,13 @@
 
 .priceAmount {
   font-weight: 800;
-  font-size: 22px;
+  font-size: var(--fs-xl);
   color: var(--on-surface);
-  font-family: var(--font-body);
+  font-variant-numeric: tabular-nums;
 }
 
 .priceLabel {
-  font-size: 11px;
+  font-size: var(--fs-xs);
   color: var(--on-surface-var);
   font-weight: 500;
 }

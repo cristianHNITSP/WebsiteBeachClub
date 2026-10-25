@@ -1,0 +1,13 @@
+/* Cómo pagan los huéspedes (Tablero). Solo tokens. */
+.seccion {
+  display: grid; gap: 16px; margin-top: 24px; padding: 20px; border-radius: var(--radius-xl); background: var(--card);
+  box-shadow: inset 0 0 0 1px var(--border), var(--shadow-sm);
+}
+.cabecera { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px; }
+.periodo { min-width: 200px; }
+.ayuda { margin: 4px 0 0; font-size: var(--fs-xs); color: var(--muted-foreground); }
+.definiciones { display: grid; gap: 8px; margin: 0; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+.definiciones div { display: grid; gap: 2px; }
+.definiciones dt { font-size: var(--fs-xs); font-weight: 700; color: var(--foreground); }
+.definiciones dd { margin: 0; font-size: var(--fs-xs); color: var(--muted-foreground); }
+.vacio { display: grid; justify-items: center; gap: 8px; margin: 0; padding: 24px; text-align: center; font-size: var(--fs-sm); color: var(--muted-foreground); }

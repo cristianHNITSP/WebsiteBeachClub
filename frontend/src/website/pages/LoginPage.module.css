@@ -1,0 +1,170 @@
+/* ===== LOGIN (paleta floral: usePaletaSitio pone body.site) =====
+   Solo tokens. Sin backdrop-filter: la tarjeta es sólida sobre la Aurora. */
+
+.pagina {
+  position: relative;
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+  isolation: isolate;
+  color: var(--foreground);
+}
+
+/* ── Fondo ── */
+.fondo {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background: var(--noche);
+}
+.fondoQuieto {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 60% 55% at 15% 20%, color-mix(in srgb, var(--flor-morado) 70%, transparent), transparent 65%),
+    radial-gradient(ellipse 55% 50% at 85% 80%, color-mix(in srgb, var(--flor-turquesa) 40%, transparent), transparent 60%),
+    radial-gradient(ellipse 60% 45% at 60% 0%, color-mix(in srgb, var(--flor-dorado) 30%, transparent), transparent 60%),
+    var(--noche);
+}
+.fondoAurora {
+  position: absolute;
+  inset: 0;
+  opacity: 0.9;
+}
+
+.tema {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  z-index: 2;
+  color: var(--noche-fg);
+}
+.tema:hover { color: var(--noche-fg); background: color-mix(in srgb, var(--noche-fg) 14%, transparent); }
+
+/* ── Columna centrada ── */
+.main {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 16px;
+}
+.columna {
+  width: 100%;
+  max-width: 440px;
+}
+
+/* SpotlightCard trae p-8; aquí el relleno propio y sombra más marcada sobre la noche */
+.tarjeta {
+  padding: 28px 30px;
+  border-radius: calc(var(--radius) * 1.6);
+  box-shadow: 0 30px 80px color-mix(in srgb, var(--noche) 60%, transparent);
+}
+
+.marca {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 22px;
+}
+.marcaSub {
+  font-size: var(--fs-xs);
+  font-weight: 500;
+  letter-spacing: var(--tracking-rotulo);
+  text-transform: uppercase;
+  font-family: var(--font-headline); /* rótulo */
+  color: var(--muted-foreground);
+}
+
+.titulo { margin-bottom: 16px; }
+.tituloTexto {
+  font-family: var(--font-headline);
+  font-size: var(--fs-2xl);
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--foreground);
+}
+.subtitulo {
+  margin-top: 4px;
+  font-size: var(--fs-sm);
+  color: var(--muted-foreground);
+}
+
+/* ── Bloqueo ── */
+.bloqueo {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--destructive) 12%, var(--card));
+  color: var(--destructive);
+  overflow: hidden;
+}
+.bloqueoTitulo { font-weight: 700; font-size: var(--fs-sm); }
+.bloqueoTexto { font-size: var(--fs-xs); color: var(--muted-foreground); }
+
+/* ── Formulario ── */
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 18px;
+}
+.campo {
+  display: grid;
+  gap: 8px;
+}
+.filaLabel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.conIcono { position: relative; }
+.iconoCampo {
+  position: absolute;
+  left: 13px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--muted-foreground);
+  pointer-events: none;
+}
+.ojo {
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--muted-foreground);
+}
+
+.aviso {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--destructive);
+  overflow: hidden;
+}
+/* Bloq Mayús: dorado oscuro (AA como texto en claro y en oscuro) */
+.avisoAtencion { color: var(--gold-dark); }
+
+.pie {
+  display: flex;
+  justify-content: center;
+}
+
+@media (max-width: 400px) {
+  .tarjeta { padding: 22px 18px; }
+}
+
+/* "o" + Google */
+.otros { display: flex; flex-direction: column; gap: 14px; margin-top: 18px; }
+.o {
+  display: flex; align-items: center; gap: 12px;
+  font-size: var(--fs-xs); color: var(--muted-foreground);
+}
+.o::before, .o::after { content: ''; flex: 1; height: 1px; background: var(--border); }

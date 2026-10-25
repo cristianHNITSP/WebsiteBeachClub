@@ -1,0 +1,78 @@
+[project]
+name = "beachclub-backend"
+version = "0.1.0"
+description = "Hoteles Frida: motor de reservas. API (FastAPI) y tareas (Celery)."
+readme = "README.md"
+# 3.14 hoy; 3.15 en cuanto exista su imagen oficial de Docker (PLAN-BACKEND §3).
+requires-python = ">=3.14"
+dependencies = [
+    "fastapi>=0.143.0",
+    "uvicorn[standard]>=0.54.0",
+    "pydantic>=2.14.0",
+    "pydantic-settings>=2.15.0",
+    "sqlalchemy[asyncio]>=2.1.4",
+    "alembic>=1.20.0",
+    "psycopg[binary,pool]>=3.3.6",
+    "celery[redis]>=5.6.3",
+    # redis-py: el kombu estable (5.6.x) exige < 6.5. Subir cuando salga kombu 5.7 estable.
+    "redis>=6.4.0",
+    "authx>=1.7.1",
+    "pwdlib[argon2]>=0.3.1",
+    "email-validator>=2.3.0",
+    "pillow>=13.0.0",
+    "python-multipart>=0.0.32",
+    "pillow-heif>=1.8.1",
+    "httpx>=0.28.1",
+    "icalendar>=7.3.0",
+    "protego>=0.7.0",
+    "selectolax>=1.0.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+    "pytest-asyncio>=1.4.0",
+    "ruff>=0.17.0",
+    "pip-audit>=2.10.1",
+    "hypothesis>=6.169.0",
+]
+
+[tool.uv]
+# Aplicación, no librería: no se empaqueta ni se publica.
+package = false
+# Nunca versiones beta o candidatas: si algo solo resuelve con una, que falle.
+prerelease = "disallow"
+
+[tool.ruff]
+target-version = "py314"
+line-length = 110
+
+[tool.ruff.lint]
+select = [
+    "E", "W", "F",   # pycodestyle y pyflakes
+    "I",             # orden de imports
+    "B",             # bugbear
+    "UP",            # sintaxis moderna
+    "S",             # seguridad (bandit): S608 = SQL armado a mano
+    "ASYNC",         # errores típicos de async
+    "SIM",
+    "RUF",
+]
+ignore = ["RUF001", "RUF002", "RUF003"]  # el código va en español: «», acentos y comillas tipográficas son correctos
+
+[tool.ruff.lint.isort]
+# La carpeta alembic/ (migraciones) no es el paquete alembic: que no la confunda.
+known-third-party = ["alembic"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101", "S105", "S106", "ASYNC240"]   # assert, contraseñas de prueba y leer archivos en pruebas async
+"alembic/versions/**" = ["E501"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "session"
+asyncio_default_test_loop_scope = "session"
+# La prueba de carga (1 millón de reservas) solo con `-m carga`: tarda minutos.
+addopts = "-m 'not carga'"
+markers = ["carga: prueba de carga con 1 millón de reservas (PLAN-BACKEND §9)"]

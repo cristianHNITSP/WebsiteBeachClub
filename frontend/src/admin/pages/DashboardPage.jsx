@@ -1,306 +1,296 @@
-import { useState, useEffect } from 'react'
-import { STATS, BOOKINGS_DATA } from '../../data/admin'
+import { useEffect } from 'react'
+import { motion } from 'framer-motion'
+import { toast } from 'sonner'
+import {
+  BedIcon, SunIcon, DownloadSimpleIcon, TrendUpIcon, TrendDownIcon, SignOutIcon, SignInIcon, WrenchIcon, ArrowRightIcon,
+  CurrencyDollarIcon, ReceiptIcon, ForkKnifeIcon, HandCoinsIcon, WarningCircleIcon, BellIcon, CalendarDotsIcon,
+} from '@phosphor-icons/react'
 import { SkeletonCard } from '@/components/frida/Skeleton'
-import Skeleton from '@/components/frida/Skeleton'
-import { useToast } from '@/components/frida/Toast'
-import StatCard from '@/components/frida/StatCard'
+import { Button } from '@/components/ui/button'
+import SpotlightCard from '@/components/bits/SpotlightCard'
+import CountUp from '@/components/bits/CountUp'
+import AnimatedList from '@/components/bits/AnimatedList'
+import { useTheme } from '@/context/ThemeContext'
+import TarjetaCifra from '@/components/marca/TarjetaCifra'
+import { api } from '@/lib/api'
+import { usePedido } from '@/hooks/usePedido'
+import { escucharEventos } from '@/lib/eventos'
+import { Columnas, Barras } from '../components/Graficas'
+import FormasDePago from '../components/FormasDePago'
+import { MODULOS } from '../modulos'
+import { useAvisos, haceCuanto } from '../avisos'
+import { usePropiedadActual } from '../propiedadActual'
+import { useRestaurante, periodo, resumen, ventasPorDia, platillosVendidos, categoria, mxn } from '../restaurante'
+import s from './DashboardPage.module.css'
 
-const MONTHS = ['ENE', 'FEB', 'MAR', 'ABR', 'MAY', 'JUN', 'JUL', 'AGO', 'SEP', 'OCT', 'NOV', 'DIC']
-const REVENUE = [62, 75, 88, 72, 95, 78, 84, 92, 70, 88, 96, 100]
+/*
+ * Tablero (fase 5). Todo sale de /api/admin/metricas/tablero, que lee las
+ * métricas precalculadas (nunca la tabla de reservas): responde en milisegundos
+ * aunque haya un millón de reservas. Se vuelve a pedir cuando llega un evento en
+ * vivo. Lo que no se sabe (ocupación sin habitaciones) se dice "Sin dato".
+ */
 
-const ACTIVITY = [
-  {
-    icon: 'hotel',
-    iconClass: 'activity-icon--secondary',
-    title: 'Nueva reserva confirmada',
-    sub: 'Ana Martínez · Suite Coral Grande · 4 noches',
-    time: 'Hace 12 min',
-  },
-  {
-    icon: 'star',
-    iconClass: 'activity-icon--gold',
-    title: 'Reseña 5 estrellas recibida',
-    sub: 'Carlos R. · "Experiencia increíble, el personal es excepcional"',
-    time: 'Hace 1 hora',
-  },
-  {
-    icon: 'cleaning_services',
-    iconClass: 'activity-icon--surface',
-    title: 'Housekeeping completado',
-    sub: 'Suite Horizonte Azul · Lista para check-in',
-    time: 'Hace 2 horas',
-  },
-  {
-    icon: 'payments',
-    iconClass: 'activity-icon--secondary',
-    title: 'Pago procesado',
-    sub: 'Laura J. · Villa Chuburná Sunset · MXN $15,600',
-    time: 'Hace 3 horas',
-  },
-  {
-    icon: 'logout',
-    iconClass: 'activity-icon--surface',
-    title: 'Check-out completado',
-    sub: 'Miguel T. · Cabaña del Manglar',
-    time: 'Hace 5 horas',
-  },
-]
+const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic']
+const etiquetaMes = m => MESES[Number(m.slice(5, 7)) - 1]
+const pesos = c => `$${Math.round(c / 100).toLocaleString('es-MX')}`
+const ICONO_AVISO = { reserva: CalendarDotsIcon, pago: CurrencyDollarIcon, operacion: BedIcon, sistema: BellIcon }
+const FLOR_AVISO = { reserva: 'morado', pago: 'orquidea', operacion: 'turquesa', sistema: 'dorado' }
+
+/* Cifra animada (CountUp) o quieta con reducir movimiento */
+function Cifra({ valor, decimales = 0, reduceMotion }) {
+  if (valor == null) return 'Sin dato'
+  if (reduceMotion) return valor.toLocaleString('es-MX', { minimumFractionDigits: decimales, maximumFractionDigits: decimales })
+  return <CountUp to={valor} duration={1.4} separator="," />
+}
+
+/** "+12% vs. …" o "Sin dato para comparar". */
+function Tendencia({ ahora, antes, texto }) {
+  if (ahora == null || antes == null || antes === 0) return <div className="metric-card__trend">Sin dato para comparar</div>
+  const cambio = Math.round(((ahora - antes) / antes) * 100)
+  const Icono = cambio >= 0 ? TrendUpIcon : TrendDownIcon
+  return <div className="metric-card__trend"><Icono size={16} weight="bold" aria-hidden="true" /> {cambio >= 0 ? '+' : ''}{cambio}% {texto}</div>
+}
+
+const entrada = i => ({
+  initial: { opacity: 0, y: 10 },
+  animate: { opacity: 1, y: 0 },
+  transition: { duration: 0.45, ease: [0.16, 1, 0.3, 1], delay: 0.06 * i },
+})
+
+/* ── Restaurante: lo de hoy y la última semana (sale del almacén del restaurante) ── */
+function SeccionRestaurante({ onNavigate, loading }) {
+  const { tickets, menu } = useRestaurante()
+  const hoy = resumen(periodo(tickets, 1).actual)
+  const semana = periodo(tickets, 7).actual
+  const top = platillosVendidos(semana, menu).slice(0, 5)
+  const dia = d => d.toLocaleDateString('es-MX', { weekday: 'short', day: 'numeric' })
+  return (
+    <div className={`inventory-section ${s.restSeccion}`}>
+      <div className={s.invCabecera}>
+        <div>
+          <span className="admin-page-eyebrow">Restaurante</span>
+          <h2 className="admin-section-title" style={{ marginBottom: 0 }}>Ventas del restaurante</h2>
+        </div>
+        <Button variant="outline" onClick={() => onNavigate('restaurante-estadisticas')}>Ver estadísticas <ArrowRightIcon size={14} weight="bold" /></Button>
+      </div>
+      <div className="inventory-grid">
+        {[
+          { Icono: CurrencyDollarIcon, flor: 'morado',   label: 'Ventas hoy', prefijo: '$', value: Math.round(hoy.ventas) },
+          { Icono: ReceiptIcon,        flor: 'turquesa', label: 'Tickets hoy', value: hoy.tickets },
+          { Icono: ForkKnifeIcon,      flor: 'dorado',   label: 'Platillos vendidos hoy', value: hoy.platillos },
+          { Icono: HandCoinsIcon,      flor: 'naranja',  label: 'Ticket promedio hoy', prefijo: '$', value: Math.round(hoy.promedio) },
+        ].map((item, i) => (
+          <motion.div key={item.label} {...entrada(i)}><TarjetaCifra {...item} loading={loading} /></motion.div>
+        ))}
+      </div>
+      <div className={s.restGraficas}>
+        <div className={s.restPanel}>
+          <div className="chart-title">Ventas de los últimos 7 días</div>
+          <Columnas titulo="Ventas de los últimos 7 días" alto={180} marcar={new Date().toDateString()}
+            datos={ventasPorDia(tickets, 7).map(d => ({ clave: d.fecha.toDateString(), etiqueta: dia(d.fecha), valor: d.ventas, pista: `${dia(d.fecha)}: ${mxn(d.ventas)}, ${d.tickets} tickets` }))} />
+        </div>
+        <div className={s.restPanel}>
+          <div className="chart-title">Platillos más vendidos, 7 días</div>
+          <Barras titulo="Platillos más vendidos, 7 días" datos={top.map(v => {
+            const c = categoria(v.categoria)
+            return { clave: v.id, etiqueta: v.nombre, valor: v.cantidad, texto: `${v.cantidad} vendidos`, Icono: c.Icono, flor: c.flor }
+          })} />
+        </div>
+      </div>
+    </div>
+  )
+}
 
 const DashboardPage = ({ onNavigate }) => {
-  const addToast = useToast()
-  const [loading, setLoading] = useState(true)
-  useEffect(() => { const t = setTimeout(() => setLoading(false), 1400); return () => clearTimeout(t) }, [])
+  const { reduceMotion } = useTheme()
+  const { propiedadId } = usePropiedadActual()
+  const pedido = usePedido(senal => api(`/api/admin/metricas/tablero${propiedadId ? `?propiedad=${propiedadId}` : ''}`, { senal }), [propiedadId])
+  const { avisos } = useAvisos()
+  // En vivo: cualquier cambio de reservas vuelve a pedir el tablero.
+  const { recargar } = pedido
+  useEffect(() => {
+    let espera = null
+    const quitar = escucharEventos(m => { if (m.agregado === 'reserva') { clearTimeout(espera); espera = setTimeout(recargar, 2500) } })
+    return () => { clearTimeout(espera); quitar() }
+  }, [recargar])
 
-  const today = new Date().toLocaleDateString('es-MX', {
-    weekday: 'long',
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-  })
+  const d = pedido.datos
+  const loading = pedido.cargando
+  const hoyTexto = new Date().toLocaleDateString('es-MX', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
+
+  const exportar = () => {
+    if (!d) return
+    const filas = [
+      ['mes', 'noches_vendidas', 'ocupacion_%', 'ingreso_mxn', 'adr_mxn', 'revpar_mxn', 'canceladas'],
+      ...d.meses.map(m => [m.mes, m.noches_vendidas, m.ocupacion ?? '', m.ingreso_centavos / 100, (m.adr_centavos ?? 0) / 100, (m.revpar_centavos ?? 0) / 100, m.canceladas]),
+    ]
+    const url = URL.createObjectURL(new Blob([filas.map(f => f.join(',')).join('\n')], { type: 'text/csv;charset=utf-8' }))
+    Object.assign(document.createElement('a'), { href: url, download: `tablero-${d.fecha}.csv` }).click()
+    URL.revokeObjectURL(url)
+    toast.success('Resumen exportado', { description: 'Los últimos 12 meses, en CSV.' })
+  }
+
+  if (pedido.error) {
+    return (
+      <div className={s.vacio} role="alert">
+        <WarningCircleIcon size={28} aria-hidden="true" />
+        <p>{pedido.error.message}</p>
+        <Button variant="outline" onClick={pedido.recargar}>Reintentar</Button>
+      </div>
+    )
+  }
+
+  const hoy = d?.hoy
+  const INVENTARIO = d ? [
+    { Icono: BedIcon,     flor: 'morado',   label: 'Ocupadas hoy',     value: hoy.ocupadas, sufijo: `/${hoy.habitaciones}`, sub: hoy.bloqueadas ? `${hoy.bloqueadas} bloqueadas por mantenimiento` : 'Sin bloqueos hoy' },
+    { Icono: SignInIcon,  flor: 'turquesa', label: 'Llegadas hoy',     value: hoy.llegadas, sub: 'Reservas que empiezan hoy' },
+    { Icono: SignOutIcon, flor: 'naranja',  label: 'Salidas hoy',      value: hoy.salidas,  sub: 'Reservas que terminan hoy' },
+    { Icono: WrenchIcon,  flor: 'dorado',   label: 'En mantenimiento', value: hoy.en_mantenimiento, sub: 'Habitaciones fuera de servicio' },
+    { Icono: HandCoinsIcon, flor: 'orquidea', label: 'Por cobrar', prefijo: '$', value: Math.round(hoy.por_cobrar_centavos / 100), sub: 'Reservas confirmadas y en curso' },
+  ] : []
+  const actividad = avisos.slice(0, 6).map(a => ({ ...a, Icono: ICONO_AVISO[a.tipo] ?? BellIcon, flor: FLOR_AVISO[a.tipo] ?? 'morado' }))
 
   return (
     <div>
-      {/* Page header */}
+      {/* ── Cabecera ── */}
       <div className="admin-page-header">
         <div>
           <span className="admin-page-eyebrow">Resumen operacional</span>
-          <h1 className="admin-page-title">
-            Tablero<br />
-            <em>Principal</em>
-          </h1>
-          {/* Status chips */}
-          <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginTop: '16px' }}>
-            {[
-              { icon: 'circle', label: 'Sistema en línea', color: '#16a34a', bg: 'rgba(34,197,94,0.12)' },
-              { icon: 'hotel', label: `${STATS.total - STATS.available}/${STATS.total} ocupadas`, color: 'var(--primary)', bg: 'rgba(0,105,113,0.10)' },
-              { icon: 'wb_sunny', label: '8 check-ins hoy', color: '#d97706', bg: 'rgba(245,158,11,0.12)' },
-            ].map((chip, i) => (
-              <span key={i} style={{
-                display: 'inline-flex', alignItems: 'center', gap: '6px',
-                padding: '5px 14px', borderRadius: 'var(--radius-full)',
-                background: chip.bg, color: chip.color,
-                fontFamily: 'var(--font-body)', fontWeight: 700, fontSize: '12px',
-              }}>
-                <span className="material-symbols-outlined" style={{ fontSize: '13px' }}>{chip.icon}</span>
-                {chip.label}
-              </span>
-            ))}
-          </div>
+          <h1 className="admin-page-title">Tablero <em>principal</em></h1>
+          {d && (
+            <div className={s.chips}>
+              <span className={`${s.chip} ${s.chipMarca}`}><BedIcon size={14} weight="bold" aria-hidden="true" /> {hoy.ocupadas}/{hoy.habitaciones} ocupadas</span>
+              <span className={`${s.chip} ${s.chipSol}`}><SunIcon size={14} weight="bold" aria-hidden="true" /> {hoy.llegadas} llegada{hoy.llegadas !== 1 ? 's' : ''} hoy</span>
+            </div>
+          )}
         </div>
         <div className="admin-page-header-actions">
-          <div className="admin-date" style={{ textTransform: 'capitalize' }}>{today}</div>
+          <div className="admin-date" style={{ textTransform: 'capitalize' }}>{hoyTexto}</div>
           <div className="admin-page-header-actions-row">
-            <button className="btn-outline" onClick={() => addToast('Reporte exportado correctamente', { type: 'success', title: 'Exportado' })}>
-              <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>download</span>
-              Exportar
-            </button>
+            <Button variant="outline" disabled={!d} onClick={exportar}>
+              <DownloadSimpleIcon size={16} weight="bold" /> Exportar
+            </Button>
           </div>
         </div>
       </div>
 
-      {/* Metrics grid */}
+      {/* ── Hoy en la operación: lo primero que se ve (check-in, check-out, cobro) ── */}
+      <div className={`inventory-section ${s.hoyArriba}`}>
+        <div className={s.invCabecera}>
+          <div>
+            <span className="admin-page-eyebrow">Hoy</span>
+            <h2 className="admin-section-title" style={{ marginBottom: 0 }}>Resumen operacional</h2>
+          </div>
+          <Button variant="outline" className="h-11" onClick={() => onNavigate('hoy')}>Llegadas y salidas <ArrowRightIcon size={14} weight="bold" /></Button>
+        </div>
+        <div className="inventory-grid">
+          {(loading ? [0, 1, 2, 3, 4] : INVENTARIO).map((item, i) => (
+            <motion.div key={item.label ?? i} {...entrada(i)}>
+              {loading ? <SkeletonCard height="120px" /> : <TarjetaCifra {...item} />}
+            </motion.div>
+          ))}
+        </div>
+      </div>
+
+      {/* ── Métricas ── */}
       <div className="metrics-grid">
         {loading ? (
-          <>
-            <SkeletonCard height="180px" />
-            <SkeletonCard height="180px" />
-            <SkeletonCard height="180px" />
-          </>
+          <><SkeletonCard height="180px" /><SkeletonCard height="180px" /><SkeletonCard height="180px" /></>
         ) : (
           <>
-            {/* Occupancy */}
-            <div className="metric-card metric-card--light">
-              <div className="metric-card__label">Ocupación actual</div>
-              <div>
-                <div className="metric-card__value">{STATS.occupancy}%</div>
-                <div className="metric-card__trend">
-                  <span className="material-symbols-outlined" style={{ fontSize: '16px', color: '#16a34a' }}>trending_up</span>
-                  +6% vs. semana pasada
+            <motion.div {...entrada(0)}>
+              <SpotlightCard className="metric-card metric-card--light h-full" spotlightColor="color-mix(in srgb, var(--primary) 12%, transparent)">
+                <div className="metric-card__label">Ocupación de hoy</div>
+                <div>
+                  <div className="metric-card__value"><Cifra valor={hoy.ocupacion} decimales={1} reduceMotion={reduceMotion} />{hoy.ocupacion != null && '%'}</div>
+                  <Tendencia ahora={hoy.ocupacion} antes={d.ultimos_7_dias.ocupacion} texto="vs. promedio de los últimos 7 días" />
                 </div>
-              </div>
-              <div style={{
-                height: '4px',
-                borderRadius: '2px',
-                background: 'var(--surface-container-high)',
-                marginTop: '16px',
-              }}>
-                <div style={{
-                  height: '100%',
-                  width: `${STATS.occupancy}%`,
-                  background: 'linear-gradient(90deg, var(--surface-tint), var(--secondary))',
-                  borderRadius: '2px',
-                }} />
-              </div>
-              <div style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                marginTop: '8px',
-                fontFamily: 'var(--font-body)',
-                fontSize: '11px',
-                color: 'var(--outline)',
-              }}>
-                <span>{STATS.available} disponibles</span>
-                <span>{STATS.total} total</span>
-              </div>
-            </div>
+                <div className={s.barra} role="img" aria-label={`Ocupación ${hoy.ocupacion ?? 0}%`}>
+                  <motion.div className={s.barraRelleno} initial={{ scaleX: reduceMotion ? 1 : 0 }} animate={{ scaleX: 1 }}
+                    transition={{ duration: 1.1, ease: [0.16, 1, 0.3, 1], delay: 0.2 }} style={{ width: `${hoy.ocupacion ?? 0}%` }} />
+                </div>
+                <div className={s.barraPie}>
+                  <span>{hoy.habitaciones - hoy.ocupadas - hoy.bloqueadas} disponibles</span>
+                  <span>{hoy.habitaciones} en total</span>
+                </div>
+              </SpotlightCard>
+            </motion.div>
 
-            {/* ADR */}
-            <div className="metric-card metric-card--primary">
-              <div className="metric-card__label">Tarifa promedio diaria</div>
+            <motion.div {...entrada(1)} className="metric-card metric-card--primary">
+              <div className="metric-card__label">Tarifa promedio (ADR) del mes</div>
               <div>
-                <div className="metric-card__value" style={{ fontSize: '3.5rem' }}>
-                  ${STATS.adr.toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                </div>
-                <div className="metric-card__trend">
-                  <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>trending_up</span>
-                  +12% vs. mes anterior
-                </div>
-                <div className="metric-card--primary metric-card__sub">
-                  ADR por encima del objetivo trimestral de $320 MXN
-                </div>
+                <div className="metric-card__value">{d.mes.adr_centavos != null && '$'}<Cifra valor={d.mes.adr_centavos != null ? Math.round(d.mes.adr_centavos / 100) : null} reduceMotion={reduceMotion} /></div>
+                <Tendencia ahora={d.mes.adr_centavos} antes={d.mes_anterior.adr_centavos} texto="vs. el mismo tramo del mes anterior" />
+                <div className="metric-card__sub">{d.mes.noches_vendidas} noches vendidas este mes</div>
               </div>
-            </div>
+            </motion.div>
 
-            {/* Revenue */}
-            <div className="metric-card metric-card--gold">
-              <div className="metric-card__label">Ingresos del día</div>
+            <motion.div {...entrada(2)} className="metric-card metric-card--gold">
+              <div className="metric-card__label">Ingresos reservados del mes</div>
               <div>
-                <div className="metric-card__value">
-                  ${(STATS.dailyRevenue / 1000).toFixed(1)}k
-                </div>
-                <div className="metric-card__trend">
-                  <span className="material-symbols-outlined" style={{ fontSize: '16px', color: 'var(--tertiary)' }}>trending_up</span>
-                  MXN proyectados
-                </div>
+                <div className="metric-card__value">$<Cifra valor={Math.round(d.mes.ingreso_centavos / 100)} reduceMotion={reduceMotion} /></div>
+                <Tendencia ahora={d.mes.ingreso_centavos} antes={d.mes_anterior.ingreso_centavos} texto="vs. el mismo tramo del mes anterior" />
+                <div className="metric-card__sub">RevPAR {d.mes.revpar_centavos != null ? pesos(d.mes.revpar_centavos) : 'Sin dato'}</div>
               </div>
-            </div>
+            </motion.div>
           </>
         )}
       </div>
 
-      {/* Chart + Activity */}
+      {/* ── Gráficas + actividad ── */}
       <div className="dashboard-charts-row">
-        {/* Chart */}
-        <div>
+        <div className={s.graficas}>
           <div className="chart-area">
-            <div className="chart-header">
-              <div className="chart-title">Revenue Growth</div>
-              <div className="chart-legend">
-                <div className="chart-legend__item">
-                  <div className="chart-legend__dot" style={{ background: 'var(--primary)' }} />
-                  Ingresos 2026
-                </div>
-                <div className="chart-legend__item">
-                  <div className="chart-legend__dot" style={{ background: 'var(--secondary-container)' }} />
-                  Proyección
-                </div>
-              </div>
-            </div>
-            <div className="chart-bars">
-              {REVENUE.map((val, i) => (
-                <div key={i} className="chart-bar-wrap">
-                  <div
-                    className="chart-bar"
-                    style={{ height: `${val}%` }}
-                    title={`${MONTHS[i]}: ${val}%`}
-                  />
-                </div>
-              ))}
-            </div>
-            <div className="chart-months">
-              {MONTHS.map(m => (
-                <span key={m} className="chart-month">{m}</span>
-              ))}
-            </div>
+            <div className="chart-title">Ingresos reservados por mes</div>
+            {loading ? <SkeletonCard height="200px" /> : (
+              <Columnas titulo="Ingresos reservados por mes" alto={200} marcar={d.meses.at(-1)?.mes}
+                datos={d.meses.map(m => ({ clave: m.mes, etiqueta: etiquetaMes(m.mes), valor: m.ingreso_centavos / 100,
+                  pista: `${etiquetaMes(m.mes)} ${m.mes.slice(0, 4)}: ${pesos(m.ingreso_centavos)}, ocupación ${m.ocupacion ?? 'sin dato'}${m.ocupacion != null ? '%' : ''}` }))} />
+            )}
           </div>
-
-          {/* Featured suite */}
-          <div className="featured-suite">
-            <img
-              src="https://placehold.co/1200x400/003b41/006971?text=Suite+Horizonte+Azul"
-              alt="Suite Horizonte Azul"
-            />
-            <div className="featured-suite__overlay" />
-            <div className="featured-suite__content">
-              <span style={{
-                fontFamily: 'var(--font-body)',
-                fontSize: '10px',
-                fontWeight: '700',
-                letterSpacing: '0.2em',
-                textTransform: 'uppercase',
-                color: 'var(--tertiary-fixed)',
-                display: 'block',
-                marginBottom: '12px',
-              }}>
-                Habitación premium
-              </span>
-              <h3 style={{
-                fontFamily: 'var(--font-headline)',
-                fontSize: '1.75rem',
-                color: '#fff',
-                marginBottom: '12px',
-              }}>
-                Suite Horizonte Azul
-              </h3>
-              <p style={{
-                fontFamily: 'var(--font-body)',
-                fontSize: '13px',
-                color: 'rgba(255,255,255,0.75)',
-                lineHeight: '1.65',
-                marginBottom: '20px',
-              }}>
-                Próximo check-in: 3 de Abril · Sofia Hernández
-              </p>
-              <div style={{ display: 'flex', gap: '10px' }}>
-                <span className="status-badge status-badge--maintenance">
-                  En preparación
-                </span>
-              </div>
-            </div>
+          <div className="chart-area">
+            <div className="chart-title">Ocupación de los próximos 14 días</div>
+            {loading ? <SkeletonCard height="160px" /> : (
+              <Columnas titulo="Ocupación de los próximos 14 días" alto={160} marcar={d.proximos[0]?.dia}
+                datos={d.proximos.map(p => {
+                  const dia = new Date(`${p.dia}T12:00`)
+                  const etiqueta = dia.toLocaleDateString('es-MX', { weekday: 'narrow', day: 'numeric' })
+                  return { clave: p.dia, etiqueta, valor: p.ocupacion ?? 0, pista: `${dia.toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'short' })}: ${p.ocupacion ?? 'sin dato'}${p.ocupacion != null ? '%' : ''}, ${p.noches_vendidas} ocupadas` }
+                })} />
+            )}
           </div>
         </div>
 
-        {/* Activity feed */}
+        {/* Actividad: los avisos más recientes (los mismos de la campana) */}
         <div className="activity-feed">
-          <div className="activity-feed__title">Actividad Reciente</div>
-          {ACTIVITY.map((item, i) => (
-            <div key={i} className="activity-item">
-              <div className={`activity-icon ${item.iconClass}`}>
-                <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>
-                  {item.icon}
-                </span>
-              </div>
-              <div>
-                <div className="activity-title">{item.title}</div>
-                <div className="activity-sub">{item.sub}</div>
-                <div className="activity-time">{item.time}</div>
-              </div>
-            </div>
-          ))}
+          <div className="activity-feed__title">Actividad reciente</div>
+          {actividad.length === 0 ? <p className={s.sinActividad}>Aún no hay actividad.</p> : (
+            <AnimatedList
+              items={actividad}
+              showGradients={false}
+              displayScrollbar={false}
+              maxHeight={520}
+              renderItem={item => (
+                <div className="activity-item">
+                  <div className={s.actIcono} style={{ background: `var(--flor-${item.flor})`, color: `var(--flor-${item.flor}-fg)` }}>
+                    <item.Icono size={18} weight="fill" aria-hidden="true" />
+                  </div>
+                  <div>
+                    <div className="activity-title">{item.titulo}</div>
+                    <div className="activity-sub">{item.texto}</div>
+                    <div className="activity-time">{haceCuanto(item.fecha)}</div>
+                  </div>
+                </div>
+              )}
+            />
+          )}
         </div>
       </div>
 
-      {/* Inventory health section */}
-      <div className="inventory-section">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '8px' }}>
-          <div>
-            <span className="admin-page-eyebrow" style={{ marginBottom: '8px' }}>Inventory Status</span>
-            <h2 className="admin-section-title" style={{ marginBottom: 0 }}>Resumen Operacional</h2>
-          </div>
-          <button className="btn-outline">Ver detalle completo</button>
-        </div>
+      {/* ── Cómo pagan los huéspedes ── */}
+      <FormasDePago />
 
-        <div className="inventory-grid">
-          {[
-            { icon: 'bed',             label: 'Habitaciones ocupadas', value: STATS.total - STATS.available, suffix: `/${STATS.total}`, sub: 'Ocupación 84% · Por encima del objetivo', color: 'var(--primary)' },
-            { icon: 'login',           label: 'Check-ins hoy',         value: 8,                             sub: 'Próximo: Ana Martínez · 3:00 PM',    color: 'var(--surface-tint)' },
-            { icon: 'logout',          label: 'Check-outs hoy',        value: 5,                             sub: 'Completados: 3 · Pendientes: 2',     color: 'var(--secondary)' },
-            { icon: 'construction',    label: 'En mantenimiento',      value: 1,                             sub: 'Suite Horizonte Azul · Listo 6 PM',  color: '#d97706' },
-          ].map((item, i) => (
-            <StatCard key={i} loading={loading} {...item} />
-          ))}
-        </div>
-      </div>
+      {MODULOS.restaurante && <SeccionRestaurante onNavigate={onNavigate} loading={loading} />}
     </div>
   )
 }

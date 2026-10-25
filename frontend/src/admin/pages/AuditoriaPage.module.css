@@ -1,0 +1,31 @@
+/* Auditoría forense. Solo tokens; los datos como texto (nunca HTML). */
+.verificacion { margin: 0 0 16px; padding: 12px 16px; border-radius: var(--radius-lg); font-size: var(--fs-sm); font-weight: 600; overflow-wrap: anywhere; }
+.integra { background: var(--accent); color: var(--accent-foreground); }
+.rota { background: var(--destructive); color: var(--destructive-foreground); }
+.filtros { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); margin-bottom: 16px; }
+.campo { display: grid; gap: 6px; }
+.fechas { display: flex; gap: 8px; }
+.lista { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.evento { border-radius: var(--radius-lg); background: var(--card); box-shadow: inset 0 0 0 1px var(--border); }
+.insignia { margin-left: 8px; vertical-align: middle; }
+.resumen {
+  display: flex; align-items: center; gap: 12px; width: 100%; min-height: 56px; padding: 10px 14px;
+  border: 0; background: transparent; text-align: left; cursor: pointer; color: var(--foreground);
+}
+.resumen:focus-visible { outline: 2px solid var(--ring); outline-offset: -2px; border-radius: var(--radius-lg); }
+.secuencia { font-family: var(--font-headline); font-size: var(--fs-sm); color: var(--muted-foreground); min-width: 4ch; }
+.texto { display: grid; flex: 1; min-width: 0; font-size: var(--fs-sm); }
+.texto span { font-size: var(--fs-xs); color: var(--muted-foreground); overflow-wrap: anywhere; }
+.girado { transform: rotate(180deg); }
+.detalle { display: grid; gap: 8px; margin: 0; padding: 0 14px 14px; }
+.detalle div { display: grid; gap: 2px; }
+.detalle dt { font-size: var(--fs-xs); color: var(--muted-foreground); }
+.detalle dd { margin: 0; font-size: var(--fs-xs); color: var(--foreground); overflow-wrap: anywhere; }
+.detalle pre { margin: 0; padding: 8px; border-radius: var(--radius-md); background: var(--muted); white-space: pre-wrap; word-break: break-word; font-size: var(--fs-xs); }
+.hash { font-family: ui-monospace, monospace; }
+.vacio {
+  display: grid; justify-items: center; gap: 10px; padding: 32px 16px; text-align: center;
+  border-radius: var(--radius-xl); background: var(--card); box-shadow: inset 0 0 0 1px var(--border);
+  font-size: var(--fs-sm); color: var(--muted-foreground);
+}
+.mas { display: flex; justify-content: center; margin-top: 16px; }

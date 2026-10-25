@@ -60,3 +60,9 @@
 @media (max-width: 768px) {
   .photoGrid { grid-template-columns: 1fr; gap: 20px; }
 }
+
+/* Dos campos lado a lado; en teléfono, uno debajo del otro */
+.twoCol { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+@media (max-width: 480px) {
+  .twoCol { grid-template-columns: 1fr; }
+}
