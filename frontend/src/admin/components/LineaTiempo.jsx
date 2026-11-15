@@ -13,7 +13,7 @@ import {
   AlertDialog, AlertDialogClose, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogPopup, AlertDialogTitle,
 } from '@/components/coss/alert-dialog'
 import { DropletButton } from '@/components/devl/droplet-button'
-import { Florecita } from '@/components/marca/Wordmark'
+import { CoronaFlores, Florecita } from '@/components/marca/Wordmark'
 import Pista, { GrupoPistas } from '@/admin/components/Pista'
 import { useParametros } from '@/hooks/useParametros'
 import Skeleton from '@/components/frida/Skeleton'
@@ -22,7 +22,7 @@ import { aISO, deISO } from '@/lib/fechas'
 import { fichaHabitacion } from '../habitaciones'
 import { ESTADOS, FUENTES, deFuera, useReservas, conflicto, hoy, sumarDias, dias, habitacionesConocidas } from '../reservas'
 import { useSesion } from '@/lib/sesion'
-import { florDeLugar } from '../propiedadActual'
+import { florDeLugar, usePropiedadActual } from '../propiedadActual'
 import DetalleReserva from './DetalleReserva'
 import s from './LineaTiempo.module.css'
 
@@ -73,7 +73,7 @@ const FILTROS = [
 ]
 const corto = d => d.toLocaleDateString('es-MX', { day: 'numeric', month: 'short' })
 
-export default function LineaTiempo({ onNuevaReserva }) {
+export default function LineaTiempo({ onNuevaReserva, onNuevaHabitacion }) {
   const { reduceMotion } = useTheme()
   // ?reserva=<id>: el detalle abierto también vive en la URL (recargar lo conserva).
   const [p, set] = useParametros({ escala: 'semana', desde: '', agrupar: 'propiedad', estado: 'todos', q: '', reserva: '' })
@@ -221,6 +221,9 @@ export default function LineaTiempo({ onNuevaReserva }) {
         <Button variant="outline" onClick={recargar}>Reintentar</Button>
       </div>
     )
+  }
+  if (!cargando && !habitaciones.length) {
+    return <SinHabitaciones sesion={sesion} onNuevaHabitacion={onNuevaHabitacion} />
   }
 
   return (
@@ -588,6 +591,32 @@ export default function LineaTiempo({ onNuevaReserva }) {
         </SheetPopup>
       </Sheet>
     </div>
+  )
+}
+
+/** Sin habitaciones no hay filas: en vez de una rejilla en blanco, qué pasa y qué hacer. */
+function SinHabitaciones({ sesion, onNuevaHabitacion }) {
+  const { propiedadId } = usePropiedadActual()
+  const propiedad = sesion?.propiedades?.find(p => p.id === propiedadId)
+  const puede = sesion?.permisos?.includes('habitaciones.editar')
+  return (
+    <section className={s.vacio} role="status" aria-labelledby="lt-vacio">
+      <CoronaFlores className={s.vacioCorona} />
+      <h2 id="lt-vacio" className={s.vacioTitulo}>
+        {propiedad ? `${propiedad.nombre} todavía no tiene habitaciones` : 'Todavía no hay habitaciones'}
+      </h2>
+      <p className={s.vacioTexto}>
+        La línea de tiempo muestra una fila por habitación. Cuando estén dadas de alta, aquí verás sus
+        reservas y podrás crear una nueva con un clic en el día.
+      </p>
+      {puede
+        ? onNuevaHabitacion && (
+          <DropletButton type="button" onClick={onNuevaHabitacion}>
+            <PlusIcon size={16} weight="bold" aria-hidden="true" /> Agregar habitación
+          </DropletButton>
+        )
+        : <p className={s.vacioTexto}>Pide a un gerente o al dueño que las dé de alta.</p>}
+    </section>
   )
 }
 

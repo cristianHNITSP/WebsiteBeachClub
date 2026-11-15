@@ -15,7 +15,10 @@ export default function CalendarPage({ onNavigate }) {
       </div>
       {/* Una reserva nueva desde el calendario sigue en el formulario completo (pago y abono),
           con la habitación, las fechas y el huésped ya puestos en la URL. */}
-      <LineaTiempo onNuevaReserva={datos => onNavigate('nueva-reserva', null, new URLSearchParams(datos).toString())} />
+      <LineaTiempo
+        onNuevaReserva={datos => onNavigate('nueva-reserva', null, new URLSearchParams(datos).toString())}
+        onNuevaHabitacion={() => onNavigate('nueva-habitacion')}
+      />
     </div>
   )
 }
