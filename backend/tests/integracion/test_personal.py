@@ -112,7 +112,7 @@ async def test_nunca_queda_sin_nadie_que_gestione(sesion):
         id=uuid.uuid7(),
         sid=uuid.uuid7(),
         rol="gerente",
-        permisos=frozenset({"usuarios.gestionar"}),
+        permisos=frozenset({"usuarios.gestionar", "personal.gerentes"}),
         propiedades=frozenset(),
         todas_las_propiedades=True,
     )
@@ -146,6 +146,7 @@ async def test_lista_roles_y_permisos(cliente, sesion):
     r = (await cliente.get(URL, params={"q": "buscable"})).json()
     assert [x["usuario"] for x in r["items"]] == ["buscable"]
     assert {x["clave"] for x in (await cliente.get(f"{URL}/roles")).json()} == {
+        "dueno",
         "gerente",
         "recepcion",
         "restaurante",
@@ -153,3 +154,64 @@ async def test_lista_roles_y_permisos(cliente, sesion):
     cliente.cookies.clear()
     await entrar_como(cliente, sesion, rol="recepcion", propiedades=["chelem"])
     assert (await cliente.get(URL)).status_code == 403
+
+
+# ── Dueño y gerentes (2026-11-15): el dueño ve las dos propiedades y la auditoría, y es el único
+# que da de alta o cambia a gerentes y dueños. El gerente ve solo las propiedades que se le asignan.
+
+
+async def test_gerente_ve_solo_sus_propiedades_y_no_la_auditoria(cliente, sesion):
+    await entrar_como(cliente, sesion, rol="gerente", propiedades=["chelem"])
+    yo = (await cliente.get("/api/auth/yo")).json()
+    assert [p["clave"] for p in yo["propiedades"]] == ["chelem"]
+    assert "auditoria.ver" not in yo["permisos"]
+    assert (await cliente.get("/api/admin/auditoria")).status_code == 403
+
+
+async def test_dueno_ve_todo_y_la_auditoria(cliente, sesion):
+    await entrar_como(cliente, sesion, rol="dueno")
+    yo = (await cliente.get("/api/auth/yo")).json()
+    assert {p["clave"] for p in yo["propiedades"]} == {"chelem", "chuburna"}
+    assert (await cliente.get("/api/admin/auditoria")).status_code == 200
+
+
+async def test_dueno_da_de_alta_a_un_gerente_de_una_sola_propiedad(cliente, sesion):
+    await entrar_como(cliente, sesion, rol="dueno")
+    r = await alta(cliente, sesion, rol="gerente")
+    assert r.status_code == 201, r.text
+    assert len(r.json()["propiedades"]) == 1
+
+
+async def test_gerente_no_da_de_alta_ni_toca_a_gerentes_ni_duenos(cliente, sesion):
+    await entrar_como(cliente, sesion, rol="gerente", propiedades=["chelem", "chuburna"])
+    for rol in ("gerente", "dueno"):
+        r = await alta(cliente, sesion, rol=rol, usuario=f"nuevo.{rol}", correo=f"{rol}@hotel.mx")
+        assert r.status_code == 403 and r.json()["codigo"] == "solo_dueno", r.text
+    otro = await crear_usuario(sesion, rol="gerente", propiedades=["chelem"])
+    chuburna = await propiedad(sesion, "chuburna")
+    cambio = {
+        "nombre": otro.nombre,
+        "correo": otro.correo,
+        "rol": "gerente",
+        "propiedades": [str(chuburna.id)],
+    }
+    r = await cliente.put(f"{URL}/{otro.id}", json=cambio, headers=csrf(cliente))
+    assert r.status_code == 403 and r.json()["codigo"] == "solo_dueno"
+    for accion in ("desactivar", "clave"):
+        cuerpo = {"clave_temporal": TEMPORAL} if accion == "clave" else None
+        r = await cliente.post(f"{URL}/{otro.id}/{accion}", json=cuerpo, headers=csrf(cliente))
+        assert r.status_code == 403 and r.json()["codigo"] == "solo_dueno", accion
+    recep = await crear_usuario(sesion, rol="recepcion", propiedades=["chelem"])
+    ascenso = {"nombre": recep.nombre, "correo": recep.correo, "rol": "gerente", "propiedades": []}
+    r = await cliente.put(f"{URL}/{recep.id}", json=ascenso, headers=csrf(cliente))
+    assert r.status_code == 403 and r.json()["codigo"] == "solo_dueno"
+
+
+async def test_gerente_si_gestiona_recepcion_de_sus_propiedades(cliente, sesion):
+    await entrar_como(cliente, sesion, rol="gerente", propiedades=["chelem"])
+    assert (await alta(cliente, sesion)).status_code == 201
+    chuburna = await propiedad(sesion, "chuburna")
+    ajena = await alta(
+        cliente, sesion, usuario="otra.pech", correo="otra@hotel.mx", propiedades=[str(chuburna.id)]
+    )
+    assert ajena.status_code == 404  # una propiedad que no es suya no existe para él

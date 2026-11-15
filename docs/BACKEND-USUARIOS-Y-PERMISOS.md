@@ -10,12 +10,13 @@ Un solo tipo de cuenta (`usuarios`) para todos. Lo que cambia es el **rol**:
 
 | Rol (`clave`) | Quién | Llega a | Ejemplos de lo que puede |
 |---|---|---|---|
-| `gerente` | Dueño o administrador | El panel | Todo: alta de personal, precios, ajustes (incluida la modalidad de cobro: anticipo o completo, `ajustes.cobro`), ver auditoría, sitios web y sus claves (`sitios.gestionar`) |
+| `dueno` | Dueño (2026-11-15, migración 0025) | El panel | Todo, en las dos propiedades (`propiedades.todas`): ver la auditoría (`auditoria.ver`) y es el único que da de alta o cambia a gerentes y dueños (`personal.gerentes`) |
+| `gerente` | Administrador de una o de las dos propiedades | El panel | Lo de su(s) propiedad(es) asignada(s): alta de recepción y restaurante (solo en sus propiedades), precios, ajustes (incluida la modalidad de cobro, `ajustes.cobro`), sitios web (`sitios.gestionar`). **Sin** auditoría, sin ver otras propiedades y sin tocar a gerentes ni dueños |
 | `recepcion` | Recepción | El panel | Reservas, Línea de tiempo, huéspedes, reservas externas |
 | `restaurante` | Personal del restaurante | El panel | Menú, tickets, estadísticas del restaurante |
 | `huesped` | **Apagado hoy** | (nada) | Sin cuentas de huésped mientras no haya website propia (`frontend/src/lib/producto.js`, `PLAN-BACKEND.md` §0). El rol se conserva para cuando se encienda: entonces llegaría a `/mi-cuenta` y vería solo sus reservas |
 
-- **El personal no se registra solo:** lo da de alta un gerente.
+- **El personal no se registra solo:** lo da de alta un gerente (recepción y restaurante, en sus propiedades) o un dueño (cualquiera). Siempre queda al menos un dueño activo (`ultimo_dueno`).
 - **Hoy no hay cuentas de huésped:** reserva desde la website externa (WordPress o Shopify) y consulta o cancela su reserva con el enlace de su correo de confirmación (`PLAN-BACKEND.md` §4.3, §11). Si algún día se encienden, se registraría solo o entraría con Google o con un enlace por correo.
 - **Los roles NO son niveles.** `restaurante` no está «por debajo» de `recepcion`: ven cosas distintas. Por eso se protege por **permisos**, no por «nivel mínimo».
   - *En SIMDES los roles sí eran niveles (consulta 10 < investigador 50 < admin 80) porque cada rol hacía lo mismo que el de abajo y algo más. Aquí no pasa, y forzarlo en niveles acabaría dándole el restaurante a recepción.*

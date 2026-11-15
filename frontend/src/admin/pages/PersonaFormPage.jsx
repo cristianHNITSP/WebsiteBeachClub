@@ -146,7 +146,7 @@ function Formulario({ persona, roles, onBack, onDirtyChange, onAlta }) {
           <div className={s.campo}>
             <span className="text-sm font-medium" id="p-rol">Rol</span>
             <Selector ariaLabel="Rol" value={form.rol} onChange={v => setForm(f => ({ ...f, rol: v }))}
-              opciones={opcionesDeRol(roles)} />
+              opciones={opcionesDeRol(roles, sesion)} />
             {rolElegido && (
               <span className={s.ayuda}>
                 {rolElegido.permisos.length

@@ -96,7 +96,7 @@ def reemplazar_cookie(cliente, nombre: str, valor: str, ruta: str) -> None:
     cliente.cookies.set(nombre, valor, domain=dominio, path=ruta)
 
 
-async def entrar_como(cliente, sesion, rol="gerente", propiedades=()):
+async def entrar_como(cliente, sesion, rol="dueno", propiedades=()):
     """Crea a alguien del personal y deja al cliente con su sesión (cookies). Devuelve el usuario."""
     from tests.fabricas import CLAVE, crear_usuario
 

@@ -20,7 +20,7 @@ def _hash(clave: str) -> str:
 
 
 async def crear_usuario(
-    sesion, *, rol="gerente", propiedades=(), clave=CLAVE, activo=True, usuario=None
+    sesion, *, rol="dueno", propiedades=(), clave=CLAVE, activo=True, usuario=None
 ) -> Usuario:
     n = next(_n)
     rol_obj = (await sesion.execute(select(Rol).where(Rol.clave == rol))).scalar_one()

@@ -18,7 +18,7 @@ import Pista, { GrupoPistas } from '@/admin/components/Pista'
 import { useParametros } from '@/hooks/useParametros'
 import { usePedido } from '@/hooks/usePedido'
 import { useSesion } from '@/lib/sesion'
-import { personalApi, claveTemporal, opcionesDeRol, rolProximamente } from '../personal'
+import { personalApi, claveTemporal, opcionesDeRol, puedeTocarRol, rolProximamente } from '../personal'
 import s from './UsersPage.module.css'
 
 /*
@@ -198,7 +198,8 @@ export default function UsersPage({ onNavigate }) {
               <div className={s.sub}>{p.todas_las_propiedades ? 'Todas las propiedades' : p.propiedades.length ? p.propiedades.map(nombreProp).join(', ') : 'Sin propiedades'}</div>
               <div className={s.pie}>
                 <span className={s.sub}>Último acceso: {fecha(p.ultimo_acceso)}</span>
-                {gestiona && (
+                {/* A gerentes y dueños solo los cambia un dueño (la API lo exige igual). */}
+                {gestiona && puedeTocarRol(sesion, p.rol, roles.datos) && (
                   <div className={s.acciones}>
                     <Pista contenido="Editar">
                       <Button variant="outline" size="icon" aria-label={`Editar a ${p.nombre}`} onClick={() => onNavigate('editar-persona', p)}><PencilSimpleIcon size={16} weight="bold" /></Button>

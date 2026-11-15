@@ -95,7 +95,8 @@ def sembrar_desarrollo() -> None:
     if not obtener_config().es_desarrollo:
         _salir("sembrar-desarrollo solo corre con ENTORNO=desarrollo")
     for usuario, correo, nombre, rol, props in [
-        ("gerente", "gerente@hotelesfrida.mx", "Gerente General", "gerente", []),
+        ("dueno", "dueno@hotelesfrida.mx", "Dueña de Frida", "dueno", []),
+        ("gerente", "gerente@hotelesfrida.mx", "Gerente de Cabañas Frida", "gerente", ["chelem"]),
         ("recepcion", "recepcion@hotelesfrida.mx", "Lucía Pech", "recepcion", ["chelem"]),
     ]:
         with SesionSincrona() as s:
@@ -144,7 +145,7 @@ def _sembrar_habitaciones() -> None:
             if (props[clave], nombre) not in existentes
         ]  # fmt: skip
         s.add_all(nuevas)
-    print(f"✓ {len(nuevas)} habitaciones de prueba creadas (inventario interno de ejemplo)")
+    print(f"✓ {len(nuevas)} habitaciones creadas (las que ya existían no se tocan)")
 
 
 HUESPEDES_DESARROLLO = [
@@ -402,11 +403,15 @@ def main() -> None:
     c.add_argument("--usuario", required=True)
     c.add_argument("--correo", required=True)
     c.add_argument("--nombre", required=True)
-    c.add_argument("--rol", required=True, choices=["gerente", "recepcion", "restaurante"])
+    c.add_argument("--rol", required=True, choices=["dueno", "gerente", "recepcion", "restaurante"])
     c.add_argument(
-        "--propiedades", default="", help="claves separadas por coma (chelem,chuburna); el gerente ve todas"
+        "--propiedades", default="", help="claves separadas por coma (chelem,chuburna); el dueño ve todas"
     )
     sub.add_parser("sembrar-desarrollo", help="Cuentas de prueba (solo desarrollo)")
+    sub.add_parser(
+        "habitaciones-iniciales",
+        help="Da de alta el inventario de Cabañas Frida y Casa Frida (solo las que falten; nunca borra)",
+    )
     sub.add_parser(
         "fichas-iniciales", help="Da de alta los enlaces de las fichas del hotel en otras plataformas"
     )
@@ -420,6 +425,8 @@ def main() -> None:
         crear_usuario(args.usuario, args.correo, args.nombre, args.rol, props, _pedir_clave())
     elif args.comando == "recalcular-metricas":
         recalcular_metricas()
+    elif args.comando == "habitaciones-iniciales":
+        _sembrar_habitaciones()
     elif args.comando == "fichas-iniciales":
         fichas_iniciales()
     elif args.comando == "particiones":

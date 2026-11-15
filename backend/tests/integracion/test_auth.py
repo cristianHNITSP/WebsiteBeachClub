@@ -18,11 +18,11 @@ async def entrar(cliente, identificador, clave=CLAVE, recordar=False):
 
 
 async def test_entrar_devuelve_sesion_y_pone_cookies_seguras(cliente, sesion):
-    u = await crear_usuario(sesion, rol="gerente")
+    u = await crear_usuario(sesion, rol="dueno")
     r = await entrar(cliente, u.usuario)
     assert r.status_code == 200, r.text
     cuerpo = r.json()
-    assert cuerpo["rol"] == "gerente" and cuerpo["todas_las_propiedades"] is True
+    assert cuerpo["rol"] == "dueno" and cuerpo["todas_las_propiedades"] is True
     assert {p["clave"] for p in cuerpo["propiedades"]} == {"chelem", "chuburna"}
     galletas = r.headers.get_list("set-cookie")
     acceso = next(c for c in galletas if c.startswith("frida_acceso="))

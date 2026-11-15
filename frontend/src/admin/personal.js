@@ -42,7 +42,15 @@ export function claveTemporal() {
  *  puede asignar. Al encender el módulo, se habilita solo. */
 export const rolProximamente = clave => clave === 'restaurante' && !MODULOS.restaurante
 
-/** Opciones de rol para un Selector: los de módulo apagado, atenuados. */
-export const opcionesDeRol = roles => roles.map(r => (
-  rolProximamente(r.clave) ? { value: r.clave, label: r.nombre, tag: 'Próximamente', disabled: true } : { value: r.clave, label: r.nombre }
+/** Gerentes y dueños (roles que gestionan al personal) solo los da de alta o los cambia un dueño. */
+const esDeGestion = rol => rol?.permisos?.some(p => p.clave === 'usuarios.gestionar')
+export const puedeTocarRol = (sesion, clave, roles) =>
+  !!sesion?.permisos?.includes('personal.gerentes') || !esDeGestion(roles?.find(r => r.clave === clave))
+
+/** Opciones de rol para un Selector: los de módulo apagado, atenuados. Con `sesion` (al asignar un
+ *  rol), gerente y dueño quedan atenuados para quien no es dueño. */
+export const opcionesDeRol = (roles, sesion) => roles.map(r => (
+  rolProximamente(r.clave) ? { value: r.clave, label: r.nombre, tag: 'Próximamente', disabled: true }
+    : sesion && !puedeTocarRol(sesion, r.clave, roles) ? { value: r.clave, label: r.nombre, tag: 'Solo el dueño', disabled: true }
+      : { value: r.clave, label: r.nombre }
 ))

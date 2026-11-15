@@ -15,6 +15,9 @@ ROLES = [
     {"id": 2, "clave": "recepcion", "nombre": "Recepción", "es_personal": True},
     {"id": 3, "clave": "restaurante", "nombre": "Restaurante", "es_personal": True},
     {"id": 4, "clave": "huesped", "nombre": "Huésped", "es_personal": False},
+    # 2026-11-15 (migración 0025): ve las dos propiedades y la auditoría, y es el único que
+    # gestiona a gerentes y dueños. El gerente ve solo las propiedades que se le asignan.
+    {"id": 5, "clave": "dueno", "nombre": "Dueño", "es_personal": True},
 ]
 
 PERMISOS = [
@@ -86,10 +89,20 @@ PERMISOS = [
         "modulo": "sitios",
         "descripcion": "Sitios web, claves y webhooks",
     },
+    {
+        "id": 19,
+        "clave": "personal.gerentes",
+        "modulo": "usuarios",
+        "descripcion": "Dar de alta y cambiar a gerentes y dueños",
+    },
 ]
 
+# Lo que solo tiene el dueño: ver todas las propiedades, la auditoría y gestionar a gerentes y dueños.
+SOLO_DUENO = ("propiedades.todas", "auditoria.ver", "personal.gerentes")
+
 PERMISOS_POR_ROL = {
-    "gerente": [p["clave"] for p in PERMISOS],
+    "dueno": [p["clave"] for p in PERMISOS],
+    "gerente": [p["clave"] for p in PERMISOS if p["clave"] not in SOLO_DUENO],
     "recepcion": [
         "reservas.ver",
         "reservas.crear",

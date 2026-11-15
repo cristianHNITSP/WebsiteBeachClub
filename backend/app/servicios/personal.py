@@ -6,7 +6,9 @@
 - Cambiar rol o propiedades cierra sus sesiones: los permisos nuevos rigen ya,
   no cuando venza su token (15 min).
 - Nadie se desactiva ni se cambia el rol a sí mismo, y siempre queda al menos
-  una persona activa que pueda gestionar al personal.
+  una persona activa que pueda gestionar al personal (y un dueño).
+- Gerentes y dueños solo los da de alta o los cambia un dueño (`personal.gerentes`): un
+  gerente gestiona a recepción y restaurante, y solo en sus propiedades.
 """
 
 from uuid import UUID
@@ -18,7 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.claves import hasher, problema_de_clave
 from app.auth.dependencias import Actor
-from app.errores import Conflicto, NoEncontrado, ReglaDeNegocio
+from app.errores import Conflicto, NoEncontrado, ReglaDeNegocio, SinPermiso
 from app.esquemas.personal import PersonaCambios, PersonaNueva
 from app.modelos import Rol, Usuario
 from app.repositorios import usuarios as repo
@@ -26,6 +28,13 @@ from app.servicios.auditoria import auditar
 from app.servicios.auth import revocar_sesiones
 
 GESTIONA = "usuarios.gestionar"
+GERENTES = "personal.gerentes"
+
+
+def _solo_dueno(actor: Actor, *roles: Rol) -> None:
+    """Un rol que gestiona al personal (gerente, dueño) solo lo da o lo cambia un dueño."""
+    if GERENTES not in actor.permisos and any(p.clave == GESTIONA for r in roles for p in r.permisos):
+        raise SinPermiso("Solo un dueño da de alta o cambia a gerentes y dueños", codigo="solo_dueno")
 
 
 def a_salida(u: Usuario) -> dict:
@@ -101,6 +110,14 @@ async def _seguira_habiendo_gestor(sesion: AsyncSession, u: Usuario) -> None:
             "Es la única persona activa que puede gestionar al personal. Da de alta a otra antes.",
             codigo="ultimo_gestor",
         )
+    if (
+        any(p.clave == GERENTES for p in u.rol.permisos)
+        and u.activo
+        and await repo.gerentes_activos(sesion, GERENTES) <= 1
+    ):
+        raise ReglaDeNegocio(
+            "Es el único dueño activo. Da de alta a otro dueño antes.", codigo="ultimo_dueno"
+        )
 
 
 async def listar(sesion, **filtros):
@@ -117,6 +134,7 @@ async def roles(sesion):
 
 async def crear(sesion: AsyncSession, actor: Actor, datos: PersonaNueva) -> Usuario:
     rol = await _rol(sesion, datos.rol)
+    _solo_dueno(actor, rol)
     props = await _propiedades(sesion, actor, datos.propiedades)
     correo = str(datos.correo).lower()
     u = Usuario(
@@ -145,6 +163,7 @@ async def editar(sesion: AsyncSession, actor: Actor, usuario_id: UUID, datos: Pe
     u = await _cargar(sesion, usuario_id)
     antes = _foto(u)
     rol = await _rol(sesion, datos.rol)
+    _solo_dueno(actor, u.rol, rol)
     props = await _propiedades(sesion, actor, datos.propiedades)
     cambia_acceso = rol.id != u.rol_id or {p.id for p in props} != {p.id for p in u.propiedades}
     if rol.id != u.rol_id:
@@ -182,6 +201,7 @@ async def desactivar(sesion: AsyncSession, actor: Actor, usuario_id: UUID) -> Us
     u = await _cargar(sesion, usuario_id)
     if u.id == actor.id:
         raise ReglaDeNegocio("No puedes darte de baja a ti mismo", codigo="propio")
+    _solo_dueno(actor, u.rol)
     if not u.activo:
         return u
     await _seguira_habiendo_gestor(sesion, u)
@@ -200,6 +220,7 @@ async def desactivar(sesion: AsyncSession, actor: Actor, usuario_id: UUID) -> Us
 
 async def reactivar(sesion: AsyncSession, actor: Actor, usuario_id: UUID) -> Usuario:
     u = await _cargar(sesion, usuario_id)
+    _solo_dueno(actor, u.rol)
     if not u.activo:
         u.activo = True
         await sesion.flush()
@@ -212,6 +233,7 @@ async def restablecer_clave(sesion: AsyncSession, actor: Actor, usuario_id: UUID
     u = await _cargar(sesion, usuario_id)
     if u.id == actor.id:
         raise ReglaDeNegocio("Para tu propia contraseña usa Configuración, Seguridad", codigo="propio")
+    _solo_dueno(actor, u.rol)
     u.hash_clave, u.debe_cambiar_clave = _clave(clave, u.usuario, u.correo), True
     cerradas = await revocar_sesiones(sesion, u.id, None)
     await sesion.flush()

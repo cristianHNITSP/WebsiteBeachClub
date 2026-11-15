@@ -73,12 +73,13 @@ async def propiedades_por_ids(sesion: AsyncSession, ids: list[UUID]) -> list[Pro
     return list((await sesion.execute(select(Propiedad).where(Propiedad.id.in_(ids)))).scalars())
 
 
-async def gerentes_activos(sesion: AsyncSession) -> int:
-    """Cuántas personas activas tienen la gestión del personal (para no quedarse sin ninguna)."""
+async def gerentes_activos(sesion: AsyncSession, permiso: str = "usuarios.gestionar") -> int:
+    """Cuántas personas activas tienen ese permiso (gestión del personal o de gerentes): para no
+    quedarse sin ninguna."""
     consulta = (
         select(func.count(Usuario.id.distinct()))
         .join(Usuario.rol)
         .join(Rol.permisos)
-        .where(Usuario.activo.is_(True), Permiso.clave == "usuarios.gestionar")
+        .where(Usuario.activo.is_(True), Permiso.clave == permiso)
     )
     return (await sesion.execute(consulta)).scalar_one()

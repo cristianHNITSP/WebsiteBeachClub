@@ -249,7 +249,7 @@ async def test_la_base_exige_papelera_antes_del_definitivo(cliente, sesion):
 
 async def test_venta_en_linea_va_apagada_y_se_edita(cliente, sesion):
     p = await propiedad(sesion, "chelem")
-    await entrar_como(cliente, sesion, "gerente")
+    await entrar_como(cliente, sesion, "dueno")
     h = await crear(cliente, p.id)
     assert h["venta_en_linea"] is False
     cambio = datos(p.id, venta_en_linea=True, version=h["version"])

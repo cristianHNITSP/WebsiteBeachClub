@@ -18,12 +18,13 @@ $DEV api uv run alembic upgrade head
 
 ### Cuentas de prueba (solo desarrollo)
 
-`$DEV api python -m app.cli sembrar-desarrollo` crea habitaciones, reservas y estas dos cuentas. Se entra
+`$DEV api python -m app.cli sembrar-desarrollo` crea habitaciones, reservas y estas tres cuentas. Se entra
 en <http://localhost:5176/entrar> (el login ya no las muestra: se escriben a mano).
 
 | Usuario | Contraseña | Qué ve |
 |---|---|---|
-| `gerente` | `frida-panel-2026` | Las dos propiedades y todos los permisos (Personal, Auditoría, Sitios web, Otras plataformas…) |
+| `dueno` | `frida-panel-2026` | Las dos propiedades y todos los permisos (Personal, gerentes incluidos, Auditoría, Sitios web, Otras plataformas…) |
+| `gerente` | `frida-panel-2026` | Solo Cabañas Frida (Chelem); gestiona recepción y restaurante de su propiedad, sin Auditoría |
 | `recepcion` | `frida-panel-2026` | Solo Cabañas Frida (Chelem), sin configurar nada |
 
 Nunca existen en producción: ahí el primer gerente se crea con `python -m app.cli crear-usuario`
