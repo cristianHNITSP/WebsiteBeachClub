@@ -1,0 +1,36 @@
+# Reservas Frida: panel interno del personal, no un sitio público.
+# Ningún buscador lo indexa: además de esto, cada página lleva "noindex" (meta y cabecera X-Robots-Tag).
+
+# Vistas previas al pegar un enlace (WhatsApp, Facebook, Telegram, X, LinkedIn, Slack, Discord):
+# pueden leer las páginas para armar la tarjeta, nunca la API ni las fotos de las habitaciones.
+User-agent: facebookexternalhit
+User-agent: Facebot
+User-agent: WhatsApp
+User-agent: TelegramBot
+User-agent: Twitterbot
+User-agent: LinkedInBot
+User-agent: Slackbot-LinkExpanding
+User-agent: Discordbot
+Allow: /
+Disallow: /api/
+Disallow: /media/
+
+# Rastreadores que juntan contenido para entrenar modelos de IA: nada.
+User-agent: GPTBot
+User-agent: ClaudeBot
+User-agent: anthropic-ai
+User-agent: Google-Extended
+User-agent: CCBot
+User-agent: Bytespider
+User-agent: PerplexityBot
+User-agent: Applebot-Extended
+User-agent: meta-externalagent
+User-agent: Amazonbot
+Disallow: /
+
+# Todos los demás (buscadores incluidos): solo la portada y la entrada; ni el panel, ni la API, ni las fotos.
+User-agent: *
+Allow: /$
+Allow: /entrar
+Allow: /og-reservas-frida.png
+Disallow: /

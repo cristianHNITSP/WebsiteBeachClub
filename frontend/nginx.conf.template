@@ -46,6 +46,13 @@ server {
     add_header X-Content-Type-Options    "nosniff" always;
     add_header X-Frame-Options           "DENY" always;
     add_header Referrer-Policy           "strict-origin-when-cross-origin" always;
+    # Panel interno: ningún buscador lo indexa (junto con robots.txt y la meta de index.html).
+    add_header X-Robots-Tag              "noindex, nofollow" always;
+
+    # La vista previa de WhatsApp y compañía pide direcciones absolutas: index.html trae __ORIGEN__
+    # y aquí se cambia por el dominio real (sub_filter solo toca text/html: JSON, JS y CSS no).
+    sub_filter      '__ORIGEN__' 'https://${BEACHCLUB_DOMINIO}';
+    sub_filter_once off;
 
     gzip on;
     gzip_types text/css application/javascript application/json image/svg+xml;
