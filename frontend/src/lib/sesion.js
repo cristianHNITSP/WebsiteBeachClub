@@ -10,8 +10,10 @@ import { api, siSePierdeLaSesion } from './api'
  * desde que se inicia (absoluto); "Mantener la sesión iniciada" solo decide si
  * sobrevive a cerrar el navegador.
  */
-export const ROLES_PERSONAL = ['gerente', 'recepcion', 'restaurante']
-export const esPersonal = sesion => ROLES_PERSONAL.includes(sesion?.rol)
+// ¿Es del personal? Lo dice la base (roles.es_personal), que la API manda en la sesión: aquí no
+// hay lista de roles. Con una lista fija, el rol `dueno` (2026-11-15) caía como huésped y acababa
+// en /mi-cuenta. Un rol nuevo funciona solo con darlo de alta en la base.
+export const esPersonal = sesion => sesion?.es_personal === true
 
 // Estado: 'verificando' hasta que la API responde quién es; entonces lista.
 // Ninguna pantalla protegida se monta antes (ver RutaProtegida).

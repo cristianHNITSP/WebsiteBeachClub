@@ -23,6 +23,8 @@ async def test_entrar_devuelve_sesion_y_pone_cookies_seguras(cliente, sesion):
     assert r.status_code == 200, r.text
     cuerpo = r.json()
     assert cuerpo["rol"] == "dueno" and cuerpo["todas_las_propiedades"] is True
+    # El panel decide "es del personal" con este dato de la base, sin listas de roles en el frontend.
+    assert cuerpo["es_personal"] is True
     assert {p["clave"] for p in cuerpo["propiedades"]} == {"chelem", "chuburna"}
     galletas = r.headers.get_list("set-cookie")
     acceso = next(c for c in galletas if c.startswith("frida_acceso="))

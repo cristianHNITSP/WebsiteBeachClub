@@ -30,6 +30,7 @@ class SesionSalida(Salida):
     nombre: str
     correo: str
     rol: str
+    es_personal: bool  # del rol en la base (roles.es_personal): el panel no lleva lista de roles
     permisos: list[str]
     propiedades: list[PropiedadSalida]  # a las que tiene acceso (todas, si tiene `propiedades.todas`)
     todas_las_propiedades: bool
