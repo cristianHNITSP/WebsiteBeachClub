@@ -44,6 +44,9 @@ jobs:
             BRAVE_SEARCH_CLAVE=${{ secrets.BRAVE_SEARCH_CLAVE }}
             ENVEOF
             chmod 600 .env
+            # Solo el .env es privado: con umask 077 cada archivo nuevo del repo nacía 600 y Nginx
+            # (otro usuario dentro del contenedor) respondía 403 (pasó con robots.txt).
+            umask 022
 
             git fetch origin
             git reset --hard origin/main

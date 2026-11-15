@@ -25,3 +25,5 @@ FROM nginx:1.31-alpine AS prod
 ENV NGINX_ENVSUBST_FILTER=^BEACHCLUB_
 COPY nginx.conf.template /etc/nginx/templates/default.conf.template
 COPY --from=build /app/dist /usr/share/nginx/html
+# Legible para Nginx sin importar con qué permisos quedó el código en el servidor (umask del despliegue).
+RUN chmod -R a+rX /usr/share/nginx/html
