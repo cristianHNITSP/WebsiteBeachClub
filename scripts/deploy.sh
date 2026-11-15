@@ -159,7 +159,13 @@ comprobar "/admin"               200 "Las rutas del router caen en index.html"
 comprobar "/api/health"          200 "La API responde"
 comprobar "/api/health/listo"    200 "La API alcanza la base y Redis"
 comprobar "/api/auth/yo"         401 "El panel pide sesión"
-comprobar "/api/v1/habitaciones" 401 "La API pública pide la clave del sitio"
+# La API pública solo existe con API_PUBLICA_ACTIVA=true (fija en docker-compose.yml; hoy la website
+# está apagada, PLAN-BACKEND §4): encendida pide la clave del sitio (401); apagada no se monta (404).
+if "${COMPOSE[@]}" config | grep -Eq 'API_PUBLICA_ACTIVA: "?true'; then
+    comprobar "/api/v1/habitaciones" 401 "La API pública pide la clave del sitio"
+else
+    comprobar "/api/v1/habitaciones" 404 "La API pública está apagada"
+fi
 (( fallos == 0 )) || revertir
 
 docker image prune -f >/dev/null   # las imágenes colgadas de builds viejos
