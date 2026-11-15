@@ -3,7 +3,7 @@
 from app.modelos.auditoria import Auditoria
 from app.modelos.avisos import Aviso, AvisoUsuario
 from app.modelos.base import Base, ConBorradoLogico
-from app.modelos.externas import AjustesBot, CalendarioExterno, MencionExterna, ReservaExterna
+from app.modelos.externas import AjustesBot, CalendarioExterno, FichaExterna, MencionExterna, ReservaExterna
 from app.modelos.fotos import Foto
 from app.modelos.habitaciones import Habitacion
 from app.modelos.metricas import MetricaDiaria
@@ -24,6 +24,7 @@ __all__ = [
     "ClaveIdempotencia",
     "ConBorradoLogico",
     "EntregaWebhook",
+    "FichaExterna",
     "Foto",
     "Habitacion",
     "MencionExterna",

@@ -1,9 +1,9 @@
 import { useState } from 'react'
-import { toast } from 'sonner'
+import { toast } from '@/admin/toast'
 import { DesktopIcon, DeviceMobileIcon, XIcon } from '@phosphor-icons/react'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
+import { Button } from '@/components/coss/button'
+import { Input } from '@/components/coss/input'
+import { Label } from '@/components/coss/label'
 import { SkeletonCard } from '@/components/frida/Skeleton'
 import { usePedido } from '@/hooks/usePedido'
 import { refrescarSesion, useSesion } from '@/lib/sesion'
@@ -69,16 +69,16 @@ function CambiarClave() {
       <p className={s.ayuda}>Al menos 12 caracteres. Una frase larga es más segura que símbolos raros.</p>
       <div className={s.campo}>
         <Label htmlFor="c-actual">Contraseña actual</Label>
-        <Input id="c-actual" type="password" required autoComplete="current-password" maxLength={256} value={form.actual} onChange={set('actual')} className="h-11" />
+        <Input id="c-actual" type="password" required autoComplete="current-password" maxLength={256} value={form.actual} onChange={set('actual')} size="lg" />
       </div>
       <div className={s.campo}>
         <Label htmlFor="c-nueva">Contraseña nueva</Label>
-        <Input id="c-nueva" type="password" required minLength={12} autoComplete="new-password" maxLength={256} value={form.nueva} onChange={set('nueva')} className="h-11" />
+        <Input id="c-nueva" type="password" required minLength={12} autoComplete="new-password" maxLength={256} value={form.nueva} onChange={set('nueva')} size="lg" />
       </div>
       <div className={s.campo}>
         <Label htmlFor="c-repetir">Repite la nueva</Label>
         <Input id="c-repetir" type="password" required autoComplete="new-password" maxLength={256} value={form.repetir} onChange={set('repetir')}
-          aria-invalid={distintas || undefined} className="h-11" />
+          aria-invalid={distintas || undefined} size="lg" />
         {distintas && <span className={s.error}>No coincide con la nueva.</span>}
       </div>
       {error && <p className={s.error} role="alert">{error}</p>}

@@ -10,13 +10,13 @@ from pydantic import SecretStr
 from sqlalchemy import select
 
 from app import red
-from app.modelos import AjustesBot, Auditoria, Aviso, MencionExterna, ReservaExterna
+from app.modelos import AjustesBot, Auditoria, Aviso, FichaExterna, MencionExterna, ReservaExterna
 from app.servicios import bot, externas
 from app.servicios.externas import ArchivoInvalido, Evento, leer_csv, leer_ical
 from app.servicios.reservas import hoy
 from app.tareas.outbox import despachar
 from tests.conftest import csrf, entrar_como
-from tests.fabricas import crear_habitacion, propiedad
+from tests.fabricas import abrir_alcance, crear_habitacion, propiedad
 
 
 def _ical(*eventos: str) -> bytes:
@@ -36,6 +36,21 @@ def _vevento(uid, inicio, fin=None, resumen="Reserved", estado=None):
 
 
 D = hoy() + timedelta(days=20)
+
+PUBLICA = [
+    {"nombre": "Cabaña estándar", "m2": 20, "camas": "2 camas Queen", "capacidad_maxima": 4},
+    {"nombre": "Cabaña estándar", "m2": 20, "camas": "1 cama King", "capacidad_maxima": 2},
+]
+
+
+async def una_ficha(sesion, canal="airbnb", url="https://www.airbnb.mx/rooms/1"):
+    """Una ficha de plataforma con lo que publica (las plataformas son aparte del motor)."""
+    await abrir_alcance(sesion)
+    p = await propiedad(sesion, "chelem")
+    f = FichaExterna(propiedad_id=p.id, canal=canal, url=url, estado="leida", cuartos=PUBLICA)
+    sesion.add(f)
+    await sesion.flush()
+    return f
 
 
 def test_leer_ical():
@@ -75,94 +90,68 @@ def test_leer_csv_de_booking_en_ingles_y_espanol():
 
 
 async def test_guardar_es_idempotente_y_cancela_lo_que_desaparece(sesion):
-    h = await crear_habitacion(sesion, "chelem", nombre="Ext iCal")
     from app.modelos import CalendarioExterno
 
+    f = await una_ficha(sesion)
     cal = CalendarioExterno(
-        propiedad_id=h.propiedad_id,
-        habitacion_id=h.id,
-        canal="airbnb",
+        propiedad_id=f.propiedad_id, ficha_id=f.id, publicacion="Cabaña estándar, 20 m²", canal="airbnb",
         url="https://www.airbnb.mx/calendar/ical/1.ics?s=x",
-    )
+    )  # fmt: skip
     sesion.add(cal)
     await sesion.flush()
 
     def guardar(eventos):
         return lambda s: externas.guardar(
-            s, propiedad_id=h.propiedad_id, habitacion_id=h.id, canal="airbnb", origen="ical",
-            eventos=eventos,
+            s, propiedad_id=f.propiedad_id, canal="airbnb", origen="ical", eventos=eventos,
             calendario_id=cal.id,
         )  # fmt: skip
 
     uno = Evento("x1@airbnb", D, D + timedelta(days=2), "Reserved")
     dos = Evento("x2@airbnb", D + timedelta(days=4), D + timedelta(days=6), "Reserved")
     assert (await sesion.run_sync(guardar([uno, dos])))["nuevas"] == 2
-    assert await sesion.run_sync(guardar([uno, dos])) == {
-        "nuevas": 0,
-        "cambiadas": 0,
-        "canceladas": 0,
-        "choques": 0,
-    }
+    assert await sesion.run_sync(guardar([uno, dos])) == {"nuevas": 0, "cambiadas": 0, "canceladas": 0}
     movida = Evento("x1@airbnb", D + timedelta(days=1), D + timedelta(days=3), "Reserved")
     cuenta = await sesion.run_sync(guardar([movida]))  # x2 ya no viene: se canceló en Airbnb
     assert cuenta["cambiadas"] == 1 and cuenta["canceladas"] == 1
     filas = {
         x.uid_externo: x
-        for x in await sesion.scalars(select(ReservaExterna).where(ReservaExterna.habitacion_id == h.id))
+        for x in await sesion.scalars(select(ReservaExterna).where(ReservaExterna.calendario_id == cal.id))
     }
     assert filas["x1@airbnb"].llegada == D + timedelta(days=1) and filas["x2@airbnb"].estado == "cancelada"
     assert len(filas) == 2  # UNIQUE (canal, uid): releer nunca duplica
 
 
-async def test_choque_con_reserva_propia_avisa_en_los_dos_sentidos(cliente, sesion):
+async def test_lo_de_las_plataformas_no_toca_las_reservas_del_motor(cliente, sesion):
+    """Plataformas y motor van separados (no son espejo): una reserva de fuera sobre una propia no
+    avisa de «doble venta» ni cambia nada del motor; y al revés, crear una propia tampoco."""
     await entrar_como(cliente, sesion)
-    h = await crear_habitacion(sesion, "chelem", nombre="Ext Choque")
+    h = await crear_habitacion(sesion, "chelem", nombre="Ext Separada")
     r = await cliente.post(
         "/api/admin/reservas",
         json={"habitacion_id": str(h.id), "llegada": str(D), "salida": str(D + timedelta(days=3)),
-              "adultos": 1,
-              "huesped_nombre": "Propia"},
+              "adultos": 1, "huesped_nombre": "Propia"},
         headers=csrf(cliente),
     )  # fmt: skip
     assert r.status_code == 201, r.text
-    # 1) Llega una de Airbnb sobre la propia.
-    ev = Evento("choque@airbnb", D + timedelta(days=1), D + timedelta(days=2), "Reserved")
+    ev = Evento("encima@airbnb", D + timedelta(days=1), D + timedelta(days=2), "Reserved")
     cuenta = await sesion.run_sync(
-        lambda s: externas.guardar(
-            s, propiedad_id=h.propiedad_id, habitacion_id=h.id, canal="airbnb", origen="ical", eventos=[ev]
-        )
+        lambda s: externas.guardar(s, propiedad_id=h.propiedad_id, canal="airbnb", origen="csv", eventos=[ev])
     )
-    assert cuenta["choques"] == 1
-    avisos = list(await sesion.scalars(select(Aviso).where(Aviso.titulo == "Posible doble venta")))
-    assert len(avisos) == 1 and r.json()["codigo"] in avisos[0].texto
-    # 2) Al revés: una externa ya guardada y DESPUÉS una propia encima (lo avisa el
-    #    despachador del outbox al procesar `reserva.creada`).
-    ev2 = Evento("antes@booking", D + timedelta(days=11), D + timedelta(days=13), "CLOSED")
-    await sesion.run_sync(
-        lambda s: externas.guardar(
-            s, propiedad_id=h.propiedad_id, habitacion_id=h.id, canal="booking", origen="csv", eventos=[ev2]
-        )
-    )
-    r2 = await cliente.post(
-        "/api/admin/reservas",
-        json={"habitacion_id": str(h.id), "llegada": str(D + timedelta(days=10)),
-              "salida": str(D + timedelta(days=12)), "adultos": 1, "huesped_nombre": "Segunda"},
-        headers=csrf(cliente),
-    )  # fmt: skip
-    assert r2.status_code == 201, r2.text  # la venta NO se bloquea: solo se avisa
+    assert cuenta == {"nuevas": 1, "cambiadas": 0, "canceladas": 0}
     await sesion.run_sync(despachar)
-    assert await sesion.scalar(select(Aviso).where(Aviso.texto.contains(r2.json()["codigo"]))) is not None
+    assert await sesion.scalar(select(Aviso).where(Aviso.titulo == "Posible doble venta")) is None
+    assert (await cliente.get(f"/api/admin/reservas/{r.json()['id']}")).json()["estado"] == "confirmada"
 
 
 async def test_rutas_y_permisos(cliente, sesion):
-    h = await crear_habitacion(sesion, "chelem", nombre="Ext Rutas")
+    f = await una_ficha(sesion)
     await entrar_como(cliente, sesion, rol="recepcion", propiedades=("chelem",))
     assert (
         await cliente.get(f"/api/admin/externas/reservas?desde={D}&hasta={D + timedelta(days=30)}")
     ).status_code == 200
     nuevo = {
-        "habitacion_id": str(h.id),
-        "canal": "airbnb",
+        "ficha_id": str(f.id),
+        "indice": 0,
         "url": "https://www.airbnb.mx/calendar/ical/9.ics?s=secreto123",
     }
     assert (
@@ -177,6 +166,18 @@ async def test_rutas_y_permisos(cliente, sesion):
     r = await cliente.post("/api/admin/externas/calendarios", json=nuevo, headers=csrf(cliente))
     assert r.status_code == 201, r.text
     assert "secreto123" not in r.text and r.json()["url"].startswith("https://www.airbnb.mx/…")
+    assert r.json()["publicacion"] == "Cabaña estándar, 20 m², 2 camas Queen, hasta 4 personas"
+    fuera = {
+        **nuevo,
+        "indice": 9,
+        "url": "https://www.airbnb.mx/calendar/ical/10.ics",
+    }  # esa publicación no existe
+    x = await cliente.post("/api/admin/externas/calendarios", json=fuera, headers=csrf(cliente))
+    assert x.status_code == 422 and x.json()["codigo"] == "publicacion"
+    otra_publicacion = {**nuevo, "indice": 1, "url": "https://www.airbnb.mx/calendar/ical/11.ics"}
+    assert (
+        await cliente.post("/api/admin/externas/calendarios", json=otra_publicacion, headers=csrf(cliente))
+    ).status_code == 201  # la misma ficha, otra publicación: otro calendario
     fila = await sesion.scalar(select(Auditoria).where(Auditoria.accion == "calendario_externo.crear"))
     assert "secreto123" not in str(fila.despues)
     otra = await cliente.post("/api/admin/externas/calendarios", json=nuevo, headers=csrf(cliente))
@@ -308,10 +309,11 @@ async def test_lectura_condicional_y_aviso_de_reservas_de_fuera(sesion, monkeypa
     from app.modelos import CalendarioExterno
     from app.tareas import externas as tarea
 
-    h = await crear_habitacion(sesion, "chelem", nombre="Ext Eficiente")
+    f = await una_ficha(sesion)
     cal = CalendarioExterno(
-        propiedad_id=h.propiedad_id,
-        habitacion_id=h.id,
+        propiedad_id=f.propiedad_id,
+        ficha_id=f.id,
+        publicacion="Cabaña Eficiente, 20 m²",
         canal="airbnb",
         url="https://www.airbnb.mx/calendar/ical/7.ics?s=x",
     )
@@ -357,7 +359,148 @@ async def test_lectura_condicional_y_aviso_de_reservas_de_fuera(sesion, monkeypa
     # Las 2 reservas de fuera: UN aviso (por el outbox), con su permiso y a dónde ir.
     await sesion.run_sync(despachar)
     aviso = await sesion.scalar(
-        select(Aviso).where(Aviso.titulo == "Reservas fuera de la app", Aviso.texto.contains("Ext Eficiente"))
+        select(Aviso).where(
+            Aviso.titulo == "Reservas de otras plataformas", Aviso.texto.contains("Cabaña Eficiente")
+        )
     )
     assert aviso is not None and aviso.texto.startswith("2 reservas nuevas de Airbnb")
     assert aviso.permiso == "externas.ver" and aviso.destino == "/admin/otras-plataformas"
+
+
+# ── Las reservas de fuera entran al calendario del motor (migración 0024) ──
+
+
+async def _con_cuartos_en_linea(sesion, n=2):
+    await abrir_alcance(sesion)
+    return [
+        await crear_habitacion(sesion, "chelem", nombre=f"Cabaña {i}", capacidad=4, venta_en_linea=True)
+        for i in range(n)
+    ]
+
+
+def _leer(sesion, propiedad_id, *eventos, canal="booking"):
+    return sesion.run_sync(
+        lambda s: externas.guardar(
+            s, propiedad_id=propiedad_id, canal=canal, origen="ical", eventos=list(eventos)
+        )
+    )
+
+
+async def test_la_de_fuera_entra_al_calendario_con_su_fuente_y_sin_duplicar(sesion):
+    from app.modelos import Reserva
+
+    h1, _ = await _con_cuartos_en_linea(sesion)
+    ev = Evento("b1@booking", D, D + timedelta(days=2), "Ana Ruiz", False)
+    await _leer(sesion, h1.propiedad_id, ev)
+    await _leer(sesion, h1.propiedad_id, ev)  # releer no duplica
+    filas = (await sesion.scalars(select(Reserva).where(Reserva.fuente == "booking"))).all()
+    assert len(filas) == 1
+    r = filas[0]
+    assert (r.estado, r.huesped_nombre, r.habitacion_id, r.total_centavos) == (
+        "confirmada",
+        "Ana Ruiz",
+        h1.id,
+        0,
+    )
+    assert (r.llegada, r.salida) == (D, D + timedelta(days=2))
+
+
+async def test_la_segunda_de_las_mismas_fechas_va_a_otra_habitacion_en_linea(sesion):
+    from app.modelos import Reserva
+
+    h1, h2 = await _con_cuartos_en_linea(sesion)
+    a = Evento("b1@booking", D, D + timedelta(days=2), None, False)
+    b = Evento("b2@booking", D, D + timedelta(days=2), None, False)
+    await _leer(sesion, h1.propiedad_id, a, b)
+    cuartos = set(await sesion.scalars(select(Reserva.habitacion_id).where(Reserva.fuente == "booking")))
+    assert cuartos == {h1.id, h2.id}
+
+
+async def test_no_se_asigna_a_una_habitacion_solo_fisica(sesion):
+    from app.modelos import Reserva
+
+    await abrir_alcance(sesion)
+    fisica = await crear_habitacion(sesion, "chelem", venta_en_linea=False)
+    await _leer(sesion, fisica.propiedad_id, Evento("b1@booking", D, D + timedelta(days=1), None, False))
+    assert (await sesion.scalars(select(Reserva).where(Reserva.fuente == "booking"))).first() is None
+
+
+async def test_cancelada_en_la_plataforma_se_cancela_y_cambio_de_fechas_se_sigue(sesion):
+    from app.modelos import Reserva
+
+    h1, _ = await _con_cuartos_en_linea(sesion)
+    await _leer(sesion, h1.propiedad_id, Evento("b1@booking", D, D + timedelta(days=2), "Ana", False))
+    await _leer(
+        sesion,
+        h1.propiedad_id,
+        Evento("b1@booking", D + timedelta(days=1), D + timedelta(days=4), "Ana", False),
+    )
+    r = (await sesion.scalars(select(Reserva).where(Reserva.fuente == "booking"))).one()
+    assert (r.llegada, r.salida) == (D + timedelta(days=1), D + timedelta(days=4))
+    await _leer(sesion, h1.propiedad_id, Evento("b1@booking", D, D + timedelta(days=2), "Ana", True))
+    await sesion.refresh(r)
+    assert r.estado == "cancelada"
+
+
+async def test_si_la_recepcion_la_cancela_no_vuelve_a_salir(sesion):
+    from app.modelos import Reserva
+
+    h1, _ = await _con_cuartos_en_linea(sesion)
+    ev = Evento("b1@booking", D, D + timedelta(days=2), "Ana", False)
+    await _leer(sesion, h1.propiedad_id, ev)
+    r = (await sesion.scalars(select(Reserva).where(Reserva.fuente == "booking"))).one()
+    r.estado = "cancelada"
+    await sesion.flush()
+    await _leer(sesion, h1.propiedad_id, ev)  # el iCal la sigue trayendo
+    await sesion.refresh(r)
+    assert r.estado == "cancelada"
+    assert len((await sesion.scalars(select(Reserva).where(Reserva.fuente == "booking"))).all()) == 1
+
+
+async def test_sin_cuarto_libre_queda_sin_asignar_y_avisa(sesion):
+    from app.modelos import Reserva
+
+    (h1,) = await _con_cuartos_en_linea(sesion, 1)
+    await _leer(
+        sesion, h1.propiedad_id,
+        Evento("b1@booking", D, D + timedelta(days=2), None, False),
+        Evento("b2@booking", D, D + timedelta(days=2), None, False),
+    )  # fmt: skip
+    assert len((await sesion.scalars(select(Reserva).where(Reserva.fuente == "booking"))).all()) == 1
+    await sesion.run_sync(despachar)
+    assert (
+        await sesion.scalars(
+            select(Aviso).where(Aviso.titulo == "Reserva de plataforma sin habitación asignada")
+        )
+    ).first() is not None
+
+
+async def test_la_de_fuera_no_se_mueve_ni_se_cobra_pero_si_marca_llegada_y_salida(sesion):
+    from app.auth.alcance import Alcance
+    from app.errores import ReglaDeNegocio
+    from app.esquemas.reservas import Mover, PagoNuevo
+    from app.modelos import Reserva
+    from app.servicios import reservas as srv
+    from tests.fabricas import crear_usuario
+
+    (h1,) = await _con_cuartos_en_linea(sesion, 1)
+    hoy_ = hoy()
+    await _leer(sesion, h1.propiedad_id, Evento("b1@booking", hoy_, hoy_ + timedelta(days=2), "Ana", False))
+    r = (await sesion.scalars(select(Reserva).where(Reserva.fuente == "booking"))).one()
+    gerente = await crear_usuario(sesion, rol="gerente")
+    actor = SimpleNamespace(id=gerente.id, permisos=frozenset())
+    alcance = Alcance(None)
+    with pytest.raises(ReglaDeNegocio) as e:
+        await srv.mover(sesion, actor, alcance, r.id, Mover(
+            habitacion_id=h1.id, llegada=hoy_, salida=hoy_ + timedelta(days=3), version=r.version
+        ))  # fmt: skip
+    assert e.value.detalle["codigo"] == "de_plataforma"
+    with pytest.raises(ReglaDeNegocio) as e:
+        await srv.registrar_pago(sesion, actor, alcance, r.id, PagoNuevo(
+            concepto="abono", metodo="efectivo", monto_centavos=1000
+        ))  # fmt: skip
+    assert e.value.detalle["codigo"] == "de_plataforma"
+    r = await srv.llegada(sesion, actor, alcance, r.id, r.version)
+    assert r.estado == "en_curso"
+    r = await srv.salida(sesion, actor, alcance, r.id, r.version)  # no debe nada: la cobra la plataforma
+    assert r.estado == "completada"

@@ -7,6 +7,8 @@ import AdminApp from './admin/AdminApp'
 import LoginPage from './website/pages/LoginPage'
 import { cerrarSesion } from './lib/sesion'
 import { PRODUCTO } from './lib/producto'
+import NoEncontrada from './components/marca/NoEncontrada'
+import Actualizando from '@/components/marca/Actualizando'
 
 // Website pública en su propio archivo (chunk): apagada, el navegador nunca la descarga.
 const WebsiteApp = lazy(() => import('./website/WebsiteApp'))
@@ -33,8 +35,10 @@ function AppRoutes() {
           <Route path="/admin/*" element={<AdminApp />} />
           {/* Website pública apagada (lib/producto.js): toda URL suya va al login,
               que con sesión ya iniciada pasa directo al panel. */}
-          <Route path="/*"       element={PRODUCTO.websitePublica ? <Suspense fallback={null}><WebsiteApp /></Suspense> : <Navigate to="/entrar" replace />} />
+          <Route path="/"        element={PRODUCTO.websitePublica ? <Suspense fallback={null}><WebsiteApp /></Suspense> : <Navigate to="/entrar" replace />} />
+          <Route path="/*"       element={PRODUCTO.websitePublica ? <Suspense fallback={null}><WebsiteApp /></Suspense> : <NoEncontrada a="/entrar" texto="Ir a entrar" />} />
         </Routes>
+        <Actualizando />
       </BrowserRouter>
     </MotionConfig>
   )

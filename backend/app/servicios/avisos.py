@@ -35,7 +35,16 @@ def desde_evento(e: Outbox) -> dict | None:
     d = e.datos or {}
     if e.tipo == "externas.nuevas":
         return _externas_nuevas(e, d)
+    if e.tipo == "externas.sin_cuarto":
+        return _sin_cuarto(e, d)
     if e.agregado != "reserva" or d.get("tipo") == "bloqueo":
+        return None
+    # Las de otras plataformas ya avisan con «Reservas de otras plataformas»: no se repite.
+    if d.get("fuente", "motor") != "motor" and e.tipo in (
+        "reserva.creada",
+        "reserva.cancelada",
+        "reserva.movida",
+    ):
         return None
     # Una retención de la web no es noticia hasta que se paga (la mayoría vencen
     # solas); tampoco que se cancele o venza sin haberse pagado.
@@ -91,7 +100,7 @@ CANALES = {
 
 def _externas_nuevas(e: Outbox, d: dict) -> dict:
     n, canal = d.get("nuevas", 0), CANALES.get(d.get("canal"), d.get("canal"))
-    donde = f" ({d['habitacion_nombre']})" if d.get("habitacion_nombre") else ""
+    donde = f" ({d['publicacion']})" if d.get("publicacion") else ""
     fechas = ", ".join(_rango(a, b) for a, b in d.get("rangos", []))
     mas = f" y {n - len(d.get('rangos', []))} más" if n > len(d.get("rangos", [])) else ""
     cuantas = "1 reserva nueva" if n == 1 else f"{n} reservas nuevas"
@@ -100,8 +109,25 @@ def _externas_nuevas(e: Outbox, d: dict) -> dict:
         "propiedad_id": e.propiedad_id,
         "permiso": "externas.ver",
         "tipo": "reserva",
-        "titulo": "Reservas fuera de la app",
+        "titulo": "Reservas de otras plataformas",
         "texto": f"{cuantas} de {canal}{donde}: {fechas}{mas}."[:300],
+        "destino": "/admin/otras-plataformas",
+        "causado_por": None,
+    }
+
+
+def _sin_cuarto(e: Outbox, d: dict) -> dict:
+    fechas = ", ".join(_rango(r["llegada"], r["salida"]) for r in d.get("rangos", []))
+    return {
+        "evento_id": e.id,
+        "propiedad_id": e.propiedad_id,
+        "permiso": "externas.ver",
+        "tipo": "reserva",
+        "titulo": "Reserva de plataforma sin habitación asignada",
+        "texto": (
+            f"{d.get('n', 0)} sin habitación libre para la venta en línea ({fechas}). "
+            "Posible sobreventa: revisa las fechas en el calendario."
+        )[:300],
         "destino": "/admin/otras-plataformas",
         "causado_por": None,
     }

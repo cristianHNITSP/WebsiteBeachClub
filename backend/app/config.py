@@ -48,6 +48,9 @@ class Config(BaseSettings):
     # De aquí se deriva el secreto de webhooks de cada sitio (PLAN-BACKEND §4.4):
     # así no se guarda en la base. Cambiarla cambia el de todos los sitios.
     clave_webhooks: SecretStr
+    # La website pública (API /api/v1, sitios web y webhooks) está APAGADA hasta que el usuario decida
+    # hacerla (PLAN-BACKEND §4). Apagada no se monta ni se programa: el código sigue aquí.
+    api_publica_activa: bool = False
     # El bot (PLAN-BACKEND §13.1). OPCIONAL: sin ella el bot no busca y lo dice
     # en el panel. Un valor de relleno cuenta como ausente (None).
     brave_search_clave: SecretStr | None = None

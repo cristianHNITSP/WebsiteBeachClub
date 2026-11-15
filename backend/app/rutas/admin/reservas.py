@@ -15,11 +15,13 @@ from app.esquemas.reservas import (
     Accion,
     AjusteCobroCambio,
     AjusteCobroSalida,
+    ColumnaRecepcion,
     Cotizacion,
     Devolucion,
     Estado,
     EventoSalida,
     Mover,
+    PaginaRecepcion,
     PagoNuevo,
     ReservaDetalle,
     ReservaNueva,
@@ -59,6 +61,25 @@ async def listar(
         estados=tuple(estado) if estado else None, q=q.strip() if q else None, limite=limite,
     )  # fmt: skip
     return [servicio.a_salida(r) for r in filas]
+
+
+@router.get("/recepcion", response_model=PaginaRecepcion)
+async def recepcion(
+    _: Ver,
+    alcance: AlcanceActual,
+    sesion: Sesion,
+    columna: ColumnaRecepcion,
+    cursor: Annotated[str | None, Query(max_length=200)] = None,
+    limite: Annotated[int, Query(ge=1, le=100)] = 4,
+):
+    """Una página de una columna de Llegadas y salidas (hoy, en Mérida)."""
+    filas, siguiente, anterior, total = await servicio.recepcion(
+        sesion, alcance, columna=columna, cursor=cursor, limite=limite
+    )
+    return {
+        "items": [servicio.a_salida(r) for r in filas],
+        "meta": {"siguiente": siguiente, "anterior": anterior, "total": total},
+    }
 
 
 @router.get("/cotizar", response_model=Cotizacion)

@@ -1,170 +1,93 @@
-/* ===== LOGIN (paleta floral: usePaletaSitio pone body.site) =====
-   Solo tokens. Sin backdrop-filter: la tarjeta es sólida sobre la Aurora. */
+/* ===== LOGIN: la puerta del panel, con su mismo lenguaje (body.panel) =====
+   Suelo cálido y una hoja: el formulario a un lado y la marca al otro. Solo tokens. */
 
 .pagina {
-  position: relative;
-  min-height: 100svh;
-  display: flex;
-  flex-direction: column;
-  isolation: isolate;
-  color: var(--foreground);
+  min-height: 100svh; display: grid; place-items: center; padding: 10px;
+  background: var(--sidebar); color: var(--foreground);
+}
+.hoja {
+  width: 100%; max-width: 1280px; min-height: min(760px, calc(100svh - 20px));
+  display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); gap: 8px; padding: 8px;
+  border-radius: 20px; background: var(--card); box-shadow: 0 0 0 1px var(--border);
+  --escena-arriba: color-mix(in srgb, var(--flor-orquidea) 12%, var(--card));
 }
 
-/* ── Fondo ── */
-.fondo {
-  position: fixed;
-  inset: 0;
-  z-index: -1;
-  background: var(--noche);
-}
-.fondoQuieto {
-  position: absolute;
-  inset: 0;
-  background:
-    radial-gradient(ellipse 60% 55% at 15% 20%, color-mix(in srgb, var(--flor-morado) 70%, transparent), transparent 65%),
-    radial-gradient(ellipse 55% 50% at 85% 80%, color-mix(in srgb, var(--flor-turquesa) 40%, transparent), transparent 60%),
-    radial-gradient(ellipse 60% 45% at 60% 0%, color-mix(in srgb, var(--flor-dorado) 30%, transparent), transparent 60%),
-    var(--noche);
-}
-.fondoAurora {
-  position: absolute;
-  inset: 0;
-  opacity: 0.9;
-}
-
-.tema {
-  position: fixed;
-  top: 16px;
-  right: 16px;
-  z-index: 2;
-  color: var(--noche-fg);
-}
-.tema:hover { color: var(--noche-fg); background: color-mix(in srgb, var(--noche-fg) 14%, transparent); }
-
-/* ── Columna centrada ── */
-.main {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 24px 16px;
-}
-.columna {
-  width: 100%;
-  max-width: 440px;
-}
-
-/* SpotlightCard trae p-8; aquí el relleno propio y sombra más marcada sobre la noche */
-.tarjeta {
-  padding: 28px 30px;
-  border-radius: calc(var(--radius) * 1.6);
-  box-shadow: 0 30px 80px color-mix(in srgb, var(--noche) 60%, transparent);
-}
-
-.marca {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-  margin-bottom: 22px;
-}
-.marcaSub {
-  font-size: var(--fs-xs);
-  font-weight: 500;
-  letter-spacing: var(--tracking-rotulo);
-  text-transform: uppercase;
-  font-family: var(--font-headline); /* rótulo */
-  color: var(--muted-foreground);
-}
-
-.titulo { margin-bottom: 16px; }
-.tituloTexto {
-  font-family: var(--font-headline);
-  font-size: var(--fs-2xl);
-  font-weight: 700;
-  line-height: 1.2;
-  color: var(--foreground);
-}
-.subtitulo {
-  margin-top: 4px;
-  font-size: var(--fs-sm);
-  color: var(--muted-foreground);
-}
+/* ── Formulario ── */
+.lado { display: flex; flex-direction: column; min-width: 0; padding: 18px 20px 28px; }
+.arriba { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.columna { width: 100%; max-width: 380px; margin: auto; padding-top: 24px; }
+.tituloTexto { font-size: var(--fs-3xl, 2rem); font-weight: 600; letter-spacing: -0.02em; line-height: 1.15; color: var(--foreground); }
+.subtitulo { margin-top: 6px; font-size: var(--fs-sm); color: var(--muted-foreground); }
+.form { display: flex; flex-direction: column; gap: 16px; margin-top: 24px; }
+.campo { display: grid; gap: 7px; }
+.filaLabel { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.grupo { border-radius: 14px; }
+.olvido { padding: 0; border: 0; background: none; font: inherit; font-size: var(--fs-xs); font-weight: 500; color: var(--primary); cursor: pointer; text-underline-offset: 3px; }
+.olvido:hover { text-decoration: underline; }
+.olvido:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; border-radius: 4px; }
 
 /* ── Bloqueo ── */
 .bloqueo {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  margin-top: 10px;
-  padding: 10px 12px;
-  border-radius: var(--radius);
-  background: color-mix(in srgb, var(--destructive) 12%, var(--card));
-  color: var(--destructive);
-  overflow: hidden;
+  display: flex; align-items: flex-start; gap: 10px; margin-top: 14px; padding: 10px 12px; overflow: hidden; border-radius: 12px;
+  background: color-mix(in srgb, var(--destructive) 12%, var(--card)); color: var(--destructive-foreground);
 }
-.bloqueoTitulo { font-weight: 700; font-size: var(--fs-sm); }
+.bloqueoTitulo { font-weight: 600; font-size: var(--fs-sm); }
 .bloqueoTexto { font-size: var(--fs-xs); color: var(--muted-foreground); }
 
-/* ── Formulario ── */
-.form {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  margin-top: 18px;
-}
-.campo {
-  display: grid;
-  gap: 8px;
-}
-.filaLabel {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-.conIcono { position: relative; }
-.iconoCampo {
-  position: absolute;
-  left: 13px;
-  top: 50%;
-  transform: translateY(-50%);
-  color: var(--muted-foreground);
-  pointer-events: none;
-}
-.ojo {
-  position: absolute;
-  right: 4px;
-  top: 50%;
-  transform: translateY(-50%);
-  color: var(--muted-foreground);
-}
-
-.aviso {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  font-size: var(--fs-sm);
-  font-weight: 600;
-  color: var(--destructive);
-  overflow: hidden;
-}
-/* Bloq Mayús: dorado oscuro (AA como texto en claro y en oscuro) */
-.avisoAtencion { color: var(--gold-dark); }
-
-.pie {
-  display: flex;
-  justify-content: center;
-}
-
-@media (max-width: 400px) {
-  .tarjeta { padding: 22px 18px; }
-}
-
-/* "o" + Google */
+.aviso { display: flex; align-items: center; gap: 5px; overflow: hidden; font-size: var(--fs-xs); font-weight: 600; color: var(--destructive-foreground); }
+.avisoAtencion { color: var(--warning-foreground); }
+.pie { display: flex; justify-content: center; margin-top: 18px; }
 .otros { display: flex; flex-direction: column; gap: 14px; margin-top: 18px; }
-.o {
-  display: flex; align-items: center; gap: 12px;
-  font-size: var(--fs-xs); color: var(--muted-foreground);
-}
+.o { display: flex; align-items: center; gap: 12px; font-size: var(--fs-xs); color: var(--muted-foreground); }
 .o::before, .o::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+/* ── La marca: mar, sol y corona ── */
+.escena {
+  position: relative; overflow: hidden; border-radius: 14px; height: 100%;
+  background: linear-gradient(180deg, var(--escena-arriba) 12%, color-mix(in srgb, var(--flor-dorado) 16%, var(--card)));
+}
+.escenaCaja { position: relative; min-width: 0; }
+
+/* ── La gota del tema: brota del borde del panel y se funde con él al pasar ── */
+.gota { --paso: 0px; position: absolute; z-index: 1; top: 22px; left: -76px; width: 116px; height: 64px; }
+.gota:hover, .gota:has(:focus-visible) { --paso: 15px; }
+.gota:active { --paso: 22px; }
+.gotaFiltro { position: absolute; }
+/* Recortado a 2 px dentro del panel: el resto del trozo no debe notarse */
+.gotaLiquido { position: absolute; inset: 0; filter: url(#gota-tema); clip-path: inset(-20px calc(100% - 78px) -20px -20px); pointer-events: none; }
+/* Un trozo del panel, de su mismo color: lo que une a la gota */
+.gotaOrilla { position: absolute; left: 76px; right: 0; top: 0; bottom: 0; background: var(--escena-arriba); }
+.gotaBola, .gotaToque {
+  position: absolute; top: 10px; left: 12px; width: 44px; height: 44px; border-radius: 50%; translate: var(--paso) 0;
+  transition: translate 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+  animation: brotar-gota 1s 0.5s cubic-bezier(0.34, 1.4, 0.64, 1) backwards;
+}
+.gotaBola { background: var(--escena-arriba); }
+.gotaToque { display: grid; }
+.gotaBoton { display: grid; place-items: center; width: 44px; height: 44px; padding: 0; border: 0; border-radius: 50%; background: none; color: var(--foreground); cursor: pointer; outline: none; }
+.gotaBoton:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+@keyframes brotar-gota { from { translate: 44px 0; opacity: 0; } }
+.temaMovil { display: none; }
+.sol { position: absolute; left: 50%; top: 40%; width: 34%; aspect-ratio: 1; translate: -50% 0; border-radius: 50%; background: color-mix(in srgb, var(--flor-dorado) 62%, transparent); animation: subir-sol 1.6s cubic-bezier(0.22, 1, 0.36, 1) both; }
+@keyframes subir-sol { from { translate: -50% 70%; opacity: 0; } }
+.rama { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0.7; overflow: visible; }
+.brote { position: absolute; translate: -50% -50%; animation: brotar 0.9s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+.brote > span { display: block; }
+.brote svg { display: block; transition: rotate 0.8s cubic-bezier(0.34, 1.56, 0.64, 1); }
+.brote:hover svg { rotate: 60deg; }
+@keyframes brotar { from { scale: 0; rotate: -120deg; opacity: 0; } }
+.mar { position: absolute; left: 0; right: 0; bottom: 0; width: 100%; height: 30%; }
+.ola1 { fill: color-mix(in srgb, var(--flor-turquesa) 34%, transparent); animation: correr-ola 14s linear infinite; }
+.ola2 { fill: color-mix(in srgb, var(--flor-turquesa) 62%, var(--card)); animation: correr-ola 9s linear infinite reverse; }
+@keyframes correr-ola { to { translate: -600px 0; } }
+.lema { position: absolute; left: 28px; right: 28px; bottom: 24px; max-width: 26ch; font-size: var(--fs-xl); font-weight: 600; letter-spacing: -0.01em; line-height: 1.25; color: var(--foreground); }
+
+@media (prefers-reduced-motion: reduce) { .sol, .brote, .ola1, .ola2, .gotaBola, .gotaToque { animation: none; } .brote svg, .gotaBola, .gotaBoton { transition: none; } }
+:global(.reduce-motion) :is(.sol, .brote, .ola1, .ola2, .gotaBola, .gotaToque) { animation: none; }
+
+@media (max-width: 900px) {
+  .hoja { grid-template-columns: minmax(0, 1fr); min-height: calc(100svh - 20px); }
+  .escenaCaja { display: none; }
+  .temaMovil { display: block; }
+  .lado { padding: 12px 10px 24px; }
+}

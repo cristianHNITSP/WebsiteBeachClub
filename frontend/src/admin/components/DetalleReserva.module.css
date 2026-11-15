@@ -1,51 +1,97 @@
-/* Detalle de una reserva (panel lateral). Solo tokens. */
+/* Detalle de una reserva (panel lateral), con la anatomía del Delivery Tracker de devl:
+   qué pasa ahora en grande, la etapa en un riel, la persona y lo que sigue en una
+   tarjeta tintada, y la cuenta como la lista de un pedido. Secciones divididas por
+   una raya fina. Solo tokens. */
 .hoja { width: min(480px, 100%) !important; max-width: 100% !important; overflow-y: auto; }
-.cabecera { gap: 6px; }
-.titulo { font-family: var(--font-headline); font-size: var(--fs-xl, 1.5rem); color: var(--foreground); }
-.estado {
-  align-self: flex-start; padding: 2px 10px; border-radius: 999px;
-  font-size: var(--fs-xs); font-weight: 700;
-  background: var(--accent); color: var(--accent-foreground);
-}
-.estado_cancelada, .estado_expirada { background: var(--muted); color: var(--muted-foreground); }
-.estado_en_curso { background: var(--primary); color: var(--primary-foreground); }
-.cuerpo { display: grid; gap: 18px; padding: 0 16px 24px; }
-.datos { display: grid; gap: 10px; margin: 0; }
-.datos div { display: grid; gap: 2px; }
-.datos dt { font-size: var(--fs-xs); color: var(--muted-foreground); }
-.datos dd { margin: 0; font-size: var(--fs-sm); color: var(--foreground); overflow-wrap: anywhere; }
-.aviso { color: var(--muted-foreground); }
-.dinero {
-  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px;
-  padding: 14px; border-radius: var(--radius-lg); background: var(--muted);
-}
-.dinero div { display: grid; gap: 2px; }
-.dinero span { font-size: var(--fs-xs); color: var(--muted-foreground); }
-.dinero strong { font-family: var(--font-headline); font-size: var(--fs-lg); color: var(--foreground); }
-.pendiente strong { color: var(--destructive); }
-.alCorriente strong { color: var(--foreground); }
+.cuerpo { display: grid; gap: 18px; padding: 24px; }
 
-/* Acciones: arriba, en rejilla (dos por fila en el panel), 44 px o más. */
+.seccion { display: grid; gap: 10px; padding: 20px 24px; box-shadow: inset 0 -1px 0 var(--border); }
+.seccion:last-of-type { box-shadow: none; padding-bottom: 28px; }
+
+/* ── Cabeza: lo que pasa ahora ── */
+.cabeza { gap: 6px; padding-top: 22px; padding-inline-end: 56px; }
+.antes { margin: 0; font-size: var(--fs-sm); color: var(--muted-foreground); }
+.titular {
+  display: flex; align-items: center; gap: 10px; margin: 0;
+  font-size: var(--fs-2xl, 1.75rem); font-weight: 700; line-height: 1.1; letter-spacing: -0.02em; color: var(--foreground);
+}
+.iconoEstado { display: inline-grid; flex-shrink: 0; }
+.marca .iconoEstado { color: var(--primary); }
+.exito .iconoEstado { color: var(--success-foreground); }
+.aviso .iconoEstado { color: var(--warning-foreground); }
+.peligro .iconoEstado { color: var(--destructive-foreground); }
+.apagado .iconoEstado { color: var(--muted-foreground); }
+.bajada { margin: 0; font-size: var(--fs-sm); }
+
+.etapas { list-style: none; margin: 10px 0 0; padding: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+.etapas li { display: grid; gap: 6px; font-size: var(--fs-xs); color: var(--muted-foreground); }
+.etapas li.hecha { color: var(--foreground); }
+.etapas li[aria-current] { font-weight: 600; }
+.riel { position: relative; height: 4px; border-radius: 999px; background: var(--muted); overflow: hidden; }
+.relleno { position: absolute; inset: 0; border-radius: inherit; background: var(--primary); transform-origin: left center; }
+
+/* ── La persona y lo que sigue ── */
+.persona { display: flex; align-items: center; gap: 12px; }
+.personaTexto { display: grid; gap: 2px; min-width: 0; }
+.nombre { font-size: var(--fs-lg); font-weight: 600; line-height: 1.2; color: var(--foreground); overflow-wrap: anywhere; }
+.personaDato { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: var(--fs-sm); color: var(--muted-foreground); }
+.fuente { font-weight: 600; }
+.iconoBloqueo { display: grid; place-items: center; width: 48px; height: 48px; border-radius: 999px; background: var(--muted); color: var(--muted-foreground); flex-shrink: 0; }
+
+.tarjeta {
+  display: grid; gap: 12px; padding: 16px; border-radius: 1rem;
+  background: color-mix(in srgb, var(--muted) 55%, var(--card));
+}
+.deFuera { margin: 0; font-size: var(--fs-sm); line-height: 1.5; color: var(--foreground); }
+.nadaQueHacer { margin: 0; font-size: var(--fs-sm); color: var(--muted-foreground); }
 .acciones { display: grid; gap: 8px; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); }
 .accion { justify-content: flex-start; min-height: 48px; height: auto; padding-block: 6px; text-align: left; white-space: normal; }
+.accionPrincipal { grid-column: 1 / -1; min-height: 54px; }
 .accion > span { display: grid; gap: 1px; }
 .ayudaBoton { font-size: var(--fs-xs); font-weight: 400; opacity: 0.85; }
 .ayuda { font-size: var(--fs-xs); color: var(--muted-foreground); }
 .error { font-size: var(--fs-xs); color: var(--destructive); }
 
-/* Noche por noche: el estado va en una insignia (Badge de shadcn), con texto. */
-.noches { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
-.noche {
-  display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 2px 12px;
-  padding: 8px 12px; border-radius: var(--radius-lg); background: var(--card);
-  box-shadow: inset 0 0 0 1px var(--border);
-}
-.noche > :nth-child(4) { grid-column: 2; grid-row: 1 / span 3; }
-.esHoy { background: var(--muted); }
-.nocheFecha { font-size: var(--fs-sm); font-weight: 600; color: var(--foreground); }
+/* ── La estancia ── */
+.rotulo { margin: 0; font-size: var(--fs-sm); font-weight: 400; color: var(--muted-foreground); }
+.rotuloFila { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.rotuloFila > span { font-size: var(--fs-sm); color: var(--muted-foreground); }
+.renglon { display: flex; align-items: center; gap: 10px; font-size: var(--fs-base); font-weight: 500; color: var(--foreground); overflow-wrap: anywhere; }
+.renglon > svg { flex-shrink: 0; color: var(--muted-foreground); }
+.nota { margin: 2px 0 0 28px; font-size: var(--fs-sm); line-height: 1.5; color: var(--muted-foreground); }
+
+/* ── La cuenta: cada noche con su ficha ── */
+.noches { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+.noche { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 12px; }
+.ficha { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 12px; }
+.ficha_pagada { background: color-mix(in srgb, var(--success) 16%, transparent); color: var(--success-foreground); }
+.ficha_parcial { background: color-mix(in srgb, var(--warning) 18%, transparent); color: var(--warning-foreground); }
+.ficha_pendiente { background: color-mix(in srgb, var(--primary) 12%, transparent); color: var(--primary); }
+.nocheTexto { display: grid; gap: 3px; min-width: 0; }
+.nocheFecha { font-size: var(--fs-sm); font-weight: 500; color: var(--foreground); }
 .hoy { margin-left: 8px; font-style: normal; font-size: var(--fs-xs); font-weight: 700; color: var(--primary); }
-.nocheMonto { grid-column: 1; font-size: var(--fs-xs); color: var(--muted-foreground); }
-.nocheEstado { grid-column: 1; font-size: var(--fs-xs); font-weight: 600; color: var(--foreground); }
+.nocheEstado { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.nocheMonto { font-size: var(--fs-base); font-weight: 500; color: var(--foreground); font-variant-numeric: tabular-nums; }
+.cobrarAqui {
+  border: 0; padding: 2px 0; background: none; cursor: pointer;
+  font-size: var(--fs-xs); font-weight: 600; color: var(--primary); text-decoration: underline; text-underline-offset: 3px;
+}
+.cobrarAqui:disabled { opacity: 0.5; cursor: default; }
+.cobrarAqui:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; border-radius: 4px; }
+
+.dinero {
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px;
+  position: relative; margin-top: 6px; padding: 14px 16px; border-radius: 1rem;
+  background: color-mix(in srgb, var(--muted) 55%, var(--card));
+}
+.sello { position: absolute; right: 10px; top: -14px; }
+.dinero div { display: grid; gap: 2px; }
+.dinero span { font-size: var(--fs-xs); color: var(--muted-foreground); }
+.dinero strong { font-size: var(--fs-lg); color: var(--foreground); font-variant-numeric: tabular-nums; }
+.pendiente strong { color: var(--destructive-foreground); }
+.alCorriente strong { color: var(--foreground); }
+
+/* ── Pagos ── */
 .subtitulo { margin: 0 0 8px; font-size: var(--fs-sm); font-weight: 700; color: var(--foreground); }
 .lista { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
 .lista li {
@@ -55,9 +101,24 @@
 .lista li:last-child { box-shadow: none; }
 .lista small { grid-column: 1 / -1; font-size: var(--fs-xs); color: var(--muted-foreground); }
 .salida strong { color: var(--muted-foreground); }
+
+/* ── Historial: una línea de tiempo con puntos ── */
+.linea { list-style: none; margin: 0; padding: 0; display: grid; }
+.linea li { position: relative; display: grid; gap: 1px; padding: 0 0 14px 22px; font-size: var(--fs-sm); color: var(--foreground); }
+.linea li::before { content: ''; position: absolute; left: 4px; top: 6px; width: 8px; height: 8px; border-radius: 999px; background: var(--primary); }
+.linea li:not(:last-child)::after { content: ''; position: absolute; left: 7.5px; top: 16px; bottom: 0; width: 1px; background: var(--border); }
+.linea li:not(:first-child)::before { background: var(--muted-foreground); opacity: 0.5; }
+.linea li:last-child { padding-bottom: 0; }
+.linea small { font-size: var(--fs-xs); color: var(--muted-foreground); }
+
+/* ── Formulario de dinero (dentro de la tarjeta) ── */
 .formulario {
-  display: grid; gap: 12px; padding: 14px; border-radius: var(--radius-lg);
-  box-shadow: inset 0 0 0 1px var(--border); background: var(--card);
+  display: grid; gap: 12px; padding: 14px; border-radius: 0.75rem; background: var(--card);
 }
 .campo { display: grid; gap: 6px; }
 .botones { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
+
+@media (max-width: 639px) {
+  .seccion { padding-inline: 20px; }
+  .cabeza { padding-inline-end: 52px; }
+}

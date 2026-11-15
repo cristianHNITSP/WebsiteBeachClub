@@ -1,26 +1,26 @@
-import { SignOutIcon } from '@phosphor-icons/react'
+import { LogOutIcon } from 'lucide-react'
 import {
-  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
-  AlertDialogFooter, AlertDialogHeader, AlertDialogMedia, AlertDialogTitle,
-} from '@/components/ui/alert-dialog'
+  AlertDialog, AlertDialogClose, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogPopup, AlertDialogTitle,
+} from '@/components/coss/alert-dialog'
+import { Button } from '@/components/coss/button'
 
-/** "¿Deseas cerrar sesión?": panel (menú del avatar y pie de la SideNav) y Mi cuenta. */
+/** "¿Deseas cerrar sesión?" (AlertDialog de coss): menú del avatar, pie de la SideNav y Mi cuenta. */
 export default function ConfirmarSalida({ abierto, onCambiar, onSalir }) {
   return (
     <AlertDialog open={abierto} onOpenChange={onCambiar}>
-      <AlertDialogContent>
+      <AlertDialogPopup>
         <AlertDialogHeader>
-          <AlertDialogMedia className="bg-[var(--accent)] text-[var(--accent-foreground)]">
-            <SignOutIcon weight="bold" />
-          </AlertDialogMedia>
+          <div className="mb-1 grid size-10 place-items-center rounded-full bg-accent text-accent-foreground" aria-hidden="true">
+            <LogOutIcon className="size-5" />
+          </div>
           <AlertDialogTitle>¿Deseas cerrar sesión?</AlertDialogTitle>
           <AlertDialogDescription>Tendrás que volver a iniciar sesión para entrar.</AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel>Seguir aquí</AlertDialogCancel>
-          <AlertDialogAction variant="destructive" onClick={onSalir}>Cerrar sesión</AlertDialogAction>
+          <AlertDialogClose render={<Button variant="outline" />}>Seguir aquí</AlertDialogClose>
+          <AlertDialogClose render={<Button variant="destructive" />} onClick={onSalir}>Cerrar sesión</AlertDialogClose>
         </AlertDialogFooter>
-      </AlertDialogContent>
+      </AlertDialogPopup>
     </AlertDialog>
   )
 }

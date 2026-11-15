@@ -1,0 +1,15 @@
+/* Rejilla de cifras (Tablero, Avisos). Sin fondo propio: la gota del cursor se pinta debajo. */
+.cifras { display: grid; grid-template-columns: 1fr 1fr; overflow: hidden; border-radius: 0.75rem; box-shadow: inset 0 0 0 1px var(--border); }
+.celda { position: relative; display: grid; gap: 1px; padding: 12px 14px; text-align: left; background: transparent; cursor: pointer; transition: background-color 0.15s, color 0.15s; border: 0; color: inherit; font: inherit; box-shadow: inset -1px -1px 0 var(--border); }
+.celda:hover { background: var(--muted); }
+:global(.cursor-none) .celda:hover { background: transparent; }
+.celda[aria-pressed='true'] { background: var(--accent); }
+/* Encima de la gota morada, el texto cambia de tinta */
+.celda[data-liquid-active], .celda[data-liquid-active] :is(.celdaEtiqueta, .celdaValor, .celdaValor small, .celdaNota) { color: var(--primary-foreground); }
+.celda:focus-visible { outline: 2px solid var(--ring); outline-offset: -2px; }
+.celdaEtiqueta { display: flex; align-items: center; gap: 7px; font-size: var(--fs-xs); color: var(--muted-foreground); transition: color 0.15s; }
+.celdaValor { display: flex; align-items: baseline; font-size: var(--fs-2xl); font-weight: 600; letter-spacing: -0.02em; line-height: 1.2; color: var(--foreground); font-variant-numeric: tabular-nums; transition: color 0.15s; }
+.celdaValor small { font-size: var(--fs-sm); font-weight: 500; color: var(--muted-foreground); }
+.celdaNota { font-size: var(--fs-xs); color: var(--muted-foreground); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; transition: color 0.15s; }
+.celdaAncha { grid-column: 1 / -1; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 14px; }
+.celdaAncha [data-liquid-active] { background: transparent; border-color: transparent; color: var(--primary-foreground); box-shadow: none; }

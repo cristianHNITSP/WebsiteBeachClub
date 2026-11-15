@@ -1,15 +1,14 @@
 import { useState } from 'react'
 import { ArrowLeftIcon } from '@phosphor-icons/react'
-import { Button } from '@/components/ui/button'
+import { Button } from '@/components/coss/button'
 import ConfirmarDescarte from '@/components/marca/ConfirmarDescarte'
-import Pista from '@/components/marca/Pista'
+import Pista from '@/admin/components/Pista'
 import s from './SectionPanel.module.css'
 
 /* ── SectionPanel ────────────────────────────────────────────────
    Ocupa todo el área de contenido del AdminLayout.
 
    Props:
-     eyebrow   string    — etiqueta superior pequeña
      title     ReactNode — título principal (puede tener <em>)
      subtitle  string    — descripción corta bajo el título
      onBack    fn        — navegar de regreso
@@ -18,7 +17,7 @@ import s from './SectionPanel.module.css'
      children  ReactNode — contenido del formulario / información
    ──────────────────────────────────────────────────────────────── */
 export default function SectionPanel({
-  eyebrow, title, subtitle,
+  title, subtitle,
   onBack, dirty = false,
   actions, children,
 }) {
@@ -40,7 +39,6 @@ export default function SectionPanel({
           </Pista>
 
           <div>
-            {eyebrow && <span className="admin-page-eyebrow">{eyebrow}</span>}
             <h1 className="admin-page-title">{title}</h1>
             {subtitle && <p className={s.subtitle}>{subtitle}</p>}
           </div>

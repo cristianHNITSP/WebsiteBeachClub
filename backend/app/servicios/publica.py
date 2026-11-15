@@ -83,11 +83,15 @@ def _habitacion(h: Habitacion, propiedades: dict, fotos: dict) -> dict:
 
 
 async def catalogo(sesion: AsyncSession, alcance: Alcance, base: str) -> list[dict]:
-    """Las que se pueden reservar (activas); en mantenimiento no se ofrecen."""
+    """Las que se pueden reservar: activas y vendidas en línea (las demás son solo de recepción)."""
     hs = list(
         await sesion.scalars(
             select(Habitacion)
-            .where(alcance.filtro(Habitacion.propiedad_id), Habitacion.estado == "activa")
+            .where(
+                alcance.filtro(Habitacion.propiedad_id),
+                Habitacion.estado == "activa",
+                Habitacion.venta_en_linea,
+            )
             .order_by(Habitacion.nombre, Habitacion.id)
         )
     )
@@ -117,7 +121,11 @@ async def disponibilidad(
             select(Habitacion)
             .where(
                 alcance.filtro(Habitacion.propiedad_id),
-                and_(Habitacion.estado == "activa", Habitacion.capacidad >= huespedes),
+                and_(
+                    Habitacion.estado == "activa",
+                    Habitacion.venta_en_linea,
+                    Habitacion.capacidad >= huespedes,
+                ),
                 ~ocupada,
             )
             .order_by(Habitacion.tarifa_centavos, Habitacion.nombre, Habitacion.id)

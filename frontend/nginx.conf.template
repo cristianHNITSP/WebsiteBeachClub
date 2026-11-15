@@ -68,6 +68,11 @@ server {
         expires -1;
     }
 
+    # La versión publicada: el panel abierto la consulta para saber si quedó viejo.
+    location = /version.json {
+        expires -1;
+    }
+
     # ── Fotos de las habitaciones (docs/PLAN-BACKEND.md §18) ──
     # Del volumen `fotos`, montado SOLO LECTURA. Solo se sirve lo que tiene la
     # forma exacta que genera la API (<uuid>/<uuid>/<uuid>-<ancho>.webp): nada de

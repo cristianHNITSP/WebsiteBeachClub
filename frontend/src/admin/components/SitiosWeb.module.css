@@ -6,13 +6,13 @@
   display: grid; gap: 14px; padding: 20px; border-radius: var(--radius-xl); background: var(--card);
   box-shadow: inset 0 0 0 1px var(--border), var(--shadow-sm);
 }
-.secretos { box-shadow: inset 0 0 0 2px var(--secondary), var(--shadow-sm); }
+.secretos { box-shadow: inset 0 0 0 2px var(--flor-dorado), var(--shadow-sm); }
 .revocado { opacity: 0.75; }
 .titulo { display: flex; align-items: center; gap: 8px; margin: 0; font-family: var(--font-headline); font-size: var(--fs-lg); color: var(--foreground); }
 .ayuda { margin: 0; max-width: 70ch; font-size: var(--fs-xs); color: var(--muted-foreground); }
 .estado, .estadoMalo { padding: 2px 10px; border-radius: 999px; font-size: var(--fs-xs); font-weight: 600; }
 .estado { background: var(--accent); color: var(--accent-foreground); }
-.estadoMalo { background: var(--destructive); color: var(--destructive-foreground); }
+.estadoMalo { background: var(--destructive); color: var(--primary-foreground); } /* blanco en claro, tinta en oscuro: lo mismo que pide --destructive */
 .datos { display: grid; gap: 10px; margin: 0; }
 .dato { display: grid; gap: 4px; min-width: 0; }
 .dato dd { margin: 0; font-size: var(--fs-sm); color: var(--foreground); overflow-wrap: anywhere; }

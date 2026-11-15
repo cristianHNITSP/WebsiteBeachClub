@@ -33,9 +33,13 @@ export function alternarTemaConCirculo(evento, cambiar, reducirMovimiento) {
   raiz.style.setProperty('--tema-x', `${x}px`)
   raiz.style.setProperty('--tema-y', `${y}px`)
 
+  // Sin transiciones de color mientras se toma la foto nueva: con ellas el
+  // navegador fotografía los colores a medio cambiar y, al abrirse el círculo,
+  // saltan al final (el parpadeo que se veía en el modo oscuro).
+  raiz.classList.add('sin-transicion')
   enCurso = true
   const transicion = document.startViewTransition(() => flushSync(cambiar))
-  transicion.finished.finally(() => { enCurso = false })
+  transicion.finished.finally(() => { enCurso = false; requestAnimationFrame(() => raiz.classList.remove('sin-transicion')) })
   transicion.ready.then(() => {
     document.documentElement.animate(
       { clipPath: [`circle(0px at ${x}px ${y}px)`, `circle(${radio}px at ${x}px ${y}px)`] },

@@ -1,12 +1,14 @@
 import { useState, useEffect } from 'react'
 import SectionPanel from '../components/SectionPanel'
 import {
-  BarbellIcon, BathtubIcon, CalendarDotsIcon, CameraIcon, CarIcon, CookingPotIcon, DoorOpenIcon, FloppyDiskIcon, HourglassIcon, LockIcon, PlusCircleIcon, SnowflakeIcon, SwimmingPoolIcon, TelevisionIcon, TrashIcon, WavesIcon, WifiHighIcon, WineIcon,
+  BarbellIcon, BathtubIcon, CalendarDotsIcon, CameraIcon, CarIcon, CookingPotIcon, DoorOpenIcon, FloppyDiskIcon, LockIcon, PlusCircleIcon, SnowflakeIcon, SwimmingPoolIcon, TelevisionIcon, TrashIcon, WavesIcon, WifiHighIcon, WineIcon,
 } from '@phosphor-icons/react'
 import { Field, Input, Select, Textarea } from '@/components/frida/Field'
 import { SkeletonCard } from '@/components/frida/Skeleton'
-import { useToast } from '@/components/frida/Toast'
-import { Button } from '@/components/ui/button'
+import { toast } from '@/admin/toast'
+import { DropletButton } from '@/components/devl/droplet-button'
+import { Button } from '@/components/coss/button'
+import { LiquidSwitch } from '@/components/devl/liquid-switch'
 import Imagen from '@/components/marca/Imagen'
 import TarifasTemporada from '../components/TarifasTemporada'
 import { usePedido } from '@/hooks/usePedido'
@@ -41,17 +43,6 @@ const AMENIDADES = [
   { Icono: BarbellIcon, label: 'Gym' },
 ]
 
-const SectionLabel = ({ children }) => (
-  <div style={{
-    fontFamily: 'var(--font-body)', fontSize: 'var(--fs-xs)', fontWeight: 800,
-    letterSpacing: '0.18em', textTransform: 'uppercase',
-    color: 'var(--outline)', marginBottom: '14px', marginTop: '28px',
-    paddingBottom: '8px', borderBottom: '1px solid var(--outline-var)',
-  }}>
-    {children}
-  </div>
-)
-
 const aFormulario = h => ({
   nombre: h?.nombre ?? '',
   tipo: h?.tipo ?? '',
@@ -61,6 +52,7 @@ const aFormulario = h => ({
   tamano_m2: h?.tamano_m2 != null ? String(h.tamano_m2) : '',
   tarifa: h ? String(h.tarifa_centavos / 100) : '',
   estado: h?.estado ?? 'activa',
+  venta_en_linea: h?.venta_en_linea ?? false,
   descripcion: h?.descripcion ?? '',
   amenidades: h?.amenidades ?? [],
 })
@@ -71,14 +63,14 @@ export default function HabitacionFormPage({ habitacionId, onBack, onDirtyChange
   if (!habitacionId) return <Formulario onBack={onBack} onDirtyChange={onDirtyChange} />
   if (pedido.error) {
     return (
-      <SectionPanel eyebrow="Habitaciones" title={<>Editar<br /><em>Habitación</em></>} subtitle={pedido.error.message} onBack={onBack}>
+      <SectionPanel title="Editar habitación" subtitle={pedido.error.message} onBack={onBack}>
         <Button variant="outline" onClick={pedido.recargar}>Reintentar</Button>
       </SectionPanel>
     )
   }
   if (pedido.cargando) {
     return (
-      <SectionPanel eyebrow="Habitaciones" title={<>Editar<br /><em>Habitación</em></>} subtitle="Cargando la habitación" onBack={onBack}>
+      <SectionPanel title="Editar habitación" subtitle="Cargando la habitación" onBack={onBack}>
         <div className={s.formGrid}><SkeletonCard height="520px" /><SkeletonCard height="320px" /></div>
       </SectionPanel>
     )
@@ -86,7 +78,7 @@ export default function HabitacionFormPage({ habitacionId, onBack, onDirtyChange
   const fuera = SITUACION[pedido.datos.situacion]
   if (fuera) {
     return (
-      <SectionPanel eyebrow="Habitaciones" title={<>{pedido.datos.nombre}</>}
+      <SectionPanel title={<>{pedido.datos.nombre}</>}
         subtitle={`${fuera.texto}. ${fuera.detalle}`} onBack={onBack} />
     )
   }
@@ -95,7 +87,6 @@ export default function HabitacionFormPage({ habitacionId, onBack, onDirtyChange
 }
 
 function Formulario({ room, onBack, onDirtyChange, onRecargar }) {
-  const addToast = useToast()
   const { sesion } = useSesion()
   const nueva = !room
   const inicial = aFormulario(room)
@@ -128,66 +119,41 @@ function Formulario({ room, onBack, onDirtyChange, onRecargar }) {
       descripcion: form.descripcion,
       tarifa_centavos: Math.round(Number(form.tarifa) * 100),
       estado: form.estado,
+      venta_en_linea: form.venta_en_linea,
     }
     try {
       if (nueva) await habitacionesApi.crear({ ...cuerpo, propiedad_id: form.propiedad_id })
       else await habitacionesApi.editar(room.id, { ...cuerpo, version: room.version })
       onDirtyChange?.(false)
-      addToast(nueva ? 'Habitación registrada correctamente' : 'Habitación actualizada correctamente',
-        { type: 'success', title: nueva ? 'Habitación creada' : 'Cambios guardados' })
+      toast.success(nueva ? 'Habitación registrada correctamente' : 'Habitación actualizada correctamente')
       onBack()
     } catch (err) {
       if (err.datos?.codigo === 'version') setDesactualizada(true)
-      addToast(err.message, { type: 'error', title: 'No se guardó' })
+      toast.error('No se guardó', { description: err.message })
       setSubmitting(false)
     }
   }
 
   const actions = (
     <>
-      <button
-        type="button"
-        onClick={onBack}
-        style={{
-          padding: '9px 18px', borderRadius: 'var(--radius-md)',
-          border: '1.5px solid var(--outline-var)', background: 'transparent',
-          color: 'var(--on-surface)', cursor: 'pointer',
-          fontFamily: 'var(--font-body)', fontSize: 'var(--fs-sm)', fontWeight: 700,
-          transition: 'background 0.15s',
-        }}
-        onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-container-low)'}
-        onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-      >
-        Cancelar
-      </button>
-      <button
-        type="submit"
-        form="habitacion-form"
-        disabled={submitting}
-        className="btn-primary"
-        style={{ opacity: submitting ? 0.6 : 1, cursor: submitting ? 'not-allowed' : 'pointer' }}
-      >
-        {submitting ? <HourglassIcon size={15} aria-hidden="true" /> : nueva ? <PlusCircleIcon size={15} weight="bold" aria-hidden="true" /> : <FloppyDiskIcon size={15} weight="bold" aria-hidden="true" />}
+      <Button variant="outline" size="lg" className="rounded-full" onClick={onBack}>Cancelar</Button>
+      <DropletButton type="submit" form="habitacion-form" disabled={submitting}>
+        {nueva ? <PlusCircleIcon size={16} weight="bold" aria-hidden="true" /> : <FloppyDiskIcon size={16} weight="bold" aria-hidden="true" />}
         {submitting ? 'Guardando…' : nueva ? 'Crear habitación' : 'Guardar cambios'}
-      </button>
+      </DropletButton>
     </>
   )
 
   return (
     <SectionPanel
-      eyebrow="Habitaciones"
-      title={nueva ? <>Nueva<br /><em>Habitación</em></> : <>Editar<br /><em>Habitación</em></>}
+      title={nueva ? "Nueva habitación" : "Editar habitación"}
       subtitle={nueva ? 'Registra una nueva habitación o cabaña en una de las propiedades' : `Modifica los detalles de «${room.nombre}»`}
       onBack={onBack}
       dirty={dirty}
       actions={actions}
     >
       {desactualizada && (
-        <div role="alert" style={{
-          display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap', marginBottom: '18px',
-          padding: '12px 16px', borderRadius: 'var(--radius-lg)',
-          background: 'var(--secondary-container)', color: 'var(--on-surface)', fontSize: 'var(--fs-sm)',
-        }}>
+        <div role="alert" className={s.desactualizada}>
           Alguien más guardó cambios en esta habitación. Recarga para ver lo nuevo (perderás lo que escribiste aquí).
           <Button variant="outline" size="sm" onClick={() => { onDirtyChange?.(false); onRecargar() }}>Recargar</Button>
         </div>
@@ -197,8 +163,8 @@ function Formulario({ room, onBack, onDirtyChange, onRecargar }) {
 
           {/* ── Columna izquierda ── */}
           <div>
-            <SectionLabel>Identificación</SectionLabel>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            <h2 className={s.rotulo}>Identificación</h2>
+            <div className={s.pila}>
               <Field label="Nombre de la habitación">
                 <Input required minLength={2} maxLength={120} placeholder="Ej. Suite Coral Grande"
                   value={form.nombre} onChange={set('nombre')} />
@@ -220,7 +186,7 @@ function Formulario({ room, onBack, onDirtyChange, onRecargar }) {
               </div>
             </div>
 
-            <SectionLabel>Capacidad y tamaño</SectionLabel>
+            <h2 className={s.rotulo}>Capacidad y tamaño</h2>
             <div className={s.threeCol}>
               <Field label="Capacidad (personas)">
                 <Select value={form.capacidad} onChange={set('capacidad')}>
@@ -240,35 +206,17 @@ function Formulario({ room, onBack, onDirtyChange, onRecargar }) {
               </Field>
             </div>
 
-            <SectionLabel>Amenidades</SectionLabel>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-              {AMENIDADES.map(({ Icono, label }) => {
-                const sel = form.amenidades.includes(label)
-                return (
-                  <button
-                    key={label}
-                    type="button"
-                    aria-pressed={sel}
-                    onClick={() => toggleAmenidad(label)}
-                    style={{
-                      padding: '7px 14px',
-                      borderRadius: 'var(--radius-full)',
-                      border: `1.5px solid ${sel ? 'var(--primary)' : 'var(--outline-var)'}`,
-                      background: sel ? 'color-mix(in srgb, var(--primary) 10%, transparent)' : 'transparent',
-                      color: sel ? 'var(--primary)' : 'var(--on-surface-var)',
-                      fontFamily: 'var(--font-body)', fontSize: 'var(--fs-xs)', fontWeight: 700,
-                      cursor: 'pointer', transition: 'all 0.15s',
-                      display: 'flex', alignItems: 'center', gap: '6px',
-                    }}
-                  >
-                    <Icono size={14} aria-hidden="true" />
-                    {label}
-                  </button>
-                )
-              })}
+            <h2 className={s.rotulo}>Amenidades</h2>
+            <div className={s.amenidades}>
+              {AMENIDADES.map(({ Icono, label }) => (
+                <button key={label} type="button" className={s.amenidad} aria-pressed={form.amenidades.includes(label)} onClick={() => toggleAmenidad(label)}>
+                  <Icono size={14} aria-hidden="true" />
+                  {label}
+                </button>
+              ))}
             </div>
 
-            <SectionLabel>Descripción pública</SectionLabel>
+            <h2 className={s.rotulo}>Descripción pública</h2>
             <Field label="Descripción visible para huéspedes">
               <Textarea
                 maxLength={2000}
@@ -281,18 +229,8 @@ function Formulario({ room, onBack, onDirtyChange, onRecargar }) {
 
           {/* ── Columna derecha ── */}
           <div className={s.sidePanel}>
-            <div style={{
-              background: 'var(--surface-container-low)',
-              border: '1px solid var(--outline-var)',
-              borderRadius: 'var(--radius-xl)', padding: '22px',
-              display: 'flex', flexDirection: 'column', gap: '14px',
-            }}>
-              <div style={{
-                fontFamily: 'var(--font-body)', fontSize: 'var(--fs-xs)', fontWeight: 800,
-                letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--outline)',
-              }}>
-                Tarifa y disponibilidad
-              </div>
+            <div className={s.lateral}>
+              <div className={s.lateralTitulo}>Tarifa y disponibilidad</div>
               <Field label="Tarifa base por noche (MXN, IVA incluido)">
                 <Input type="number" required min="1" max="100000" step="0.01" placeholder="3500"
                   value={form.tarifa} onChange={set('tarifa')} />
@@ -304,60 +242,36 @@ function Formulario({ room, onBack, onDirtyChange, onRecargar }) {
                   <option value="inactiva">Inactiva</option>
                 </Select>
               </Field>
+              <div className={s.interruptor}>
+                <div>
+                  <div id="venta-linea-t" className={s.interruptorTitulo}>Se vende en línea</div>
+                  <p className={s.ayuda}>
+                    Encendido: se ofrece en la web y a esta habitación se asignan las reservas de Booking y Airbnb.
+                    Apagado: solo la usa la recepción.
+                  </p>
+                </div>
+                <LiquidSwitch checked={form.venta_en_linea} aria-labelledby="venta-linea-t"
+                  onCheckedChange={v => setForm(f => ({ ...f, venta_en_linea: v }))} />
+              </div>
             </div>
 
             {/* Vista previa */}
-            <div style={{ background: 'var(--primary)', borderRadius: 'var(--radius-xl)', overflow: 'hidden' }}>
-              <div style={{ height: '120px' }}>
-                <Imagen src={room?.foto} alt={room?.nombre ?? 'Nueva habitación'} />
-              </div>
-              <div style={{ padding: '18px' }}>
-                <div style={{
-                  fontFamily: 'var(--font-body)', fontSize: 'var(--fs-xs)', fontWeight: 800,
-                  letterSpacing: '0.18em', textTransform: 'uppercase',
-                  color: 'color-mix(in srgb, var(--primary-foreground) 80%, transparent)', marginBottom: '6px',
-                }}>
-                  Vista previa
-                </div>
-                <div style={{ fontFamily: 'var(--font-headline)', fontSize: '1.1rem', color: 'var(--primary-foreground)', marginBottom: '4px' }}>
-                  {form.nombre || 'Nombre de habitación'}
-                </div>
-                <div style={{ fontFamily: 'var(--font-body)', fontSize: 'var(--fs-xs)', color: 'color-mix(in srgb, var(--primary-foreground) 75%, transparent)' }}>
-                  {form.tipo || 'Tipo'}
-                </div>
-                {form.tarifa && (
-                  <div style={{
-                    marginTop: '12px', paddingTop: '12px',
-                    borderTop: '1px solid color-mix(in srgb, var(--primary-foreground) 15%, transparent)',
-                    fontFamily: 'var(--font-headline)', fontSize: '1.2rem', color: 'var(--primary-foreground)',
-                  }}>
-                    MXN ${Number(form.tarifa).toLocaleString('es-MX')}
-                    <span style={{ fontFamily: 'var(--font-body)', fontSize: 'var(--fs-xs)', color: 'color-mix(in srgb, var(--primary-foreground) 75%, transparent)', marginLeft: '4px' }}>
-                      / noche
-                    </span>
-                  </div>
-                )}
+            <div className={s.previa}>
+              <div className={s.previaFoto}><Imagen src={room?.foto} alt={room?.nombre ?? 'Nueva habitación'} /></div>
+              <div className={s.previaTexto}>
+                <span className={s.ayuda}>Vista previa</span>
+                <span className={s.previaNombre}>{form.nombre || 'Nombre de habitación'}</span>
+                <span className={s.ayuda}>{form.tipo || 'Tipo'}</span>
+                {form.tarifa && <span className={s.previaTarifa}>MXN ${Number(form.tarifa).toLocaleString('es-MX')} <small>/ noche</small></span>}
               </div>
             </div>
 
-            <div style={{
-              background: 'var(--surface-container-low)',
-              border: '1px solid var(--outline-var)',
-              borderRadius: 'var(--radius-xl)', padding: '18px',
-              display: 'flex', flexDirection: 'column', gap: '10px',
-            }}>
+            <div className={s.notas}>
               {[
                 { Icono: CameraIcon, text: 'Las fotos se gestionan desde la galería de la habitación' },
                 { Icono: CalendarDotsIcon, text: 'Las fechas de bloqueo se gestionan desde el calendario' },
                 { Icono: TrashIcon, text: 'Mandarla a la papelera se hace desde la lista de habitaciones' },
-              ].map((item, i) => (
-                <div key={i} style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
-                  <item.Icono size={14} aria-hidden="true" style={{ color: 'var(--primary)', marginTop: '1px', flexShrink: 0 }} />
-                  <span style={{ fontFamily: 'var(--font-body)', fontSize: 'var(--fs-xs)', color: 'var(--on-surface-var)', lineHeight: 1.5 }}>
-                    {item.text}
-                  </span>
-                </div>
-              ))}
+              ].map(item => <div key={item.text} className={s.nota}><item.Icono size={14} aria-hidden="true" /><span>{item.text}</span></div>)}
             </div>
           </div>
         </div>

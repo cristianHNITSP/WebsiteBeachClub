@@ -18,7 +18,7 @@ from sqlalchemy import (
     func,
     text,
 )
-from sqlalchemy.dialects.postgresql import ARRAY, DATERANGE, Range
+from sqlalchemy.dialects.postgresql import ARRAY, DATERANGE, JSONB, Range
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.modelos.base import Base
@@ -51,7 +51,9 @@ class CalendarioExterno(Base):
     __tablename__ = "calendarios_externos"
     id: Mapped[UUID] = mapped_column(primary_key=True, server_default=text("uuidv7()"))
     propiedad_id: Mapped[UUID]
-    habitacion_id: Mapped[UUID]
+    # Cuelga de lo que la PLATAFORMA publica (una ficha y uno de sus tipos), no de una habitación del motor.
+    ficha_id: Mapped[UUID] = mapped_column(ForeignKey("fichas_externas.id", ondelete="CASCADE"), index=True)
+    publicacion: Mapped[str] = mapped_column(String(200))
     canal: Mapped[str] = mapped_column(String(10))
     url: Mapped[str] = mapped_column(String(1000))
     activo: Mapped[bool] = mapped_column(server_default=text("true"))
@@ -69,14 +71,8 @@ class CalendarioExterno(Base):
     creado_por: Mapped[UUID | None] = mapped_column(ForeignKey("usuarios.id", ondelete="RESTRICT"))
 
     __table_args__ = (
-        ForeignKeyConstraint(
-            ["habitacion_id", "propiedad_id"],
-            ["habitaciones.id", "habitaciones.propiedad_id"],
-            ondelete="RESTRICT",
-            name="fk_calendarios_externos_habitacion_propiedad",
-        ),
         ForeignKeyConstraint(["propiedad_id"], ["propiedades.id"], ondelete="RESTRICT"),
-        UniqueConstraint("habitacion_id", "canal"),
+        UniqueConstraint("ficha_id", "publicacion"),
         CheckConstraint(f"canal IN {CANALES}", name="canal"),
         CheckConstraint("url LIKE 'https://%'", name="https"),
     )
@@ -86,7 +82,6 @@ class ReservaExterna(Base):
     __tablename__ = "reservas_externas"
     id: Mapped[UUID] = mapped_column(primary_key=True, server_default=text("uuidv7()"))
     propiedad_id: Mapped[UUID] = mapped_column(ForeignKey("propiedades.id", ondelete="RESTRICT"))
-    habitacion_id: Mapped[UUID | None] = mapped_column(ForeignKey("habitaciones.id", ondelete="RESTRICT"))
     canal: Mapped[str] = mapped_column(String(10))
     uid_externo: Mapped[str] = mapped_column(String(255))
     estancia: Mapped[Range[date]] = mapped_column(DATERANGE)
@@ -116,9 +111,6 @@ class ReservaExterna(Base):
             "NOT isempty(estancia) AND NOT lower_inf(estancia) AND NOT upper_inf(estancia)", name="estancia"
         ),
         Index("ix_reservas_externas_propiedad_estancia", "propiedad_id", "estancia", postgresql_using="gist"),
-        Index(
-            "ix_reservas_externas_habitacion_estancia", "habitacion_id", "estancia", postgresql_using="gist"
-        ),
     )
 
 
@@ -161,3 +153,34 @@ class AjustesBot(Base):
     ultimo_resultado: Mapped[str | None] = mapped_column(String(300))
 
     __table_args__ = (CheckConstraint("id = 1", name="una_fila"),)
+
+
+ESTADOS_FICHA = ("pendiente", "leyendo", "leida", "sin_datos", "bloqueada_robots", "verificacion", "error")
+
+
+class FichaExterna(Base):
+    """Una ficha del hotel en otra plataforma (la URL la pone el hotel: es suya).
+    El bot la lee con cortesía y guarda aquí lo que encontró: las habitaciones
+    que publica y los datos de la ficha. Solo CONSULTA: no toca `habitaciones`
+    hasta que el gerente importa una."""
+
+    __tablename__ = "fichas_externas"
+    id: Mapped[UUID] = mapped_column(primary_key=True, server_default=text("uuidv7()"))
+    propiedad_id: Mapped[UUID] = mapped_column(ForeignKey("propiedades.id", ondelete="RESTRICT"))
+    canal: Mapped[str] = mapped_column(String(10))
+    url: Mapped[str] = mapped_column(String(1000))
+    estado: Mapped[str] = mapped_column(String(20), server_default="pendiente")
+    detalle: Mapped[str | None] = mapped_column(String(300))
+    titulo: Mapped[str | None] = mapped_column(String(300))
+    resumen: Mapped[dict] = mapped_column(JSONB, server_default=text("'{}'::jsonb"))
+    cuartos: Mapped[list] = mapped_column(JSONB, server_default=text("'[]'::jsonb"))
+    leida_en: Mapped[datetime | None]
+    creado: Mapped[datetime] = mapped_column(server_default=func.now())
+    creado_por: Mapped[UUID | None] = mapped_column(ForeignKey("usuarios.id", ondelete="RESTRICT"))
+
+    __table_args__ = (
+        CheckConstraint(f"canal IN {CANALES}", name="canal"),
+        CheckConstraint(f"estado IN {ESTADOS_FICHA}", name="estado"),
+        CheckConstraint("url LIKE 'https://%'", name="https"),
+        UniqueConstraint("url", name="uq_fichas_externas_url"),
+    )

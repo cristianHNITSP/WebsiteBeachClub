@@ -30,3 +30,9 @@
 }
 .texto { position: relative; }
 .hueco { min-width: 24px; text-align: center; color: var(--muted-foreground); }
+
+/* En el panel: la ficha neutra y chica de devl/coss (la website sigue igual) */
+:global(body.panel) .paginador { margin-top: 0; gap: 2px; }
+:global(body.panel) .numero { min-width: 30px; height: 30px; padding: 0 6px; font-size: var(--fs-xs); font-weight: 600; }
+:global(body.panel) .activo, :global(body.panel) .activo:hover { color: var(--foreground); }
+:global(body.panel) .marca { background: var(--background); box-shadow: 0 0 0 1px var(--border), var(--shadow-sm); }

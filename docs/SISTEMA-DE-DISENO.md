@@ -1,4 +1,4 @@
-# Sistema de diseño Hoteles Frida
+# Sistema de diseño Reservas Frida
 
 > Contrato visual y técnico de `frontend/`. Cuando se diseñe o rehaga
 > **cualquier** página, componente, modal, tarjeta o texto, se hace según este
@@ -35,7 +35,7 @@
 4. **Jerarquía por tipografía, superficie y espacio**, no por caracteres
    decorativos (§3). Titulares en `--font-headline` (Noto Serif), todo lo
    demás en `--font-body` (Manrope).
-5. **La elevación es SOLO por sombra.** Hover de tarjetas y botones = sube la
+5. **La elevación es SOLO por sombra (website).** El panel tiene sus reglas de movimiento en §15. Hover de tarjetas y botones = sube la
    sombra (`--shadow-sm` → `--shadow-md`). **Nada de `translateY` al hover**,
    ni `whileHover={{ y: … }}` de framer-motion: mueve el contenido bajo el
    cursor y hace temblar los bordes. Excepción: navegación y gestos (un
@@ -568,3 +568,26 @@ usar el PNG: trae fondo blanco y "CABAÑAS" en negro.
 - Iconos de categoría con su flor = identidad, no estado. Los estados
   (pagado, cancelado) usan el par tintado + icono + texto.
 
+
+## 15. Panel: devl.dev + coss (2026-11-05)
+
+Rehecho a pedido del usuario. Se quedan React, Tailwind, la paleta floral y todas las funciones; cambian las piezas y el movimiento. La website sigue en §14.
+
+- **Piezas:** `components/devl/` (devl.dev) y `components/coss/` (coss.com/ui, Base UI), instaladas con `sh scripts/devl-add.sh <pieza>` para no pisar `components/ui/`, que es de shadcn y la usa la website. Se usan tal cual: lo nuestro es el color y el texto en español. Reinstalar una pieza borra su traducción y los ajustes de `metric-card` (`axisFormat`, `maxValue`).
+- **Color:** `body.panel` (`admin/admin.css`) redeclara los tokens y convierte los `--color-violet-500`, `rose`, `sky`, `amber` y `emerald` de las piezas en flores. Morado lleno solo en UNA acción por pantalla, en los datos y en lo seleccionado. Texto morado en oscuro: `#A26BE8` (AA medido contra tarjeta y tinta).
+- **Letras:** Geist y Geist Mono. Sin rótulos en mayúsculas.
+- **Armazón:** inset centrado (1480 px como máximo). Navegación solo en la barra lateral; la superior lleva migas, lanzador, avisos, tema y "Nueva reserva".
+- **Movimiento:** bajar en la barra lateral entra desde abajo y subir desde arriba; los paneles entran desde la derecha y salen por la derecha; los botones reaccionan sin seguir al cursor; al cambiar de periodo, las barras del Calendario se deslizan. Aquí sí se permite el desplazamiento corto y con sentido. Todo se apaga con reducir movimiento.
+- **Estados del Calendario:** confirmada llena, en curso tinte con borde fino, pendiente con contorno dorado, completada apagada, mantenimiento rayado gris, otra plataforma rayada dorada. Cada estado se distingue por su marca y no solo por el color.
+- **Nunca tablas.** Listas divididas o tarjetas. Listas largas paginadas.
+- **No mezclar overlays:** dentro de un panel o diálogo de Base UI, todo lo que abre encima debe ser de Base UI. Un `Select` de coss dentro de un `Sheet` de Radix no recibe clics.
+- **Avisos:** `toast` de `@/admin/toast` (ToastDeck). Sonner sigue montado solo para Restaurante y Tienda.
+
+### 15.x Vida y paneles (2026-11-05, pedido del usuario)
+
+- **Paneles:** nacen del elemento tocado y, al volver, regresan a él (`admin/transicionPanel.js`, recorte con View Transitions). Reemplaza a "salen hacia la derecha". Al regresar se restaura el scroll. Sin soporte o con reducir movimiento, cambian al instante.
+- **Botones:** todos son pastilla. Los de contorno y fantasma se rellenan desde donde entra el cursor, hacen onda al presionar y sueltan gotitas (`admin/vida.js`). La acción principal es `DropletButton` con doble contorno y una ola que sube al pasar.
+- **Iconos:** cada uno hace su gesto al pasar (`marca/iconosVivos.jsx`). En la acción principal también corre en reposo, con pausas.
+- **Buscador:** en pantalla ancha, el globo modal `GloboBuscar` crece desde su botón; en móvil, el `Launcher` de devl. En ambos, la página de atrás no se desplaza.
+- **Cursor líquido:** la gota se pinta entre el fondo y el contenido, así que el fondo va en la caja de `LiquidCursor` y lo que está dentro no debe ser opaco. Lo que tiene `liquidTarget` cambia de tinta con `[data-liquid-active]`.
+- **Propiedad:** se elige solo con la ficha de la barra lateral; ficha y menú comparten ancho y filas.

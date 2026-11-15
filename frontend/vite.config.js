@@ -6,8 +6,20 @@ import path from "path";
 // Proxy /api → backend en desarrollo. El destino llega por variable de
 // entorno (API_DESTINO, la pone docker-compose.dev.yml), nunca un literal.
 // Solo hace falta al servir (npm run dev); el build no la necesita.
+// Versión de esta compilación: va dentro del código (__VERSION__) y en /version.json. Si la
+// publicada cambia, el panel abierto sabe que quedó viejo y ofrece actualizar (lib/version.js).
+const VERSION = process.env.VERSION_APP || new Date().toISOString()
+const publicarVersion = {
+  name: "publicar-version",
+  apply: "build",
+  generateBundle() {
+    this.emitFile({ type: "asset", fileName: "version.json", source: JSON.stringify({ version: VERSION }) });
+  },
+};
+
 export default defineConfig(({ command }) => ({
-  plugins: [react(), tailwindcss()],
+  plugins: [react(), tailwindcss(), publicarVersion],
+  define: { __VERSION__: JSON.stringify(VERSION) },
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),

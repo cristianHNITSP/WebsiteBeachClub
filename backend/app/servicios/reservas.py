@@ -10,6 +10,7 @@ en el hotel"). Las de la API pública nacen `retenida` y vencen solas (fase 6,
 `servicios/publica.py`); ahí no hay empleado: `actor` es None.
 """
 
+import base64
 import secrets
 from datetime import date, datetime, timedelta
 from uuid import UUID
@@ -108,6 +109,7 @@ def a_salida(r: Reserva) -> dict:
         "pagado_centavos": r.pagado_centavos,
         "por_cobrar_centavos": r.por_cobrar_centavos,
         "motivo_cancelacion": r.motivo_cancelacion,
+        "fuente": r.fuente,
         "sitio_id": r.sitio_id,
         "vence_en": r.vence_en,
         "version": r.version,
@@ -171,6 +173,17 @@ async def _habitacion(sesion: AsyncSession, alcance: Alcance, habitacion_id: UUI
     if h is None:
         raise NoEncontrado("Esa habitación no existe")
     return h
+
+
+def _solo_motor(r: Reserva) -> None:
+    """Las de otras plataformas (Booking, Airbnb…) le pertenecen a la plataforma: aquí solo se marca su
+    llegada y su salida, o se cancelan. Nada de moverlas, editarlas ni cobrarlas."""
+    if r.fuente != "motor":
+        raise ReglaDeNegocio(
+            f"Esta reserva viene de {r.fuente}. Los cambios y los cobros se hacen en esa plataforma; "
+            "aquí solo se registra su llegada y su salida, o se cancela.",
+            codigo="de_plataforma",
+        )
 
 
 def _validar_habitacion(h: Habitacion, tipo: str, adultos: int, ninos: int) -> None:
@@ -339,6 +352,7 @@ async def mover(
     sesion: AsyncSession, actor: Actor, alcance: Alcance, reserva_id: UUID, datos: Mover
 ) -> Reserva:
     r = await _cargar(sesion, alcance, reserva_id, datos.version)
+    _solo_motor(r)
     if r.estado not in ("retenida", "confirmada", "en_curso"):
         raise Conflicto(f"Una reserva {ETIQUETA[r.estado]} ya no se mueve", codigo="transicion")
     if r.estado == "en_curso" and datos.llegada != r.llegada:
@@ -419,6 +433,12 @@ async def _cambiar_estado(
             raise ReglaDeNegocio("Un bloqueo no tiene llegada", codigo="bloqueo")
         if not r.llegada <= hoy() < r.salida:
             raise ReglaDeNegocio("La llegada se registra el día de su estancia", codigo="fuera_de_fecha")
+    if a in ("en_curso", "completada") and r.habitacion.eliminado_en is not None:
+        raise ReglaDeNegocio(
+            "La habitación está eliminada: no se puede registrar llegada ni salida a menos que se restaure "
+            "de la papelera. Al terminar la última noche, la reserva se cierra sola sin cancelarse.",
+            codigo="habitacion_eliminada",
+        )
     if a == "completada" and r.por_cobrar_centavos > 0:
         raise ReglaDeNegocio(
             f"Falta cobrar ${r.por_cobrar_centavos / 100:,.2f} antes de registrar la salida",
@@ -512,6 +532,7 @@ async def _cobrar(sesion, actor: Actor, r: Reserva, *, concepto, metodo, monto: 
 async def registrar_pago(sesion, actor, alcance, reserva_id: UUID, datos: PagoNuevo) -> Reserva:
     # Sin `version`: sumar un pago no pisa nada, y la fila está bloqueada (FOR UPDATE).
     r = await _cargar(sesion, alcance, reserva_id)
+    _solo_motor(r)
     await _cobrar(
         sesion,
         actor,
@@ -529,6 +550,50 @@ async def registrar_pago(sesion, actor, alcance, reserva_id: UUID, datos: PagoNu
 
 async def listar(sesion, alcance, **filtros) -> list[Reserva]:
     return await repo.listar(sesion, alcance, **filtros)
+
+
+# ── Llegadas y salidas: cada columna, por cursor de doble sentido ──
+
+
+def _cursor_recepcion(fecha: date, ident: UUID, sentido: str) -> str:
+    return base64.urlsafe_b64encode(f"{fecha.isoformat()}|{ident}|{sentido}".encode()).decode()
+
+
+def _leer_cursor_recepcion(cursor: str) -> tuple[tuple[date, UUID], bool]:
+    try:
+        fecha, ident, sentido = base64.urlsafe_b64decode(cursor.encode()).decode().split("|")
+        if sentido not in ("s", "a"):
+            raise ValueError
+        return (date.fromisoformat(fecha), UUID(ident)), sentido == "a"
+    except ValueError as e:  # binascii.Error también es ValueError
+        raise ReglaDeNegocio("El cursor no es válido", codigo="cursor") from e
+
+
+async def recepcion(
+    sesion, alcance, *, columna: str, cursor: str | None, limite: int
+) -> tuple[list[Reserva], str | None, str | None, int]:
+    """(filas, cursor siguiente, cursor anterior, total) de una columna de hoy."""
+    dia = hoy()
+    desde, atras = _leer_cursor_recepcion(cursor) if cursor else (None, False)
+    filas = await repo.recepcion(
+        sesion, alcance, columna=columna, dia=dia, desde=desde, hacia_atras=atras, limite=limite + 1
+    )
+    hay_mas, filas = len(filas) > limite, filas[:limite]
+    if atras:
+        filas.reverse()
+    total = await repo.contar_recepcion(sesion, alcance, columna=columna, dia=dia)
+    if not filas:
+        return [], None, None, total
+    clave = (lambda r: r.salida) if columna in ("en_casa", "salen") else (lambda r: r.llegada)
+    primera, ultima = filas[0], filas[-1]
+    # Hacia adelante siempre hay anterior si se llegó con cursor; hacia atrás, siguiente.
+    siguiente = _cursor_recepcion(clave(ultima), ultima.id, "s") if (atras or hay_mas) else None
+    anterior = (
+        _cursor_recepcion(clave(primera), primera.id, "a")
+        if ((atras and hay_mas) or (cursor and not atras))
+        else None
+    )
+    return filas, siguiente, anterior, total
 
 
 async def detalle(sesion, alcance, reserva_id: UUID) -> tuple[Reserva, list[Pago], list[dict]]:
@@ -621,6 +686,7 @@ async def devolver(sesion, actor: Actor, alcance: Alcance, reserva_id: UUID, dat
     """Registra dinero que SALE hacia el huésped. No toca pagos anteriores: es
     una fila más. Se puede en cualquier estado (típico: tras cancelar)."""
     r = await _cargar(sesion, alcance, reserva_id)
+    _solo_motor(r)
     if r.tipo != "reserva":
         raise ReglaDeNegocio("Un bloqueo no lleva pagos", codigo="bloqueo")
     if datos.monto_centavos > r.pagado_centavos:
@@ -699,6 +765,98 @@ def vencer_retenciones(sesion, limite: int = 200) -> int:
             Outbox(
                 tipo="reserva.expirada", agregado="reserva", agregado_id=r.id, propiedad_id=r.propiedad_id,
                 datos={**despues, "detalle": None, "de": "retenida", "por": None},
+            )
+        )  # fmt: skip
+    sesion.flush()
+    return len(filas)
+
+
+# ── Habitaciones eliminadas con reservas (Celery, cada noche) ──
+
+
+def cerrar_reservas_de_habitaciones_eliminadas(sesion, limite: int = 500) -> int:
+    """Una habitación eliminada (papelera o definitiva) no deja reservas colgadas: cuando pasa la
+    noche del último día de una reserva suya que seguía abierta (`confirmada` o `en_curso`), la
+    reserva se cierra sola como `completada`. NO se cancela ni se borra: queda en el historial con
+    el aviso «habitación eliminada». Con historial, auditoría y outbox como cualquier cambio."""
+    filas = (
+        sesion.execute(
+            select(Reserva)
+            .join(Habitacion, Habitacion.id == Reserva.habitacion_id)
+            .where(
+                Habitacion.eliminado_en.is_not(None),
+                Reserva.estado.in_(("confirmada", "en_curso")),
+                func.upper(Reserva.estancia) <= hoy(),  # la última noche es la anterior a la salida
+            )
+            .options(selectinload(Reserva.habitacion))
+            .execution_options(**{INCLUIR_ELIMINADOS: True})
+            .order_by(Reserva.estancia)
+            .limit(limite)
+            .with_for_update(of=Reserva, skip_locked=True)
+        )
+        .scalars()
+        .all()
+    )
+    for r in filas:
+        antes, de = _foto(r), r.estado
+        r.estado = "completada"
+        sesion.flush()
+        despues = _foto(r)
+        sesion.add(
+            ReservaEvento(
+                reserva_id=r.id, propiedad_id=r.propiedad_id, tipo="cierre", de_estado=de,
+                a_estado="completada", detalle={"motivo": "habitacion_eliminada"},
+            )
+        )  # fmt: skip
+        sesion.add(
+            nueva_auditoria(
+                accion="reserva.cierre", entidad="reserva", entidad_id=r.id, antes=antes,
+                despues={**despues, "motivo": "habitacion_eliminada"},
+            )
+        )  # fmt: skip
+        sesion.add(
+            Outbox(
+                tipo="reserva.cerrada", agregado="reserva", agregado_id=r.id, propiedad_id=r.propiedad_id,
+                datos={**despues, "detalle": {"motivo": "habitacion_eliminada"}, "de": de, "por": None},
+            )
+        )  # fmt: skip
+    sesion.flush()
+    return len(filas)
+
+
+def purgar_habitaciones_sin_reservas_abiertas(sesion, limite: int = 200) -> int:
+    """La habitación que está en la papelera y TUVO reservas se elimina sola (definitivo, con lápida)
+    cuando ya no le queda ninguna abierta. Las que nunca tuvieron reservas siguen el camino de siempre:
+    las vacía quien tenga `papelera.vaciar`."""
+    abierta = (
+        select(Reserva.id)
+        .where(
+            Reserva.habitacion_id == Habitacion.id, Reserva.estado.in_(("retenida", "confirmada", "en_curso"))
+        )
+        .exists()
+    )
+    tuvo = select(Reserva.id).where(Reserva.habitacion_id == Habitacion.id).exists()
+    filas = (
+        sesion.execute(
+            select(Habitacion)
+            .where(Habitacion.eliminado_en.is_not(None), Habitacion.purgado_en.is_(None), tuvo, ~abierta)
+            .execution_options(**{INCLUIR_ELIMINADOS: True})
+            .order_by(Habitacion.eliminado_en)
+            .limit(limite)
+            .with_for_update(skip_locked=True)
+        )
+        .scalars()
+        .all()
+    )
+    for h in filas:
+        antes = {"nombre": h.nombre, "tipo": h.tipo}
+        h.purgado_en = func.now()
+        h.vaciar_contenido()
+        sesion.flush()
+        sesion.add(
+            nueva_auditoria(
+                accion="habitacion.borrar_definitivo", entidad="habitacion", entidad_id=h.id, antes=antes,
+                despues={"motivo": "sin reservas abiertas"},
             )
         )  # fmt: skip
     sesion.flush()

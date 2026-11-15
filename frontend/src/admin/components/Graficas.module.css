@@ -1,9 +1,9 @@
-/* ===== GRÁFICAS (una serie, un color; texto con tokens de texto) =====
- * Serie en --primary; "hoy" en --flor-rojo (igual que la línea de hoy de la
- * Línea de tiempo). Par validado con scripts/validate_palette.js (claro y
- * oscuro). En oscuro la serie baja a #A874EC: --primary (#B98AF0) queda fuera
- * de la banda de luminosidad para marcas. */
-.figura { margin: 0; --serie: var(--primary); --hoy: var(--flor-rojo); }
+/* ===== GRÁFICAS (una serie, un tono; texto con tokens de texto) =====
+ * El periodo actual ("hoy", el mes en curso) va en --serie lleno; el resto, en
+ * su tinte al 66% sobre la tarjeta (3.3:1 en claro, 3.0:1 en oscuro: se ven
+ * como datos). En oscuro la serie baja a #A874EC: --primary (#B98AF0) queda
+ * fuera de la banda de luminosidad para marcas. */
+.figura { margin: 0; --serie: var(--primary); }
 :global(.dark) .figura, :global(.dark) .barras { --serie: #A874EC; }
 
 .columnas {
@@ -18,11 +18,11 @@
   width: 100%;
   max-width: 56px;
   border-radius: 4px 4px 0 0;
-  background: var(--serie);
+  background: color-mix(in srgb, var(--serie) 66%, var(--card));
   transform-origin: bottom center;
   transition: background-color 0.15s;
 }
-.marcada { background: var(--hoy); }
+.marcada { background: var(--serie); }
 
 .eje { display: flex; gap: 2px; margin-top: 6px; }
 .ejeEtiqueta {

@@ -1,24 +1,22 @@
+import { SkeletonSweepBlock } from '@/components/devl/skeleton-sweep'
+
 /**
  * Skeleton — placeholder de carga con shimmer, usa tokens del design system.
  * Variantes: rect (default), circle, text
  */
 export default function Skeleton({ variant = 'rect', width, height, style, className }) {
-  const shimmerStyle = {
-    background: 'linear-gradient(90deg, var(--surface-container) 0%, var(--surface-container-highest) 48%, var(--surface-container) 100%)',
-    backgroundSize: '200% 100%',
-    animation: 'shimmer 1.6s linear infinite',
-    borderRadius:
-      variant === 'circle' ? 'var(--radius-full)'
-      : variant === 'text'  ? 'var(--radius-sm)'
-      : 'var(--radius-md)',
-    display: 'block',
-    flexShrink: 0,
-    width:  width  ?? (variant === 'circle' ? '40px' : '100%'),
-    height: height ?? (variant === 'circle' ? '40px' : variant === 'text' ? '14px' : '80px'),
-    ...style,
-  }
-
-  return <span style={shimmerStyle} className={className} />
+  return (
+    <SkeletonSweepBlock
+      className={className}
+      style={{
+        borderRadius: variant === 'circle' ? 'var(--radius-full)' : variant === 'text' ? 'var(--radius-sm)' : 'var(--radius-md)',
+        flexShrink: 0,
+        width: width ?? (variant === 'circle' ? '40px' : '100%'),
+        height: height ?? (variant === 'circle' ? '40px' : variant === 'text' ? '14px' : '80px'),
+        ...style,
+      }}
+    />
+  )
 }
 
 /* ── Compound helpers ── */

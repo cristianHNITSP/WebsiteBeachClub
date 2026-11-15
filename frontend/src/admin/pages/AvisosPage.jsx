@@ -1,23 +1,45 @@
 import { useMemo } from 'react'
+import { BellQuiet } from '@/components/devl/bell-quiet'
+import { LiquidSegments } from '@/components/devl/liquid-segments'
 import { useNavigate } from 'react-router-dom'
 import { SkeletonCard } from '@/components/frida/Skeleton'
 import { motion, AnimatePresence } from 'framer-motion'
-import { toast } from 'sonner'
+import { toast } from '@/admin/toast'
 import {
-  BellIcon, BellSlashIcon, CalendarDotsIcon, CreditCardIcon, WrenchIcon, StarIcon, GearSixIcon,
+  BellSlashIcon, CalendarDotsIcon, CreditCardIcon, WrenchIcon, StarIcon, GearSixIcon,
   EnvelopeSimpleIcon, EnvelopeSimpleOpenIcon, TrashIcon, ArrowRightIcon, ChecksIcon,
 } from '@phosphor-icons/react'
-import { Button } from '@/components/ui/button'
-import JellyRadio from '@/components/bits/JellyRadio'
-import TarjetaCifra from '@/components/marca/TarjetaCifra'
+import { Button } from '@/components/coss/button'
+import { LiquidCursor } from '@/components/devl/liquid-cursor'
+import { MetricCard } from '@/components/devl/metric-card'
+import { claseVivo, marcarIconos } from '@/components/marca/iconosVivos'
+import { CoronaFlores } from '@/components/marca/Wordmark'
 import Paginador from '@/components/marca/Paginador'
-import Pista, { GrupoPistas } from '@/components/marca/Pista'
+import Pista, { GrupoPistas } from '@/admin/components/Pista'
 import { useParametros } from '@/hooks/useParametros'
 import { animacionItem } from '@/lib/animacionListas'
 import { useAvisos, grupoDe, haceCuanto } from '../avisos'
+import Celda from '../components/Celda'
+import c from '../components/Celda.module.css'
 import s from './AvisosPage.module.css'
 
 const POR_PAGINA = 8
+const ENTERO = { maximumFractionDigits: 0 }
+const mismoDia = (a, b) => a.toDateString() === b.toDateString()
+
+/** Cuántos avisos de cada tipo hubo en cada uno de los últimos 7 días. */
+function deLaSemana(avisos) {
+  const puntos = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date()
+    d.setDate(d.getDate() - 6 + i)
+    const delDia = avisos.filter(a => mismoDia(a.fecha, d))
+    return {
+      label: d.toLocaleDateString('es-MX', { weekday: 'short', day: 'numeric' }),
+      values: ['reserva', 'pago', 'operacion'].map(t => delDia.filter(a => a.tipo === t).length),
+    }
+  })
+  return { puntos, total: puntos.reduce((n, x) => n + x.values.reduce((m, v) => m + v, 0), 0) }
+}
 
 // Cada tipo con su flor del logo (identidad, no estado) y su icono.
 const TIPO = {
@@ -52,6 +74,13 @@ export default function AvisosPage({ onNavigate }) {
   const visibles = filtrados.slice((pagina - 1) * POR_PAGINA, pagina * POR_PAGINA)
 
   const cuenta = tipo => avisos.filter(a => a.tipo === tipo).length
+  const semana = useMemo(() => deLaSemana(avisos), [avisos])
+  const deHoy = tipo => {
+    const n = avisos.filter(a => a.tipo === tipo && mismoDia(a.fecha, new Date())).length
+    return n ? `${n} de hoy` : 'Ninguno hoy'
+  }
+  // Tocar la cifra del filtro activo lo quita.
+  const filtrar = f => set({ filtro: p.filtro === f ? 'todos' : f, pagina: 1 })
 
   const quitar = aviso => {
     borrar(aviso.id)
@@ -72,7 +101,6 @@ export default function AvisosPage({ onNavigate }) {
     <div>
       <div className="admin-page-header">
         <div>
-          <span className="admin-page-eyebrow">Centro de avisos</span>
           <h1 className="admin-page-title">Tus <em>avisos</em></h1>
           <p className="admin-page-sub">
             {sinLeer > 0 ? `Tienes ${sinLeer} aviso${sinLeer !== 1 ? 's' : ''} sin leer.` : 'Estás al día. No hay avisos sin leer.'}
@@ -91,26 +119,26 @@ export default function AvisosPage({ onNavigate }) {
         </div>
       </div>
 
-      <div className="inventory-grid" style={{ marginBottom: 28 }}>
-        <TarjetaCifra Icono={BellIcon}         flor="morado"   label="Sin leer" value={sinLeer} />
-        <TarjetaCifra Icono={CalendarDotsIcon} flor="turquesa" label="Reservas" value={cuenta('reserva')} />
-        <TarjetaCifra Icono={CreditCardIcon}   flor="dorado"   label="Pagos"    value={cuenta('pago')} />
-        <TarjetaCifra Icono={WrenchIcon}       flor="naranja"  label="Operación" value={cuenta('operacion')} />
-      </div>
+      {/* El mismo resumen del Tablero: la semana en una línea y las cifras tocables filtran */}
+      <LiquidCursor className={s.resumen} role="region" aria-label="Resumen de avisos">
+        <div className={s.resumenCaja}>
+          <span data-mece="" className={s.ramillete}><CoronaFlores /></span>
+          <MetricCard className="max-w-none border-0 bg-transparent shadow-none before:hidden" title="Avisos de la semana" locale="es-MX" showDelta={false}
+            series={[{ name: 'Reservas', color: 'var(--primary)' }, { name: 'Pagos', color: 'var(--flor-dorado)' }, { name: 'Operación', color: 'var(--flor-turquesa)' }]}
+            format={ENTERO} axisFormat={ENTERO}
+            ranges={[{ id: 's', label: '7 días', caption: `${semana.total} en los últimos 7 días`, points: semana.puntos }]} />
+          <div className={c.cifras}>
+            <Celda color="var(--flor-rojo)" etiqueta="Sin leer" valor={sinLeer} nota={`De ${avisos.length} en total`} activa={p.filtro === 'sin-leer'} onClick={() => filtrar('sin-leer')} />
+            <Celda color="var(--primary)" etiqueta="Reservas" valor={cuenta('reserva')} nota={deHoy('reserva')} activa={p.filtro === 'reserva'} onClick={() => filtrar('reserva')} />
+            <Celda color="var(--flor-dorado)" etiqueta="Pagos" valor={cuenta('pago')} nota={deHoy('pago')} activa={p.filtro === 'pago'} onClick={() => filtrar('pago')} />
+            <Celda color="var(--flor-turquesa)" etiqueta="Operación" valor={cuenta('operacion')} nota={deHoy('operacion')} activa={p.filtro === 'operacion'} onClick={() => filtrar('operacion')} />
+          </div>
+        </div>
+      </LiquidCursor>
 
-      {/* Filtros: JellyRadio (React Bits). Cambiar de filtro vuelve a la página 1 */}
+      {/* Filtros: LiquidSegments (devl.dev). Cambiar de filtro vuelve a la página 1 */}
       <div className={s.filtros}>
-        <JellyRadio
-          items={FILTROS}
-          value={p.filtro}
-          onChange={v => set({ filtro: v, pagina: 1 })}
-          ariaLabel="Filtrar avisos"
-          size="md"
-          chipColor="var(--muted)"
-          activeColor="var(--primary)"
-          textColor="var(--muted-foreground)"
-          activeTextColor="var(--primary-foreground)"
-        />
+        <LiquidSegments options={FILTROS} value={p.filtro} onValueChange={v => set({ filtro: v, pagina: 1 })} aria-label="Filtrar avisos" size="default" />
         <span className={s.resultado}>{filtrados.length} aviso{filtrados.length !== 1 ? 's' : ''}</span>
       </div>
 
@@ -125,9 +153,8 @@ export default function AvisosPage({ onNavigate }) {
           </div>
         ) : visibles.length === 0 ? (
           <div className={s.vacio} role="status">
-            <span className={s.vacioIcono}><BellSlashIcon size={30} /></span>
-            <div className={s.vacioTitulo}>{p.filtro === 'sin-leer' ? 'No tienes avisos sin leer' : 'No hay avisos aquí'}</div>
-            <div className={s.vacioTexto}>Cuando pase algo en tus hoteles, lo verás en esta bandeja.</div>
+            <BellQuiet hue="amber" title={p.filtro === 'sin-leer' ? 'No tienes avisos sin leer' : 'No hay avisos aquí'}
+              description="Aquí aparecerán las reservas nuevas, los cambios, los pagos y las llegadas de tus propiedades." />
           </div>
         ) : (
           <GrupoPistas>
@@ -140,9 +167,9 @@ export default function AvisosPage({ onNavigate }) {
                   return (
                     <motion.li key={aviso.id} {...animacionItem}>
                       {nuevoGrupo && <div className={`rotulo ${s.grupo}`}>{grupo}</div>}
-                      <article className={`${s.aviso} ${aviso.leido ? '' : s.noLeido}`}>
+                      <article className={`${s.aviso} ${claseVivo} ${aviso.leido ? '' : s.noLeido}`}>
                         <span className={s.icono} style={{ background: `var(--flor-${t.flor})`, color: `var(--flor-${t.flor}-fg)` }}>
-                          <t.Icono size={19} weight="fill" aria-hidden="true" />
+                          {marcarIconos(<t.Icono size={19} weight="fill" aria-hidden="true" />)}
                         </span>
                         <div className={s.cuerpo}>
                           <div className={s.cabecera}>

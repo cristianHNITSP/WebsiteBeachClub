@@ -43,7 +43,7 @@ export default function Navbar({ overHero }) {
           "volaría" desde donde estaba la página con scroll. */}
       <motion.nav layoutRoot className={`${s.navbar} ${overHero ? s.sobreHero : s.solida}`}>
         {/* Logo */}
-        <Link to="/" className={s.logo} aria-label="Hoteles Frida, inicio">
+        <Link to="/" className={s.logo} aria-label="Reservas Frida, inicio">
           <Wordmark tono={overHero ? 'noche' : 'normal'} tamano={1.35} />
         </Link>
 

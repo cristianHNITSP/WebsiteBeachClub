@@ -42,6 +42,11 @@ celery.conf.update(
             "task": "app.tareas.outbox.verificar_metricas",
             "schedule": crontab(hour=3, minute=30),
         },
+        # 00:10 de Mérida: pasó la última noche; lo de habitaciones eliminadas se cierra solo.
+        "cerrar-habitaciones-eliminadas": {
+            "task": "app.tareas.sistema.cerrar_habitaciones_eliminadas",
+            "schedule": crontab(hour=0, minute=10),
+        },
         "limpiar-fotos": {"task": "app.tareas.fotos.limpiar_fotos", "schedule": 900.0},
         # API pública (fase 6): retenciones vencidas, avisos a las websites, claves viejas.
         "vencer-retenciones": {"task": "app.tareas.publica.vencer_retenciones", "schedule": 60.0},
@@ -51,11 +56,20 @@ celery.conf.update(
         "leer-calendarios": {"task": "app.tareas.externas.leer_calendarios", "schedule": 300.0},
         "buscar-menciones": {
             "task": "app.tareas.externas.buscar_menciones",
-            "schedule": crontab(hour=6, minute=20),
+            "schedule": crontab(hour=4, minute=25),
         },
+        # El bot, de madrugada (hora de Mérida): casi nadie usa el panel y no estorba a la recepción.
+        # Después de las métricas (3:30) y la limpieza (4:10); termina antes de que llegue el personal.
+        "leer-fichas": {"task": "app.tareas.externas.leer_fichas", "schedule": crontab(hour=4, minute=40)},
         "limpiar-idempotencia": {
             "task": "app.tareas.publica.limpiar_idempotencia",
             "schedule": crontab(hour=4, minute=10),
         },
     },
 )
+
+# La website está apagada por omisión (API_PUBLICA_ACTIVA): sin sitios no hay retenciones,
+# webhooks ni claves de idempotencia que atender. El código y las tareas siguen aquí.
+if not obtener_config().api_publica_activa:
+    for _nombre in ("vencer-retenciones", "entregar-webhooks", "limpiar-idempotencia"):
+        celery.conf.beat_schedule.pop(_nombre, None)

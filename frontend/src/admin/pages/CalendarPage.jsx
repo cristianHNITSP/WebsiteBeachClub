@@ -1,5 +1,3 @@
-import { PlusIcon } from '@phosphor-icons/react'
-import BotonDestacado from '@/components/marca/BotonDestacado'
 import LineaTiempo from '../components/LineaTiempo'
 
 /*
@@ -12,18 +10,12 @@ export default function CalendarPage({ onNavigate }) {
     <div>
       <div className="admin-page-header">
         <div>
-          <span className="admin-page-eyebrow">Reservaciones</span>
           <h1 className="admin-page-title">Calendario de <em>reservaciones</em></h1>
         </div>
-        <div className="admin-page-header-actions">
-          <div className="admin-page-header-actions-row">
-            <BotonDestacado onClick={() => onNavigate('nueva-reserva')}>
-              <PlusIcon size={16} weight="bold" /> Nueva reserva
-            </BotonDestacado>
-          </div>
-        </div>
       </div>
-      <LineaTiempo />
+      {/* Una reserva nueva desde el calendario sigue en el formulario completo (pago y abono),
+          con la habitación, las fechas y el huésped ya puestos en la URL. */}
+      <LineaTiempo onNuevaReserva={datos => onNavigate('nueva-reserva', null, new URLSearchParams(datos).toString())} />
     </div>
   )
 }

@@ -32,6 +32,7 @@
   --color-popover: var(--popover);
   --color-popover-foreground: var(--popover-foreground);
   --color-primary: var(--primary);
+  --color-brand: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
   --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);
@@ -43,6 +44,8 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--foreground);
   --color-chart-1: var(--chart-1);
   --color-chart-2: var(--chart-2);
   --color-chart-3: var(--chart-3);
@@ -68,6 +71,14 @@
 
   --animate-star-movement-bottom: star-movement-bottom linear infinite alternate;
   --animate-star-movement-top: star-movement-top linear infinite alternate;
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-warning: var(--warning);
+  --color-success-foreground: var(--success-foreground);
+  --color-success: var(--success);
+  --color-info-foreground: var(--info-foreground);
+  --color-info: var(--info);
+  --color-code: var(--code); /* fondo del bloque de código de devl (solo panel) */
 
   @keyframes star-movement-bottom {
     0%   { transform: translate(0%, 0%);    opacity: 1; }
@@ -110,6 +121,13 @@
   --marca-google-verde:    #34A853;
   --marca-google-amarillo: #FBBC05;
   --marca-google-rojo:     #EA4335;
+  --destructive-foreground: var(--color-red-700);
+  --info: var(--color-blue-500);
+  --info-foreground: var(--color-blue-700);
+  --success: var(--color-emerald-500);
+  --success-foreground: var(--color-emerald-700);
+  --warning: var(--color-amber-500);
+  --warning-foreground: var(--color-amber-700);
 }
 
 /* ── CLARO ─────────────────────────────────────────────────────────────── */
@@ -188,6 +206,44 @@ body.site {
   --shadow-md:      0 10px 30px rgba(46, 16, 80, 0.12);
   --shadow-lg:      0 24px 56px rgba(46, 16, 80, 0.18);
   --shadow-primary: 0 10px 30px rgba(122, 50, 192, 0.30);
+  --positivo:       #405818; /* 7.99 sobre --card */
+}
+
+/* Los colores de Tailwind (--color-*) se calculan en :root, donde --primary
+   aún es el teal de index.css. Redeclarados aquí toman la paleta floral: lo
+   necesitan las piezas de devl/coss, que leen var(--color-*) directamente. */
+body.site {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-sidebar: var(--sidebar);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-flor-morado: var(--flor-morado);
+  --color-flor-dorado: var(--flor-dorado);
+  --color-flor-naranja: var(--flor-naranja);
+  --color-flor-rojo: var(--flor-rojo);
+  --color-flor-turquesa: var(--flor-turquesa);
+  --color-flor-orquidea: var(--flor-orquidea);
+  --color-flor-hoja: var(--flor-hoja);
 }
 
 /* ── OSCURO: acentos claros con tinta encima (vía B de §2.3) ──────────── */
@@ -239,6 +295,7 @@ body.site {
   --shadow-md:      0 10px 30px rgba(0, 0, 0, 0.45);
   --shadow-lg:      0 24px 56px rgba(0, 0, 0, 0.55);
   --shadow-primary: 0 10px 30px rgba(185, 138, 240, 0.25);
+  --positivo:       #9CC56A; /* 8.79 sobre --card */
 }
 
 /* ── ALTO CONTRASTE (el oscuro va después y con más especificidad) ───── */
@@ -309,6 +366,7 @@ body.site {
 }
 /* La foto nueva nace oculta en el punto del clic y encima de la vieja; la
    animación JS la abre. Evita el cuadro con el tema nuevo completo. */
+.sin-transicion, .sin-transicion *, .sin-transicion *::before, .sin-transicion *::after { transition: none !important; }
 ::view-transition-old(root) { z-index: 1; }
 ::view-transition-new(root) {
   z-index: 2;
@@ -362,3 +420,13 @@ body.site {
 }
 .pantalla-verificando__corona { display: block; width: 4.5rem; }
 .pantalla-verificando__corona svg { width: 100%; height: auto; }
+
+.dark {
+  --destructive-foreground: var(--color-red-400);
+  --info: var(--color-blue-500);
+  --info-foreground: var(--color-blue-400);
+  --success: var(--color-emerald-500);
+  --success-foreground: var(--color-emerald-400);
+  --warning: var(--color-amber-500);
+  --warning-foreground: var(--color-amber-400);
+}

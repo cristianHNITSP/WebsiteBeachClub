@@ -38,6 +38,8 @@ class Habitacion(ConBorradoLogico, Base):
     descripcion: Mapped[str] = mapped_column(String(2000), server_default="")
     tarifa_centavos: Mapped[int] = mapped_column(BigInteger)  # tarifa base por noche, IVA incluido
     estado: Mapped[str] = mapped_column(String(20), server_default="activa")
+    # Se vende en plataformas (Booking, web): a estas se asignan las de fuera. Las demás, solo recepción.
+    venta_en_linea: Mapped[bool] = mapped_column(server_default=text("false"))
     # Bloqueo optimista (PLAN-BACKEND §6.3): dos gerentes editando a la vez no se pisan.
     version: Mapped[int] = mapped_column(server_default=text("1"))
     creada: Mapped[datetime] = mapped_column(server_default=func.now())

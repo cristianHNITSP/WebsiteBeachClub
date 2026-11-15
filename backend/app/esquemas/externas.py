@@ -16,15 +16,16 @@ _DOMINIO = re.compile(r"^[a-z0-9-]+(\.[a-z0-9-]+)+$")
 
 
 class CalendarioNuevo(Entrada):
-    habitacion_id: UUID
-    canal: Canal
+    ficha_id: UUID  # la ficha de la plataforma
+    indice: int = Field(ge=0, le=100)  # cuál de las publicaciones de esa ficha
     url: str = Field(max_length=1000, pattern=r"^https://\S+$")
 
 
 class CalendarioSalida(Salida):
     id: UUID
     propiedad_id: UUID
-    habitacion_id: UUID
+    ficha_id: UUID
+    publicacion: str
     canal: Canal
     url: str  # oculta: dominio y final (lleva el token de la plataforma)
     activo: bool
@@ -37,8 +38,8 @@ class CalendarioSalida(Salida):
 class ExternaSalida(Salida):
     id: UUID
     propiedad_id: UUID
-    habitacion_id: UUID | None
-    habitacion_nombre: str | None
+    ficha_id: UUID | None
+    publicacion: str | None  # lo que la plataforma publica; None si vino de un CSV sin calendario
     canal: Canal
     uid_externo: str
     llegada: date
@@ -47,7 +48,6 @@ class ExternaSalida(Salida):
     estado: Literal["vigente", "cancelada"]
     origen: Literal["ical", "csv"]
     leida_en: datetime
-    choca: bool  # cae sobre una reserva propia activa de la misma habitación
 
 
 class ImportacionSalida(Salida):
@@ -55,7 +55,6 @@ class ImportacionSalida(Salida):
     nuevas: int
     cambiadas: int
     canceladas: int
-    choques: int
 
 
 class MencionSalida(Salida):
@@ -107,3 +106,22 @@ class BotCambio(Entrada):
         if malos:
             raise ValueError(f"Dominio no válido (solo el dominio, sin https:// ni rutas): {malos[0]}")
         return v
+
+
+class FichaNueva(Entrada):
+    propiedad_id: UUID
+    url: str = Field(max_length=1000, pattern=r"^https://\S+$")
+
+
+class FichaSalida(Salida):
+    id: UUID
+    propiedad_id: UUID
+    canal: Canal
+    url: str
+    estado: Literal["pendiente", "leyendo", "leida", "sin_datos", "bloqueada_robots", "verificacion", "error"]
+    detalle: str | None
+    titulo: str | None
+    resumen: dict
+    cuartos: list[dict]
+    leida_en: datetime | None
+    creado: datetime

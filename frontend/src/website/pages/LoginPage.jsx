@@ -1,29 +1,27 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useLayoutEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 import {
   UserIcon, LockSimpleIcon, EyeIcon, EyeSlashIcon, WarningCircleIcon, WarningIcon,
-  SignInIcon, HouseIcon, ArrowUpIcon, SpinnerGapIcon,
+  SignInIcon, HouseIcon, ArrowUpIcon,
 } from '@phosphor-icons/react'
 import { toast } from 'sonner'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Separator } from '@/components/ui/separator'
+import { Button } from '@/components/coss/button'
+import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/coss/input-group'
+import { Label } from '@/components/coss/label'
+import { DropletButton } from '@/components/devl/droplet-button'
+import { LiquidCheckbox } from '@/components/devl/liquid-checkbox'
+import { MorphIcon } from '@/components/devl/morph-icons'
 import { Toaster } from '@/components/ui/sonner'
-import Aurora from '@/components/bits/Aurora'
-import SpotlightCard from '@/components/bits/SpotlightCard'
-import SplitText from '@/components/bits/SplitText'
-import BotonDestacado from '@/components/marca/BotonDestacado'
 import BotonTema from '@/components/marca/BotonTema'
 import Pista from '@/components/marca/Pista'
-import SpringCheck from '@/components/bits/SpringCheck'
 import { useTheme } from '@/context/ThemeContext'
 import { usePaletaSitio } from '@/hooks/usePaletaSitio'
-import { leerToken } from '@/lib/tokens-css'
-import Wordmark from '@/components/marca/Wordmark'
+import { alternarTemaConCirculo } from '@/lib/transicionTema'
+import Wordmark, { Florecita } from '@/components/marca/Wordmark'
 import LogoGoogle from '@/components/marca/LogoGoogle'
 import { PantallaVerificando } from '@/components/marca/RutaProtegida'
+import { instalarVida } from '@/admin/vida'
 import { PRODUCTO } from '@/lib/producto'
 import { useSesion, iniciarSesion, destinoTrasEntrar } from '@/lib/sesion'
 import { ErrorApi } from '@/lib/api'
@@ -41,6 +39,59 @@ const aparecer = {
   animate: { opacity: 1, height: 'auto' },
   exit:    { opacity: 0, height: 0 },
   transition: { duration: 0.2 },
+}
+
+/* La corona del logotipo, en grande: cada flor brota al entrar y se mece. [color, x %, y %, tamaño] */
+const CORONA = [
+  ['turquesa', 8, 56, 74], ['orquidea', 20, 37, 92], ['naranja', 35, 24, 80], ['morado', 50, 17, 118],
+  ['rojo', 65, 25, 84], ['dorado', 78, 38, 90], ['turquesa', 90, 56, 70], ['morado', 27, 54, 54], ['naranja', 72, 56, 58],
+]
+
+/** El lado de la marca: mar, sol y corona de flores. Dibujado, sin fotos ni datos de muestra. */
+function Escena() {
+  return (
+    <div className={s.escena} aria-hidden="true">
+      <span className={s.sol} />
+      <svg className={s.rama} viewBox="0 0 100 100" preserveAspectRatio="none"><path d="M8 56 Q50 -22 90 56" fill="none" stroke="var(--flor-hoja)" strokeWidth="0.8" strokeLinecap="round" vectorEffect="non-scaling-stroke" /></svg>
+      {CORONA.map(([flor, x, y, tamano], i) => (
+        <span key={i} className={s.brote} style={{ left: `${x}%`, top: `${y}%`, animationDelay: `${0.15 + i * 0.08}s` }}>
+          <span data-mece="" style={{ animationDelay: `${-i * 0.9}s` }}><Florecita color={`var(--flor-${flor})`} tamano={tamano} /></span>
+        </span>
+      ))}
+      <svg className={s.mar} viewBox="0 0 1200 200" preserveAspectRatio="none">
+        <path className={s.ola1} d="M0 70 Q150 30 300 70 T600 70 T900 70 T1200 70 T1500 70 T1800 70 V200 H0Z" />
+        <path className={s.ola2} d="M0 110 Q150 70 300 110 T600 110 T900 110 T1200 110 T1500 110 T1800 110 V200 H0Z" />
+      </svg>
+      <p className={s.lema}>Dos casas junto al mar, un solo motor de reservas.</p>
+    </div>
+  )
+}
+
+/** El tema es una gota que brota del panel de flores y, al pasar, se funde otra vez con él. */
+function GotaTema() {
+  const { isDark, toggleDark, reduceMotion } = useTheme()
+  const texto = isDark ? 'Modo claro' : 'Modo oscuro'
+  return (
+    <div className={s.gota}>
+      <svg width="0" height="0" className={s.gotaFiltro} aria-hidden="true">
+        <filter id="gota-tema" colorInterpolationFilters="sRGB" x="-20%" y="-20%" width="140%" height="140%">
+          <feGaussianBlur stdDeviation="7" />
+          <feColorMatrix values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 24 -11" />
+        </filter>
+      </svg>
+      <div className={s.gotaLiquido} aria-hidden="true">
+        <span className={s.gotaOrilla} />
+        <span className={s.gotaBola} />
+      </div>
+      <div className={s.gotaToque}>
+        <Pista contenido={texto} lado="bottom">
+          <button type="button" className={s.gotaBoton} aria-label={texto} onClick={e => alternarTemaConCirculo(e, toggleDark, reduceMotion)}>
+            <MorphIcon name="theme" morphed={isDark} className="size-5" />
+          </button>
+        </Pista>
+      </div>
+    </div>
+  )
 }
 
 /* ── Mensaje bajo un campo ── */
@@ -65,11 +116,16 @@ function Aviso({ id, mensaje, tono = 'error', Icono = WarningCircleIcon }) {
  */
 export default function LoginPage() {
   usePaletaSitio()
+  // Los tokens, las letras y los botones vivos del panel: es su puerta de entrada.
+  useLayoutEffect(() => {
+    document.body.classList.add('panel')
+    return () => document.body.classList.remove('panel')
+  }, [])
+  useEffect(instalarVida, [])
   const navigate  = useNavigate()
   const [params]  = useSearchParams()
   const volver    = params.get('volver')
   const { verificando, sesion } = useSesion()
-  const { reduceMotion } = useTheme()
 
   const [email,        setEmail]        = useState('')
   const [password,     setPassword]     = useState('')
@@ -88,13 +144,6 @@ export default function LoginPage() {
     const t = setTimeout(() => setBloqueo(null), Math.max(0, bloqueo.hasta - Date.now()))
     return () => clearTimeout(t)
   }, [bloqueo])
-
-  // WebGL no entiende var(): tokens ya resueltos.
-  const aurora = useMemo(() => [
-    leerToken('--flor-morado', '#7A32C0'),
-    leerToken('--flor-turquesa', '#4EC8BC'),
-    leerToken('--flor-orquidea', '#A848B8'),
-  ], [])
 
   /* Detectar Caps Lock */
   useEffect(() => {
@@ -156,196 +205,143 @@ export default function LoginPage() {
   if (sesion) return <Navigate to={destinoTrasEntrar(sesion, volver)} replace />
 
   return (
-    <>
-      <div className={s.pagina}>
-        {/* ── Fondo: Aurora (WebGL) o degradado quieto con reducir movimiento ── */}
-        <div className={s.fondo} aria-hidden="true">
-          <div className={s.fondoQuieto} />
-          {!reduceMotion && (
-            <div className={s.fondoAurora}>
-              <Aurora colorStops={aurora} amplitude={1.1} blend={0.55} speed={0.5} />
-            </div>
-          )}
-        </div>
+    <div className={s.pagina}>
+      <div className={s.hoja}>
+        <main className={s.lado}>
+          <div className={s.arriba}>
+            <Wordmark tamano={1.5} />
+            <span className={s.temaMovil}><BotonTema lado="left" /></span>
+          </div>
 
-        {/* ── Cambio de tema (círculo desde el botón) ── */}
-        <BotonTema className={s.tema} lado="left" />
-
-        <main className={s.main}>
           <motion.div
             animate={shake ? { x: [0, -10, 10, -8, 8, -4, 4, 0] } : { x: 0 }}
             transition={{ duration: 0.45 }}
             className={s.columna}
           >
-            <motion.div {...fadeUp(0.05)}>
-              <SpotlightCard className={s.tarjeta} spotlightColor="color-mix(in srgb, var(--flor-orquidea) 16%, transparent)">
-
-                {/* ── Marca ── */}
-                <motion.div {...fadeUp(0.12)} className={s.marca}>
-                  <Wordmark tamano={2} />
-                </motion.div>
-
-                {/* ── Título ── */}
-                <motion.div {...fadeUp(0.18)} className={s.titulo}>
-                  {reduceMotion
-                    ? <h1 className={s.tituloTexto}>Acceder</h1>
-                    : <SplitText text="Acceder" tag="h1" className={s.tituloTexto} splitType="chars" delay={45} duration={0.7}
-                        from={{ opacity: 0, y: '0.45em' }} to={{ opacity: 1, y: 0 }} textAlign="left" rootMargin="0px" />}
-                  <p className={s.subtitulo}>{PRODUCTO.huespedes
-                    ? 'Entra con tu usuario o correo. Te llevamos a tu cuenta o al panel, según tu perfil.'
-                    : 'Motor de reservas. Entra con tu usuario o correo.'}</p>
-                </motion.div>
-
-                {/* ── Bloqueo por intentos ── */}
-                <AnimatePresence initial={false}>
-                  {bloqueado && (
-                    <motion.div {...aparecer} role="alert" className={s.bloqueo}>
-                      <WarningIcon size={18} weight="fill" aria-hidden="true" />
-                      <div>
-                        <div className={s.bloqueoTitulo}>Demasiados intentos fallidos</div>
-                        <div className={s.bloqueoTexto}>{bloqueo?.mensaje} Si olvidaste tu contraseña, pide a gerencia que la restablezca.</div>
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-
-                {/* ── Formulario ── */}
-                <form onSubmit={handleSubmit} noValidate className={s.form}>
-                  <motion.div {...fadeUp(0.3)} className={s.campo}>
-                    <Label htmlFor="login-email">Usuario o correo</Label>
-                    <div className={s.conIcono}>
-                      <UserIcon size={18} className={s.iconoCampo} aria-hidden="true" />
-                      <Input
-                        id="login-email"
-                        type="text"
-                        autoCapitalize="none"
-                        spellCheck={false}
-                        placeholder="tu usuario o tu@correo.com"
-                        value={email}
-                        onChange={e => { setEmail(e.target.value); clearError('email') }}
-                        autoComplete="username"
-                        disabled={loading}
-                        aria-invalid={!!errors.email}
-                        aria-describedby={errors.email ? 'err-email' : undefined}
-                        className="h-11 pl-10"
-                      />
-                    </div>
-                    <Aviso id="err-email" mensaje={errors.email} />
-                  </motion.div>
-
-                  <motion.div {...fadeUp(0.36)} className={s.campo}>
-                    <div className={s.filaLabel}>
-                      <Label htmlFor="login-password">Contraseña</Label>
-                      <Pista contenido="Te enviaremos un enlace a tu correo registrado" lado="top">
-                          <Button
-                            type="button"
-                            variant="link"
-                            className="h-auto p-0 text-xs"
-                            onClick={() => toast.info('Recuperar contraseña', { description: 'Función disponible en producción.' })}
-                          >
-                            ¿Olvidaste tu contraseña?
-                          </Button>
-                      </Pista>
-                    </div>
-                    <div className={s.conIcono}>
-                      <LockSimpleIcon size={18} className={s.iconoCampo} aria-hidden="true" />
-                      <Input
-                        id="login-password"
-                        type={showPassword ? 'text' : 'password'}
-                        placeholder="Tu contraseña"
-                        value={password}
-                        onChange={e => { setPassword(e.target.value); clearError('password') }}
-                        autoComplete="current-password"
-                        disabled={loading}
-                        aria-invalid={!!errors.password}
-                        aria-describedby={errors.password ? 'err-password' : undefined}
-                        className="h-11 pl-10 pr-11"
-                      />
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className={s.ojo}
-                        onClick={() => setShowPassword(v => !v)}
-                        aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
-                        aria-pressed={showPassword}
-                      >
-                        {showPassword ? <EyeSlashIcon size={18} /> : <EyeIcon size={18} />}
-                      </Button>
-                    </div>
-                    <Aviso id="err-password" mensaje={errors.password} />
-                    <Aviso
-                      mensaje={capsLock && password.length > 0 ? 'Bloq Mayús activado' : ''}
-                      tono="atencion"
-                      Icono={ArrowUpIcon}
-                    />
-                  </motion.div>
-
-                  <motion.div {...fadeUp(0.4)}>
-                    <SpringCheck
-                      label="Mantener la sesión iniciada"
-                      checked={recordar}
-                      onChange={setRecordar}
-                      strike="none"
-                      doneOpacity={1}
-                      boxSize={20}
-                      boxRadius={6}
-                      fontSize={14}
-                      color="var(--foreground)"
-                      fillColor="var(--primary)"
-                      checkColor="var(--primary-foreground)"
-                    />
-                  </motion.div>
-
-                  <motion.div {...fadeUp(0.44)}>
-                    <BotonDestacado
-                      type="submit"
-                      tamano="lg"
-                      disabled={loading || bloqueado}
-                      className={`w-full ${loading || bloqueado ? 'opacity-60 pointer-events-none' : ''}`}
-                      aria-busy={loading}
-                    >
-                      {loading ? (
-                        <>
-                          <SpinnerGapIcon size={18} weight="bold" className="animate-spin" aria-hidden="true" />
-                          Verificando
-                        </>
-                      ) : (
-                        <>
-                          <SignInIcon size={18} weight="bold" aria-hidden="true" />
-                          Entrar
-                        </>
-                      )}
-                    </BotonDestacado>
-                  </motion.div>
-                </form>
-
-                {/* ── Otros accesos (Google era para huéspedes: lib/producto.js) ── */}
-                {PRODUCTO.huespedes && <motion.div {...fadeUp(0.48)} className={s.otros}>
-                  <div className={s.o} role="separator"><span>o</span></div>
-                  <Button type="button" variant="outline" size="lg" className="h-11 w-full" onClick={conGoogle} disabled={loading}>
-                    <LogoGoogle tamano={18} retraso={0.7} />
-                    Continuar con Google
-                  </Button>
-                </motion.div>}
-
-                {PRODUCTO.websitePublica && <>
-                <Separator className="my-5" />
-
-                <motion.div {...fadeUp(0.5)} className={s.pie}>
-                  <Button type="button" variant="outline" onClick={() => navigate('/')}>
-                    <HouseIcon size={16} weight="bold" />
-                    Ir al sitio web
-                  </Button>
-                </motion.div>
-                </>}
-              </SpotlightCard>
+            <motion.div {...fadeUp(0.1)}>
+              <h1 className={s.tituloTexto}>Entra al panel</h1>
+              <p className={s.subtitulo}>{PRODUCTO.huespedes
+                ? 'Entra con tu usuario o correo. Te llevamos a tu cuenta o al panel, según tu perfil.'
+                : 'Motor de reservas de Reservas Frida. Entra con tu usuario o correo.'}</p>
             </motion.div>
+
+            {/* ── Bloqueo por intentos ── */}
+            <AnimatePresence initial={false}>
+              {bloqueado && (
+                <motion.div {...aparecer} role="alert" className={s.bloqueo}>
+                  <WarningIcon size={18} weight="fill" aria-hidden="true" />
+                  <div>
+                    <div className={s.bloqueoTitulo}>Demasiados intentos fallidos</div>
+                    <div className={s.bloqueoTexto}>{bloqueo?.mensaje} Si olvidaste tu contraseña, pide a gerencia que la restablezca.</div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {/* ── Formulario ── */}
+            <form onSubmit={handleSubmit} noValidate className={s.form}>
+              <motion.div {...fadeUp(0.18)} className={s.campo}>
+                <Label htmlFor="login-email">Usuario o correo</Label>
+                <InputGroup className={s.grupo}>
+                  <InputGroupAddon><UserIcon size={17} aria-hidden="true" /></InputGroupAddon>
+                  <InputGroupInput
+                    id="login-email"
+                    type="text"
+                    size="lg"
+                    autoCapitalize="none"
+                    spellCheck={false}
+                    placeholder="tu usuario o tu@correo.com"
+                    value={email}
+                    onChange={e => { setEmail(e.target.value); clearError('email') }}
+                    autoComplete="username"
+                    disabled={loading}
+                    aria-invalid={errors.email ? true : undefined}
+                    aria-describedby={errors.email ? 'err-email' : undefined}
+                  />
+                </InputGroup>
+                <Aviso id="err-email" mensaje={errors.email} />
+              </motion.div>
+
+              <motion.div {...fadeUp(0.24)} className={s.campo}>
+                <div className={s.filaLabel}>
+                  <Label htmlFor="login-password">Contraseña</Label>
+                  <Pista contenido="Te enviaremos un enlace a tu correo registrado" lado="top">
+                    <button type="button" className={s.olvido}
+                      onClick={() => toast.info('Recuperar contraseña', { description: 'Función disponible en producción.' })}>
+                      ¿Olvidaste tu contraseña?
+                    </button>
+                  </Pista>
+                </div>
+                <InputGroup className={s.grupo}>
+                  <InputGroupAddon><LockSimpleIcon size={17} aria-hidden="true" /></InputGroupAddon>
+                  <InputGroupInput
+                    id="login-password"
+                    type={showPassword ? 'text' : 'password'}
+                    size="lg"
+                    placeholder="Tu contraseña"
+                    value={password}
+                    onChange={e => { setPassword(e.target.value); clearError('password') }}
+                    autoComplete="current-password"
+                    disabled={loading}
+                    aria-invalid={errors.password ? true : undefined}
+                    aria-describedby={errors.password ? 'err-password' : undefined}
+                  />
+                  <InputGroupAddon align="inline-end">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-sm"
+                      onClick={() => setShowPassword(v => !v)}
+                      aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                      aria-pressed={showPassword}
+                    >
+                      {showPassword ? <EyeSlashIcon size={17} /> : <EyeIcon size={17} />}
+                    </Button>
+                  </InputGroupAddon>
+                </InputGroup>
+                <Aviso id="err-password" mensaje={errors.password} />
+                <Aviso
+                  mensaje={capsLock && password.length > 0 ? 'Bloq Mayús activado' : ''}
+                  tono="atencion"
+                  Icono={ArrowUpIcon}
+                />
+              </motion.div>
+
+              <motion.div {...fadeUp(0.3)}>
+                <LiquidCheckbox checked={recordar} onCheckedChange={setRecordar} label="Mantener la sesión iniciada" />
+              </motion.div>
+
+              <motion.div {...fadeUp(0.36)}>
+                <DropletButton type="submit" size="lg" className="w-full" loading={loading} disabled={bloqueado} aria-label={loading ? 'Verificando' : undefined}>
+                  Entrar <SignInIcon size={18} weight="bold" aria-hidden="true" />
+                </DropletButton>
+              </motion.div>
+            </form>
+
+            {/* ── Otros accesos (Google era para huéspedes: lib/producto.js) ── */}
+            {PRODUCTO.huespedes && <motion.div {...fadeUp(0.42)} className={s.otros}>
+              <div className={s.o} role="separator"><span>o</span></div>
+              <Button type="button" variant="outline" size="lg" className="w-full" onClick={conGoogle} disabled={loading}>
+                <LogoGoogle tamano={18} retraso={0.7} />
+                Continuar con Google
+              </Button>
+            </motion.div>}
+
+            {PRODUCTO.websitePublica && <motion.div {...fadeUp(0.46)} className={s.pie}>
+              <Button type="button" variant="ghost" onClick={() => navigate('/')}>
+                <HouseIcon size={16} weight="bold" /> Ir al sitio web
+              </Button>
+            </motion.div>}
           </motion.div>
         </main>
 
-        <Toaster position="top-center" closeButton />
+        <div className={s.escenaCaja}>
+          <Escena />
+          <GotaTema />
+        </div>
       </div>
-    </>
+
+      <Toaster position="top-center" closeButton />
+    </div>
   )
 }

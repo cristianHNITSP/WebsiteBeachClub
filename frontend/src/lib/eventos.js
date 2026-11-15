@@ -9,7 +9,8 @@ import { api } from '@/lib/api'
  *    que faltó. El servidor corta cada 10 min a propósito (el token dura 15).
  *  - Si la reconexión falla del todo (sesión vencida), se pide /api/auth/yo, que
  *    renueva la sesión si se puede, y se abre otra conexión con ?desde=<último id>.
- *  - Cada evento: { id, tipo, agregado, agregado_id, propiedad_id, por }.
+ *  - Cada evento: { id, tipo, agregado, agregado_id, propiedad_id, por }. Los avisos DE PASO
+ *    (como el progreso del bot, `bot.progreso`) llegan sin `id`: no mueven el punto de reenvío.
  */
 
 const oyentes = new Set()
@@ -25,7 +26,7 @@ function conectar() {
     espera = 1000
     try {
       const m = JSON.parse(e.data)
-      ultimoId = m.id
+      if (m.id) ultimoId = m.id
       oyentes.forEach(o => o(m))
     } catch { /* un mensaje roto no tumba la conexión */ }
   }

@@ -25,6 +25,7 @@ x-ajustes-backend: &ajustes-backend
   API_DB_USUARIO: beachclub_api
   REDIS_URL: redis://redis:6379/0
   FOTOS_DIR: /datos/fotos
+  API_PUBLICA_ACTIVA: "false"  # la website está apagada (PLAN-BACKEND §4)
 
 x-backend: &backend
   build:

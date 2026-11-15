@@ -55,7 +55,7 @@ const STATUS_META = {
 const MOCK_MESSAGES = [
   {
     id: 1,
-    from: 'Equipo Hoteles Frida',
+    from: 'Equipo Reservas Frida',
     subject: 'Confirmación de tu reserva BK001',
     preview: 'Tu reserva en Suite Coral Grande ha sido confirmada...',
     time: 'Hace 2 horas',

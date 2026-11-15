@@ -1,23 +1,23 @@
 import { useEffect, useState } from 'react'
-import { toast } from 'sonner'
-import { AnimatePresence, motion } from 'framer-motion'
+import { CardDeal } from '@/components/devl/card-deal'
+import { DropletButton } from '@/components/devl/droplet-button'
+import Inicial from '../components/Inicial'
+import { LiquidSegments } from '@/components/devl/liquid-segments'
+import { toast } from '@/admin/toast'
 import {
   UserPlusIcon, MagnifyingGlassIcon, PencilSimpleIcon, KeyIcon, UserMinusIcon, UserCheckIcon,
   CopyIcon, ArrowsClockwiseIcon, WarningCircleIcon, UsersThreeIcon,
 } from '@phosphor-icons/react'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { SkeletonCard } from '@/components/frida/Skeleton'
-import JellyRadio from '@/components/bits/JellyRadio'
-import BotonDestacado from '@/components/marca/BotonDestacado'
+import { Button } from '@/components/coss/button'
+import { Input } from '@/components/coss/input'
+import Skeleton from '@/components/frida/Skeleton'
 import ConfirmarDescarte from '@/components/marca/ConfirmarDescarte'
 import Paginador from '@/components/marca/Paginador'
-import Selector from '@/components/marca/Selector'
-import Pista, { GrupoPistas } from '@/components/marca/Pista'
+import Selector from '@/admin/components/Selector'
+import Pista, { GrupoPistas } from '@/admin/components/Pista'
 import { useParametros } from '@/hooks/useParametros'
 import { usePedido } from '@/hooks/usePedido'
 import { useSesion } from '@/lib/sesion'
-import { animacionItem } from '@/lib/animacionListas'
 import { personalApi, claveTemporal, opcionesDeRol, rolProximamente } from '../personal'
 import s from './UsersPage.module.css'
 
@@ -36,7 +36,38 @@ const ESTADOS = [
   { value: 'todos', label: 'Todos' },
 ]
 const fecha = iso => (iso ? new Date(iso).toLocaleString('es-MX', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : 'Nunca')
-const iniciales = n => n.split(' ').filter(Boolean).map(p => p[0]).slice(0, 2).join('').toUpperCase()
+
+/* Esqueletos: misma rejilla, mismas clases y casi las mismas medidas que lo real (sin saltos al cargar). */
+const EsqueletoRol = () => (
+  <article className={s.rol} aria-hidden="true">
+    <Skeleton variant="text" width="42%" height="14px" style={{ marginBottom: 12 }} />
+    <div style={{ display: 'grid', gap: 8 }}>
+      <Skeleton variant="text" width="100%" height="12px" />
+      <Skeleton variant="text" width="94%" height="12px" />
+      <Skeleton variant="text" width="58%" height="12px" />
+    </div>
+  </article>
+)
+const EsqueletoPersona = () => (
+  <article className={s.persona} aria-hidden="true">
+    <div className={s.personaCabeza}>
+      <Skeleton variant="circle" width="44px" height="44px" />
+      <div style={{ display: 'grid', gap: 7, flex: 1 }}>
+        <Skeleton variant="text" width="55%" height="16px" />
+        <Skeleton variant="text" width="30%" height="11px" />
+      </div>
+    </div>
+    <Skeleton variant="text" width="72px" height="22px" style={{ borderRadius: 999 }} />
+    <Skeleton variant="text" width="82%" height="15px" />
+    <Skeleton variant="text" width="46%" height="15px" />
+    <div className={s.pie}>
+      <Skeleton variant="text" width="48%" height="15px" />
+      <div className={s.acciones}>
+        {[0, 1, 2].map(i => <Skeleton key={i} variant="circle" width="32px" height="32px" />)}
+      </div>
+    </div>
+  </article>
+)
 
 export default function UsersPage({ onNavigate }) {
   const { sesion } = useSesion()
@@ -96,14 +127,13 @@ export default function UsersPage({ onNavigate }) {
     <div>
       <div className="admin-page-header">
         <div>
-          <span className="admin-page-eyebrow">Equipo</span>
           <h1 className="admin-page-title">Personal del <em>hotel</em></h1>
         </div>
         {gestiona && (
           <div className="admin-page-header-actions">
-            <BotonDestacado onClick={() => onNavigate('nueva-persona')}>
+            <DropletButton tone="neutral" onClick={() => onNavigate('nueva-persona')}>
               <UserPlusIcon size={16} weight="bold" /> Nueva persona
-            </BotonDestacado>
+            </DropletButton>
           </div>
         )}
       </div>
@@ -120,24 +150,23 @@ export default function UsersPage({ onNavigate }) {
             </p>
           </article>
         ))}
-        {roles.cargando && [0, 1, 2].map(i => <SkeletonCard key={i} height="96px" />)}
+        {roles.cargando && [0, 1, 2].map(i => <EsqueletoRol key={i} />)}
       </section>
 
       <div className={s.filtros}>
         <div className={s.buscador}>
           <MagnifyingGlassIcon size={17} className={s.buscadorIcono} aria-hidden="true" />
           <Input type="search" aria-label="Buscar persona" placeholder="Buscar por nombre, usuario o correo" maxLength={120}
-            value={texto} onChange={e => setTexto(e.target.value)} className="h-10 pl-10" />
+            value={texto} onChange={e => setTexto(e.target.value)} className="h-9 ps-7" />
         </div>
         <div className={s.selectorRol}>
           <Selector ariaLabel="Rol" value={rol} onChange={v => set({ rol: v, pagina: 1 })} opciones={opcionesRol} />
         </div>
-        <JellyRadio items={ESTADOS} value={estado} onChange={v => set({ estado: v, pagina: 1 })} ariaLabel="Estado"
-          size="md" chipColor="var(--muted)" activeColor="var(--primary)" textColor="var(--muted-foreground)" activeTextColor="var(--primary-foreground)" />
+        <LiquidSegments options={ESTADOS} value={estado} onValueChange={v => set({ estado: v, pagina: 1 })} aria-label="Estado" size="default" />
       </div>
 
       {lista.cargando ? (
-        <div className={s.lista}>{[0, 1, 2, 3].map(i => <SkeletonCard key={i} height="88px" />)}</div>
+        <div className={s.lista} aria-busy="true" aria-label="Cargando personal">{[0, 1, 2].map(i => <EsqueletoPersona key={i} />)}</div>
       ) : lista.error ? (
         <div className={s.vacio} role="alert">
           <WarningCircleIcon size={28} aria-hidden="true" />
@@ -151,48 +180,48 @@ export default function UsersPage({ onNavigate }) {
         </div>
       ) : (
         <GrupoPistas>
-          <ul className={s.lista} aria-busy={lista.actualizando}>
-            <AnimatePresence initial={false} mode="popLayout">
-              {items.map(p => (
-                <motion.li key={p.id} layout {...animacionItem} className={`${s.persona} ${p.activo ? '' : s.personaBaja}`}>
-                  <span className={s.avatar} aria-hidden="true">{iniciales(p.nombre)}</span>
-                  <div className={s.datos}>
-                    <div className={s.nombre}>
-                      {p.nombre}
-                      {p.usuario === sesion?.usuario && <span className={s.etiqueta}>Tú</span>}
-                      {!p.activo && <span className={`${s.etiqueta} ${s.etiquetaBaja}`}>Dado de baja</span>}
-                      {p.activo && p.debe_cambiar_clave && <span className={`${s.etiqueta} ${s.etiquetaAviso}`}>Contraseña temporal</span>}
-                    </div>
-                    <div className={s.sub}>{p.usuario}, {p.correo}</div>
-                    <div className={s.sub}>
-                      {p.rol_nombre}. {p.todas_las_propiedades ? 'Todas las propiedades' : p.propiedades.length ? p.propiedades.map(nombreProp).join(', ') : 'Sin propiedades'}. Último acceso: {fecha(p.ultimo_acceso)}
-                    </div>
-                  </div>
-                  {gestiona && (
-                    <div className={s.acciones}>
-                      <Pista contenido="Editar">
-                        <Button variant="outline" size="icon" aria-label={`Editar a ${p.nombre}`} onClick={() => onNavigate('editar-persona', p)}><PencilSimpleIcon size={16} weight="bold" /></Button>
+          <CardDeal items={items} getKey={p => p.id} className={s.lista} slotClassName={s.ranura} label="Personal" renderItem={p => (
+            <article className={`${s.persona} ${p.activo ? '' : s.personaBaja}`}>
+              <div className={s.personaCabeza}>
+                <Inicial nombre={p.nombre} tamano={44} />
+                <div className={s.datos}>
+                  <div className={s.nombre}>{p.nombre}</div>
+                  <div className={s.sub}>{p.rol_nombre}</div>
+                </div>
+              </div>
+              <div className={s.etiquetas}>
+                {p.usuario === sesion?.usuario && <span className={s.etiqueta}>Tú</span>}
+                {!p.activo && <span className={`${s.etiqueta} ${s.etiquetaBaja}`}>Dado de baja</span>}
+                {p.activo && p.debe_cambiar_clave && <span className={`${s.etiqueta} ${s.etiquetaAviso}`}>Contraseña temporal</span>}
+              </div>
+              <div className={s.sub}>{p.usuario}, {p.correo}</div>
+              <div className={s.sub}>{p.todas_las_propiedades ? 'Todas las propiedades' : p.propiedades.length ? p.propiedades.map(nombreProp).join(', ') : 'Sin propiedades'}</div>
+              <div className={s.pie}>
+                <span className={s.sub}>Último acceso: {fecha(p.ultimo_acceso)}</span>
+                {gestiona && (
+                  <div className={s.acciones}>
+                    <Pista contenido="Editar">
+                      <Button variant="outline" size="icon" aria-label={`Editar a ${p.nombre}`} onClick={() => onNavigate('editar-persona', p)}><PencilSimpleIcon size={16} weight="bold" /></Button>
+                    </Pista>
+                    {p.activo && (
+                      <Pista contenido="Contraseña temporal">
+                        <Button variant="outline" size="icon" aria-label={`Restablecer la contraseña de ${p.nombre}`} onClick={() => setARestablecer(p)}><KeyIcon size={16} weight="bold" /></Button>
                       </Pista>
-                      {p.activo && (
-                        <Pista contenido="Contraseña temporal">
-                          <Button variant="outline" size="icon" aria-label={`Restablecer la contraseña de ${p.nombre}`} onClick={() => setARestablecer(p)}><KeyIcon size={16} weight="bold" /></Button>
-                        </Pista>
-                      )}
-                      {p.activo ? (
-                        <Pista contenido="Dar de baja">
-                          <Button variant="destructive" size="icon" aria-label={`Dar de baja a ${p.nombre}`} onClick={() => setABaja(p)}><UserMinusIcon size={16} weight="bold" /></Button>
-                        </Pista>
-                      ) : (
-                        <Pista contenido="Reactivar">
-                          <Button variant="outline" size="icon" aria-label={`Reactivar a ${p.nombre}`} onClick={() => reactivar(p)}><UserCheckIcon size={16} weight="bold" /></Button>
-                        </Pista>
-                      )}
-                    </div>
-                  )}
-                </motion.li>
-              ))}
-            </AnimatePresence>
-          </ul>
+                    )}
+                    {p.activo ? (
+                      <Pista contenido="Dar de baja">
+                        <Button variant="destructive-outline" size="icon" aria-label={`Dar de baja a ${p.nombre}`} onClick={() => setABaja(p)}><UserMinusIcon size={16} weight="bold" /></Button>
+                      </Pista>
+                    ) : (
+                      <Pista contenido="Reactivar">
+                        <Button variant="outline" size="icon" aria-label={`Reactivar a ${p.nombre}`} onClick={() => reactivar(p)}><UserCheckIcon size={16} weight="bold" /></Button>
+                      </Pista>
+                    )}
+                  </div>
+                )}
+              </div>
+            </article>
+          )} />
         </GrupoPistas>
       )}
 
@@ -227,7 +256,7 @@ export default function UsersPage({ onNavigate }) {
 function ClaveMostrada({ clave, onCerrar }) {
   if (!clave) return null
   const copiar = async () => {
-    try { await navigator.clipboard.writeText(clave.valor); toast.success('Contraseña copiada') } catch { toast.error('No se pudo copiar: cópiala a mano') }
+    try { await navigator.clipboard.writeText(clave.valor); toast.success('Contraseña copiada') } catch { toast.error('No se pudo copiar. Cópiala manualmente.') }
   }
   return (
     <section className={s.panelClave} role="status" aria-labelledby="clave-titulo">
@@ -238,8 +267,8 @@ function ClaveMostrada({ clave, onCerrar }) {
       </p>
       <div className={s.clave}>
         <code aria-label="Contraseña temporal">{clave.valor}</code>
-        <Button type="button" variant="outline" className="h-11" onClick={copiar}><CopyIcon size={16} weight="bold" /> Copiar</Button>
-        <Button type="button" className="h-11" onClick={onCerrar}><ArrowsClockwiseIcon size={16} weight="bold" /> Ya se la di</Button>
+        <Button type="button" variant="outline" size="lg" onClick={copiar}><CopyIcon size={16} weight="bold" /> Copiar</Button>
+        <Button type="button" size="lg" onClick={onCerrar}><ArrowsClockwiseIcon size={16} weight="bold" /> Ya se la di</Button>
       </div>
     </section>
   )

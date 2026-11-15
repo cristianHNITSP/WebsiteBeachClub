@@ -1,11 +1,18 @@
 /* Otras plataformas: una sola pantalla. Solo tokens; móvil primero. */
 .pagina { display: grid; gap: 20px; }
-.pasos {
-  display: grid; gap: 10px; margin: 0; padding: 16px 20px; list-style: none; border-radius: var(--radius-xl);
-  background: var(--muted); font-size: var(--fs-sm); color: var(--foreground);
+.arriba { display: grid; gap: 12px; }
+@media (min-width: 1000px) { .arriba { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; } }
+.pasos { display: grid; gap: 12px; margin: 0; padding: 0; list-style: none; }
+.paso {
+  display: flex; gap: 14px; align-items: flex-start; padding: 16px 18px; border-radius: var(--radius-xl);
+  background: var(--card); box-shadow: inset 0 0 0 1px var(--border), var(--shadow-sm);
 }
-@media (min-width: 900px) { .pasos { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
-.pasos strong { display: block; margin-bottom: 2px; }
+.numero {
+  flex: none; display: grid; place-items: center; width: 36px; height: 36px; border-radius: 50%;
+  background: var(--accent); color: var(--accent-foreground); font-family: var(--font-headline); font-size: var(--fs-md, 1rem); font-weight: 700;
+}
+.pasoTitulo { margin: 0 0 2px; font-size: var(--fs-md, 1rem); font-weight: 700; color: var(--foreground); }
+.pasoTexto { margin: 0; font-size: var(--fs-sm); line-height: 1.5; color: var(--muted-foreground); }
 .seccion { margin: 0; font-family: var(--font-headline); font-size: var(--fs-lg); color: var(--foreground); }
 .lista { display: grid; gap: 10px; }
 .tarjeta { border-radius: var(--radius-xl); background: var(--card); box-shadow: inset 0 0 0 1px var(--border), var(--shadow-sm); }
@@ -17,7 +24,7 @@
 .cabecera > svg { margin-left: auto; transition: transform 0.2s; }
 .girado { transform: rotate(180deg); }
 .plataforma { font-weight: 700; font-size: var(--fs-md, 1rem); }
-.cuerpo { display: grid; gap: 12px; padding: 0 18px 18px; }
+.cuerpo { display: grid; gap: 12px; }
 .como { font-size: var(--fs-sm); color: var(--foreground); }
 .como summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; font-weight: 600; color: var(--primary); }
 .como ol { margin: 4px 0 8px; padding-left: 20px; display: grid; gap: 4px; }
@@ -62,6 +69,20 @@
   box-shadow: inset 0 0 0 1px var(--input); font: inherit; font-size: var(--fs-sm); resize: vertical;
 }
 .area:focus-visible { outline: 2px solid var(--ring); outline-offset: 1px; }
-.aviso { margin: 0; padding: 10px 14px; border-radius: var(--radius-lg); font-size: var(--fs-sm); font-weight: 600; background: var(--secondary); color: var(--secondary-foreground); }
+.aviso { margin: 0; padding: 10px 14px; border-radius: var(--radius-lg); font-size: var(--fs-sm); font-weight: 600; background: var(--flor-dorado); color: var(--flor-dorado-fg); }
 .ayuda { margin: 0; max-width: 75ch; font-size: var(--fs-xs); color: var(--muted-foreground); }
 .contenedor { display: grid; gap: 16px; }
+
+/* Tarjetas de conector (connectors de devl): dos por fila; abierta ocupa todo el ancho */
+.conectores { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; align-items: start; }
+.conector { display: grid; gap: 12px; padding: 16px 18px; border-radius: 1rem; background: var(--card); box-shadow: inset 0 0 0 1px var(--border); min-width: 0; }
+.conectorAbierto { grid-column: 1 / -1; }
+.conectorCabeza { display: flex; align-items: center; gap: 12px; }
+.logo { width: 40px; height: 40px; flex-shrink: 0; border-radius: 0.7rem; display: grid; place-items: center; font-size: var(--fs-base); font-weight: 700; }
+.conectorTexto { min-width: 0; }
+.conectorTexto p { font-size: var(--fs-xs); color: var(--muted-foreground); }
+.conectorPie { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.chip { display: inline-flex; align-items: center; height: 22px; padding: 0 8px; border-radius: 11px; font-size: var(--fs-xs); font-weight: 600; white-space: nowrap; background: var(--muted); color: var(--muted-foreground); }
+.chipVerde { background: color-mix(in srgb, var(--success) 14%, transparent); color: var(--success-foreground); }
+.chipRojo { background: color-mix(in srgb, var(--destructive) 12%, transparent); color: var(--destructive-foreground); }
+@media (max-width: 860px) { .conectores { grid-template-columns: minmax(0, 1fr); } }

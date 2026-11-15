@@ -39,6 +39,7 @@ class _Campos(Entrada):
     descripcion: Texto = Field(default="", max_length=2000)
     tarifa_centavos: int = Field(gt=0, le=TARIFA_MAXIMA)
     estado: Estado = "activa"
+    venta_en_linea: bool = False  # True: se vende en plataformas y en la web; False: solo recepción
 
     @field_validator("amenidades")
     @classmethod
@@ -69,6 +70,7 @@ class HabitacionSalida(Salida):
     descripcion: str
     tarifa_centavos: int
     estado: Estado
+    venta_en_linea: bool
     version: int
     # vigente | en_papelera | eliminado_definitivo. El panel lo usa para decir,
     # donde se nombre la habitación, si está en la papelera o se eliminó.

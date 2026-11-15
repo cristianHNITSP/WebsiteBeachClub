@@ -359,6 +359,18 @@ GROUP BY 1
 """)
 
 
+METODOS_DE_PAGO = ("efectivo", "tarjeta", "transferencia")
+_METODOS = text("""
+SELECT p.metodo, count(*) AS pagos, sum(p.monto_centavos) AS monto
+FROM pagos p
+WHERE p.concepto <> 'devolucion'
+  AND (p.creado AT TIME ZONE 'America/Merida')::date >= :desde
+  AND (p.creado AT TIME ZONE 'America/Merida')::date < :hasta
+  AND (CAST(:propiedades AS uuid[]) IS NULL OR p.propiedad_id = ANY(CAST(:propiedades AS uuid[])))
+GROUP BY p.metodo
+""")
+
+
 async def formas_de_pago(sesion: AsyncSession, alcance: Alcance, desde: date, hasta: date) -> dict:
     """Cuántas estancias terminadas en [desde, hasta) pagaron de cada forma."""
     filas = (
@@ -372,6 +384,22 @@ async def formas_de_pago(sesion: AsyncSession, alcance: Alcance, desde: date, ha
         )
     ).all()
     cuenta = {f.forma: (f.estancias, f.pagos) for f in filas}
+    por_metodo = {
+        m.metodo: (m.pagos, int(m.monto))
+        for m in (
+            await sesion.execute(
+                _METODOS,
+                {
+                    "desde": desde,
+                    "hasta": hasta,
+                    "propiedades": None
+                    if alcance.propiedades is None
+                    else [str(p) for p in alcance.propiedades],
+                },
+            )
+        ).all()
+    }
+    dinero = sum(m for _, m in por_metodo.values())
     estancias = sum(e for e, _ in cuenta.values())
     pagos = sum(p for _, p in cuenta.values())
     return {
@@ -386,5 +414,15 @@ async def formas_de_pago(sesion: AsyncSession, alcance: Alcance, desde: date, ha
                 "porcentaje": round(100 * cuenta.get(f, (0, 0))[0] / estancias, 1) if estancias else 0,
             }
             for f in FORMAS_DE_PAGO
+        ],
+        # Con qué pagan (efectivo, tarjeta, transferencia): pagos y dinero cobrado en el periodo.
+        "metodos": [
+            {
+                "metodo": m,
+                "pagos": por_metodo.get(m, (0, 0))[0],
+                "monto_centavos": por_metodo.get(m, (0, 0))[1],
+                "porcentaje": round(100 * por_metodo.get(m, (0, 0))[1] / dinero, 1) if dinero else 0,
+            }
+            for m in METODOS_DE_PAGO
         ],
     }

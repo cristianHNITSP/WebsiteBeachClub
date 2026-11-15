@@ -128,7 +128,7 @@ export default function HomePage({ onNavigate, onSelectRoom, rooms, favorites, o
             <motion.span layout transition={RESORTE_ROTADOR}>en</motion.span>
             <motion.span layout transition={RESORTE_ROTADOR} className="hero__palabra">
             <RotatingText
-              texts={['Chelem', 'Chuburná', 'Hoteles Frida']}
+              texts={['Chelem', 'Chuburná', 'Reservas Frida']}
               mainClassName="hero__rotador"
               // popLayout (no "wait"): la palabra nueva entra mientras la vieja
               // sale, y el cambio de ancho ocurre en el mismo render en que el

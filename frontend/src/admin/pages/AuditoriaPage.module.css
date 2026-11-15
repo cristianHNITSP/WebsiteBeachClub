@@ -1,28 +1,101 @@
-/* Auditoría forense. Solo tokens; los datos como texto (nunca HTML). */
-.verificacion { margin: 0 0 16px; padding: 12px 16px; border-radius: var(--radius-lg); font-size: var(--fs-sm); font-weight: 600; overflow-wrap: anywhere; }
-.integra { background: var(--accent); color: var(--accent-foreground); }
-.rota { background: var(--destructive); color: var(--destructive-foreground); }
-.filtros { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); margin-bottom: 16px; }
+/* Auditoría forense. Solo tokens; los datos como texto (nunca HTML).
+   Jerarquía por nivel (auditoriaEventos.js): alerta con tinte rojo pálido e
+   insignia, importante con insignia dorada, normal en tinta, rutina apagada y
+   agrupada. Nada de franjas laterales: el estado va en la insignia. */
+
+/* Resultado de verificar la cadena, con su sello */
+.verificacion {
+  display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 14px;
+  margin: 0 0 20px; padding: 16px 18px; border-radius: 1rem; overflow: hidden;
+}
+.integra { background: color-mix(in srgb, var(--success) 10%, var(--card)); color: var(--success-foreground); }
+.rota { background: color-mix(in srgb, var(--destructive) 10%, var(--card)); color: var(--destructive-foreground); }
+.verificacionTexto { display: grid; gap: 2px; min-width: 0; color: var(--foreground); }
+.verificacionTexto strong { font-size: var(--fs-base); font-weight: 600; }
+.verificacionTexto span { font-size: var(--fs-sm); color: var(--muted-foreground); }
+.verificacionTexto code { font-family: var(--font-mono); font-size: var(--fs-xs); color: var(--muted-foreground); overflow-wrap: anywhere; }
+.sello { font-size: 1.1rem; margin-inline-end: 6px; }
+@media (max-width: 560px) {
+  .verificacion { grid-template-columns: auto 1fr; }
+  .sello { grid-column: 1 / -1; justify-self: end; }
+}
+
+.filtros { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(180px, 280px)); margin-bottom: 20px; }
 .campo { display: grid; gap: 6px; }
 .fechas { display: flex; gap: 8px; }
-.lista { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
-.evento { border-radius: var(--radius-lg); background: var(--card); box-shadow: inset 0 0 0 1px var(--border); }
-.insignia { margin-left: 8px; vertical-align: middle; }
-.resumen {
-  display: flex; align-items: center; gap: 12px; width: 100%; min-height: 56px; padding: 10px 14px;
-  border: 0; background: transparent; text-align: left; cursor: pointer; color: var(--foreground);
+
+/* Un día, una tarjeta; el título del día va sobre el suelo */
+.dias { display: grid; gap: 22px; }
+.dia {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
+  margin: 0 4px 8px; font-size: var(--fs-sm); font-weight: 600; color: var(--foreground);
 }
-.resumen:focus-visible { outline: 2px solid var(--ring); outline-offset: -2px; border-radius: var(--radius-lg); }
-.secuencia { font-family: var(--font-headline); font-size: var(--fs-sm); color: var(--muted-foreground); min-width: 4ch; }
-.texto { display: grid; flex: 1; min-width: 0; font-size: var(--fs-sm); }
-.texto span { font-size: var(--fs-xs); color: var(--muted-foreground); overflow-wrap: anywhere; }
+.dia span { font-size: var(--fs-xs); font-weight: 400; color: var(--muted-foreground); font-variant-numeric: tabular-nums; }
+.lista, .subLista { list-style: none; margin: 0; padding: 0; }
+.lista { border-radius: 1rem; background: var(--card); box-shadow: inset 0 0 0 1px var(--border); overflow: hidden; }
+.subLista { overflow: hidden; background: color-mix(in srgb, var(--muted) 35%, var(--card)); }
+
+.evento { box-shadow: inset 0 -1px 0 var(--border); }
+.lista > .evento:last-child, .subLista > .evento:last-child { box-shadow: none; }
+
+.resumen {
+  display: flex; align-items: center; gap: 12px; width: 100%; min-height: 56px; padding: 10px 16px;
+  border: 0; background: transparent; text-align: left; cursor: pointer; color: var(--foreground);
+  transition: background-color 0.15s;
+}
+.resumen:hover { background: color-mix(in srgb, var(--muted) 45%, transparent); }
+.resumen:focus-visible { outline: 2px solid var(--ring); outline-offset: -2px; border-radius: 1rem; }
+.texto { display: grid; gap: 1px; flex: 1; min-width: 0; }
+.frase { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; font-size: var(--fs-sm); font-weight: 500; }
+.meta { font-size: var(--fs-xs); color: var(--muted-foreground); overflow-wrap: anywhere; }
+.hora { flex-shrink: 0; font-size: var(--fs-xs); color: var(--muted-foreground); font-variant-numeric: tabular-nums; }
+.flecha { flex-shrink: 0; color: var(--muted-foreground); transition: transform 0.2s; }
 .girado { transform: rotate(180deg); }
-.detalle { display: grid; gap: 8px; margin: 0; padding: 0 14px 14px; }
-.detalle div { display: grid; gap: 2px; }
+.insignia { font-weight: 600; }
+
+/* Niveles */
+.alerta > .resumen { background: color-mix(in srgb, var(--destructive) 7%, transparent); }
+.alerta > .resumen:hover { background: color-mix(in srgb, var(--destructive) 12%, transparent); }
+.alerta .frase { color: var(--destructive-foreground); font-weight: 600; }
+.importante .frase { font-weight: 600; }
+.rutina > .resumen, .grupo > .resumen { min-height: 44px; padding-block: 6px; }
+.rutina .frase, .grupo .frase { font-weight: 400; color: var(--muted-foreground); }
+.subLista .resumen { min-height: 40px; padding-inline-start: 28px; }
+
+/* El sistema (sin persona): un engrane en gris */
+.sistema {
+  display: grid; place-items: center; flex-shrink: 0; width: 32px; height: 32px; border-radius: 999px;
+  background: var(--muted); color: var(--muted-foreground);
+}
+.sistemaChico { width: 24px; height: 24px; }
+
+/* Lo desplegado: un escalón de tono, sin raya */
+.desplegable { overflow: hidden; }
+.detalle {
+  display: grid; gap: 14px; padding: 4px 16px 16px 60px;
+}
+.subLista .detalle { padding-inline-start: 68px; }
+.hechos { display: grid; gap: 10px 20px; margin: 0; grid-template-columns: repeat(auto-fill, minmax(min(100%, 13rem), 1fr)); }
+.hechos > div, .rastro > div, .detalle > div { display: grid; gap: 2px; min-width: 0; }
 .detalle dt { font-size: var(--fs-xs); color: var(--muted-foreground); }
-.detalle dd { margin: 0; font-size: var(--fs-xs); color: var(--foreground); overflow-wrap: anywhere; }
-.detalle pre { margin: 0; padding: 8px; border-radius: var(--radius-md); background: var(--muted); white-space: pre-wrap; word-break: break-word; font-size: var(--fs-xs); }
-.hash { font-family: ui-monospace, monospace; }
+.detalle dd { margin: 0; min-width: 0; font-size: var(--fs-sm); color: var(--foreground); overflow-wrap: anywhere; }
+.detalle dd code { font-family: var(--font-mono); font-size: var(--fs-xs); }
+.id { font-family: var(--font-mono); font-size: var(--fs-xs); color: var(--muted-foreground); }
+.rastro {
+  display: grid; gap: 8px; margin: 0; padding: 12px 14px; border-radius: 0.75rem;
+  background: color-mix(in srgb, var(--muted) 40%, transparent);
+}
+.detalle .rastro dd { font-family: var(--font-mono); font-size: var(--fs-xs); color: var(--muted-foreground); }
+@media (max-width: 560px) {
+  .detalle, .subLista .detalle { padding-inline-start: 16px; }
+  /* En el teléfono la hora baja bajo el texto: la fila no se aprieta */
+  .resumen { display: grid; grid-template-columns: auto 1fr auto; column-gap: 12px; row-gap: 2px; }
+  .resumen > :first-child { grid-row: 1 / span 2; align-self: start; margin-top: 2px; }
+  .hora { grid-column: 2; grid-row: 2; }
+  .flecha { grid-column: 3; grid-row: 1 / span 2; }
+  .subLista .resumen { padding-inline-start: 16px; }
+}
+
 .vacio {
   display: grid; justify-items: center; gap: 10px; padding: 32px 16px; text-align: center;
   border-radius: var(--radius-xl); background: var(--card); box-shadow: inset 0 0 0 1px var(--border);

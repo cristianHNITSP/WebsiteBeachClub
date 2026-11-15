@@ -1,12 +1,12 @@
 import { useRef, useState } from 'react'
-import { toast } from 'sonner'
+import { toast } from '@/admin/toast'
 import { AnimatePresence, motion } from 'framer-motion'
 import { CaretLeftIcon, CaretRightIcon, CloudArrowUpIcon, StarIcon, TrashIcon } from '@phosphor-icons/react'
 import SectionPanel from '../components/SectionPanel'
 import { SkeletonCard } from '@/components/frida/Skeleton'
-import { Button } from '@/components/ui/button'
+import { Button } from '@/components/coss/button'
 import Imagen from '@/components/marca/Imagen'
-import Pista, { GrupoPistas } from '@/components/marca/Pista'
+import Pista, { GrupoPistas } from '@/admin/components/Pista'
 import { usePedido } from '@/hooks/usePedido'
 import { useSesion } from '@/lib/sesion'
 import { SITUACION } from '@/lib/situacion'
@@ -26,24 +26,24 @@ const MAX_MB = 15
 
 export default function GestionFotosPage({ habitacionId, onBack }) {
   const pedido = usePedido(senal => habitacionesApi.obtener(habitacionId, senal), [habitacionId])
-  const titulo = <>Gestionar<br /><em>Fotos</em></>
+  const titulo = "Gestionar fotos"
   if (pedido.error) {
     return (
-      <SectionPanel eyebrow="Habitaciones" title={titulo} subtitle={pedido.error.message} onBack={onBack}>
+      <SectionPanel title={titulo} subtitle={pedido.error.message} onBack={onBack}>
         <Button variant="outline" onClick={pedido.recargar}>Reintentar</Button>
       </SectionPanel>
     )
   }
   if (pedido.cargando) {
     return (
-      <SectionPanel eyebrow="Habitaciones" title={titulo} subtitle="Cargando la habitación" onBack={onBack}>
+      <SectionPanel title={titulo} subtitle="Cargando la habitación" onBack={onBack}>
         <SkeletonCard height="420px" />
       </SectionPanel>
     )
   }
   const fuera = SITUACION[pedido.datos.situacion]
   if (fuera) {
-    return <SectionPanel eyebrow="Habitaciones" title={<>{pedido.datos.nombre}</>} subtitle={`${fuera.texto}. ${fuera.detalle}`} onBack={onBack} />
+    return <SectionPanel title={<>{pedido.datos.nombre}</>} subtitle={`${fuera.texto}. ${fuera.detalle}`} onBack={onBack} />
   }
   return <Galeria room={pedido.datos} onBack={onBack} />
 }
@@ -112,8 +112,7 @@ function Galeria({ room, onBack }) {
 
   return (
     <SectionPanel
-      eyebrow="Habitaciones"
-      title={<>Gestionar<br /><em>Fotos</em></>}
+      title="Gestionar fotos"
       subtitle={`Imágenes de «${room.nombre}». La primera es la portada.`}
       onBack={onBack}
     >

@@ -22,7 +22,7 @@ from app.auth.alcance import Alcance, fijar_en_base_sincrona
 from app.auth.claves import hasher, problema_de_clave
 from app.config import obtener_config
 from app.db import SesionSincrona
-from app.modelos import Habitacion, Propiedad, Rol, Usuario
+from app.modelos import FichaExterna, Habitacion, Propiedad, Rol, Usuario
 from app.servicios.auditoria import nueva
 
 _USUARIO = re.compile(r"[a-z0-9][a-z0-9._-]{2,39}")
@@ -106,38 +106,45 @@ def sembrar_desarrollo() -> None:
     _sembrar_habitaciones()
     _sembrar_reservas()
     _sembrar_pagos()
+    fichas_iniciales()
 
 
-# Las del mock del panel (frontend/src/data/admin.js), repartidas entre las dos propiedades.
-HABITACIONES_DESARROLLO = [
-    ("chelem", "Suite Coral Grande", "Suite", 2, 320_000, "activa"),
-    ("chelem", "Cabaña del Manglar", "Cabaña", 2, 210_000, "activa"),
-    ("chuburna", "Suite Horizonte Azul", "Suite Premium", 2, 480_000, "mantenimiento"),
-    ("chuburna", "Villa Chuburná Sunset", "Villa", 6, 390_000, "activa"),
-    ("chelem", "Cabaña Brisa Marina", "Cabaña", 3, 240_000, "activa"),
-    ("chuburna", "Suite Frida Clásica", "Suite", 2, 290_000, "activa"),
-    ("chelem", "Estudio Palapa Norte", "Estudio", 2, 160_000, "activa"),
-    ("chuburna", "Villa Flamingo Rosado", "Villa", 6, 420_000, "activa"),
-    ("chelem", "Habitación Familiar Arena", "Familiar", 5, 260_000, "activa"),
-    ("chuburna", "Suite Cenote Esmeralda", "Suite Premium", 2, 520_000, "mantenimiento"),
-    ("chelem", "Cabaña Selva Profunda", "Cabaña", 3, 190_000, "activa"),
-    ("chuburna", "Estudio Frida Clásico", "Estudio", 2, 145_000, "activa"),
-]
+# Inventario INTERNO de ejemplo del motor (propiedad, tipo, personas, cama, m², unidades, tarifa en
+# centavos). Es del motor: las plataformas publican otra cosa (solo lo que se vende en línea, con su
+# propio nombre y formato) y NO son espejo de esto. Las cifras son de prueba.
+# Cabañas Frida (Chelem). Casa Frida aún no se conoce: por ahora lleva las mismas habitaciones
+# (decisión del usuario, 2026-11-15). Se vende en línea lo que muestran las plataformas: la doble
+# matrimonial (2 camas Queen, hasta 4) y la King (hasta 2); la Junior suite es solo de recepción.
+_DOBLES = ["Fidji", "Maui", "Acapulco", "San Felipe", "Cancún"]
+_KING = ["Izamal", "Miami", "Dubái", "Hawái", "Honolulu"]
+# (propiedad, nombre, tipo, personas, cama, m2, tarifa en centavos, en línea)
+INVENTARIO_DESARROLLO = [
+    (clave, nombre, tipo, personas, cama, 20, tarifa, en_linea)
+    for clave in ("chelem", "chuburna")
+    for nombre, tipo, personas, cama, tarifa, en_linea in (
+        *((n, "Doble matrimonial", 4, "queen", 160_000, True) for n in _DOBLES),
+        *((n, "King size", 2, "king", 140_000, True) for n in _KING),
+        ("Junior suite", "Junior suite", 3, "king", 220_000, False),
+    )
+]  # fmt: skip
 
 
 def _sembrar_habitaciones() -> None:
-    """Idempotente: solo crea las que faltan (por nombre); nunca borra ni pisa."""
+    """Idempotente: solo crea las que faltan (por propiedad y nombre); nunca borra ni pisa."""
     with SesionSincrona.begin() as s:
         fijar_en_base_sincrona(s, Alcance(None))  # la CLI ve todas las propiedades (RLS)
         props = {p.clave: p.id for p in s.execute(select(Propiedad)).scalars()}
-        existentes = set(s.execute(select(Habitacion.nombre)).scalars())
+        existentes = set(s.execute(select(Habitacion.propiedad_id, Habitacion.nombre)).all())
         nuevas = [
-            Habitacion(propiedad_id=props[c], nombre=n, tipo=t, capacidad=cap, tarifa_centavos=tar, estado=e)
-            for c, n, t, cap, tar, e in HABITACIONES_DESARROLLO
-            if n not in existentes
-        ]
+            Habitacion(
+                propiedad_id=props[clave], nombre=nombre, tipo=tipo, capacidad=personas, cama=cama,
+                tamano_m2=m2, tarifa_centavos=tarifa, venta_en_linea=en_linea,
+            )
+            for clave, nombre, tipo, personas, cama, m2, tarifa, en_linea in INVENTARIO_DESARROLLO
+            if (props[clave], nombre) not in existentes
+        ]  # fmt: skip
         s.add_all(nuevas)
-    print(f"✓ {len(nuevas)} habitaciones de prueba creadas")
+    print(f"✓ {len(nuevas)} habitaciones de prueba creadas (inventario interno de ejemplo)")
 
 
 HUESPEDES_DESARROLLO = [
@@ -357,9 +364,39 @@ def particiones() -> None:
     print(f"✓ Particiones al día hasta {hasta:%Y-%m} ({total} nuevas)")
 
 
+def fichas_iniciales() -> None:
+    """Da de alta los enlaces que el hotel dio de sus fichas (servicios/fichas.py).
+    Idempotente: lo que ya está no se repite. Después, el bot las lee solo."""
+    from app.servicios.fichas import CUARTOS_COPIADOS, ENLACES_INICIALES, canal_de, limpiar_url
+
+    nuevas = 0
+    with SesionSincrona.begin() as s:
+        fijar_en_base_sincrona(s, Alcance(None))
+        for nombre, enlaces in ENLACES_INICIALES.items():
+            propiedad = (
+                s.execute(select(Propiedad).where(Propiedad.nombre.ilike(f"{nombre}%"))).scalars().first()
+            )
+            if propiedad is None:
+                print(f"· «{nombre}» no existe: se omiten sus enlaces")
+                continue
+            for _, url in enlaces:
+                url = limpiar_url(url)
+                if not s.execute(select(FichaExterna.id).where(FichaExterna.url == url)).first():
+                    s.add(FichaExterna(propiedad_id=propiedad.id, canal=canal_de(url), url=url))
+                    nuevas += 1
+        for url, cuartos in CUARTOS_COPIADOS.items():  # lo copiado a mano, solo si la ficha aún no tiene nada
+            ficha = s.execute(select(FichaExterna).where(FichaExterna.url == url)).scalars().first()
+            if ficha and not ficha.cuartos:
+                ficha.cuartos, ficha.estado = cuartos, "leida"
+                ficha.detalle = "Copiado por el hotel desde su ficha. El bot lo confirma cuando la lee."
+        if nuevas:
+            s.add(nueva(accion="cli.fichas_iniciales", entidad="ficha_externa", despues={"nuevas": nuevas}))
+    print(f"✓ Fichas: {nuevas} nuevas")
+
+
 def main() -> None:
     contexto.abrir("cli")  # la auditoría de lo que haga la CLI dice que vino de aquí
-    p = argparse.ArgumentParser(prog="python -m app.cli", description="Administración de Hoteles Frida")
+    p = argparse.ArgumentParser(prog="python -m app.cli", description="Administración de Reservas Frida")
     sub = p.add_subparsers(dest="comando", required=True)
     c = sub.add_parser("crear-usuario", help="Alta de una persona del personal")
     c.add_argument("--usuario", required=True)
@@ -370,6 +407,9 @@ def main() -> None:
         "--propiedades", default="", help="claves separadas por coma (chelem,chuburna); el gerente ve todas"
     )
     sub.add_parser("sembrar-desarrollo", help="Cuentas de prueba (solo desarrollo)")
+    sub.add_parser(
+        "fichas-iniciales", help="Da de alta los enlaces de las fichas del hotel en otras plataformas"
+    )
     sub.add_parser("recalcular-metricas", help="Recalcula las métricas del tablero desde las reservas")
     sub.add_parser("particiones", help="Crea las particiones mensuales de los próximos 24 meses")
     v = sub.add_parser("verificar-auditoria", help="Comprueba la cadena de hashes de la auditoría")
@@ -380,6 +420,8 @@ def main() -> None:
         crear_usuario(args.usuario, args.correo, args.nombre, args.rol, props, _pedir_clave())
     elif args.comando == "recalcular-metricas":
         recalcular_metricas()
+    elif args.comando == "fichas-iniciales":
+        fichas_iniciales()
     elif args.comando == "particiones":
         particiones()
     elif args.comando == "verificar-auditoria":

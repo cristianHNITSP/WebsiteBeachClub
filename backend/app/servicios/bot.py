@@ -60,7 +60,7 @@ def bloqueado(url: str, dominios: list[str]) -> bool:
 
 
 def agente(contacto: str) -> str:
-    return f"HotelesFridaBot/1.0 (busca menciones del hotel; contacto: {contacto})"
+    return f"ReservasFridaBot/1.0 (lee las fichas y menciones del propio hotel; contacto: {contacto})"
 
 
 # ── Extraer (puro: se prueba sin red) ──

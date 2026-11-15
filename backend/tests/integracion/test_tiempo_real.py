@@ -155,3 +155,27 @@ def test_outbox_sin_aviso_para_bloqueos():
         datos={"tipo": "bloqueo"},
     )
     assert desde_evento(e) is None
+
+
+async def test_un_aviso_de_paso_llega_a_todos_sin_id():
+    """El progreso del bot no se guarda: viaja sin `id` (no mueve el Last-Event-ID) y lo recibe
+    cualquier persona conectada, sin importar sus permisos ni sus propiedades."""
+    from app.tareas.outbox import publicar_en_vivo
+
+    async def nunca():
+        return False
+
+    flujo = tiempo_real.flujo(actor(permisos=(), propiedades=[uuid.uuid7()], todas=False), None, nunca, None,
+                              duracion_max_s=3)  # fmt: skip
+    assert await anext(flujo) == "retry: 3000\n\n"
+
+    async def primero():
+        async for trozo in flujo:
+            if trozo.startswith("data:"):
+                return trozo
+
+    tarea = asyncio.create_task(asyncio.wait_for(primero(), 3))
+    await asyncio.sleep(0.5)  # ya suscrito
+    publicar_en_vivo({"tipo": "bot.progreso", "estado": "trabajando", "paginas": []})
+    trozo = await tarea
+    assert json.loads(trozo.removeprefix("data: "))["tipo"] == "bot.progreso"

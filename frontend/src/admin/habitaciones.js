@@ -42,4 +42,10 @@ export const ESTADOS_HABITACION = {
   inactiva: 'Inactiva',
 }
 
+export const CAMAS = { king: 'King', queen: 'Queen', matrimonial: 'matrimonial', individuales: 'individual' }
+
+/** Lo que define a una habitación al reservar: "Doble matrimonial, cama Queen, hasta 4 personas". */
+export const fichaHabitacion = h => [h.tipo, h.cama && `cama ${CAMAS[h.cama] ?? h.cama}`, `hasta ${h.capacidad} persona${h.capacidad !== 1 ? 's' : ''}`]
+  .filter(Boolean).join(', ')
+
 export const pesos = centavos => `MXN $${(centavos / 100).toLocaleString('es-MX', { maximumFractionDigits: 2 })}`

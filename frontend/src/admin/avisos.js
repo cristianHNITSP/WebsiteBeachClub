@@ -1,5 +1,5 @@
 import { useEffect, useSyncExternalStore } from 'react'
-import { toast } from 'sonner'
+import { toast } from '@/admin/toast'
 import { api } from '@/lib/api'
 import { escucharEventos } from '@/lib/eventos'
 

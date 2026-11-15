@@ -5,7 +5,7 @@ from datetime import date, datetime
 from typing import Literal, Self
 from uuid import UUID
 
-from pydantic import EmailStr, Field, model_validator
+from pydantic import BaseModel, EmailStr, Field, model_validator
 
 from app.esquemas.base import Entrada, Salida
 from app.esquemas.texto import Texto
@@ -135,6 +135,7 @@ class ReservaSalida(Salida):
     pagado_centavos: int
     por_cobrar_centavos: int
     motivo_cancelacion: str | None
+    fuente: str  # motor | booking | airbnb…: distinta de motor = la dueña es la plataforma
     sitio_id: UUID | None  # vino de un sitio web (API pública)
     vence_en: datetime | None  # una retenida vence a esta hora si no se paga
     version: int
@@ -169,6 +170,23 @@ class NocheSalida(Salida):
     monto_centavos: int  # su parte del total pactado (según el precio de esa noche)
     pagado_centavos: int
     estado: Literal["pagada", "parcial", "pendiente"]
+
+
+ColumnaRecepcion = Literal["llegan", "en_casa", "salen", "sin_llegada"]
+
+
+class MetaRecepcion(BaseModel):
+    """Cursor de doble sentido: Anterior y Siguiente. `total` es barato aquí:
+    una columna de la recepción son las reservas activas de hoy, no el historial."""
+
+    siguiente: str | None
+    anterior: str | None
+    total: int
+
+
+class PaginaRecepcion(BaseModel):
+    items: list[ReservaSalida]
+    meta: MetaRecepcion
 
 
 class ReservaDetalle(ReservaSalida):

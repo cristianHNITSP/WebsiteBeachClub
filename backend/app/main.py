@@ -38,7 +38,7 @@ def crear_app() -> FastAPI:
     config = obtener_config()
     logging.basicConfig(level=logging.INFO if config.es_desarrollo else logging.WARNING)
     app = FastAPI(
-        title="Hoteles Frida: motor de reservas",
+        title="Reservas Frida: motor de reservas",
         version="0.1.0",
         lifespan=_ciclo,
         # El contrato (OpenAPI) solo en desarrollo.
@@ -74,9 +74,10 @@ def crear_app() -> FastAPI:
     app.include_router(eventos.router)
     app.include_router(reservas.router)
     app.include_router(reservas.cobro)
-    app.include_router(sitios.router)
     app.include_router(externas.router)
-    app.include_router(v1.router)
+    if config.api_publica_activa:  # la website está apagada por omisión (config.api_publica_activa)
+        app.include_router(sitios.router)
+        app.include_router(v1.router)
     return app
 
 

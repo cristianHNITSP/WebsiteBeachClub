@@ -41,6 +41,16 @@ export default defineConfig([
     rules: { 'react-refresh/only-export-components': 'off' },
   },
   {
+    // devl.dev y coss.com/ui, instalados tal cual (scripts/devl-add.sh): no se
+    // editan para que una reinstalación no pise cambios nuestros.
+    files: ['src/components/devl/**', 'src/components/coss/**'],
+    rules: {
+      'react-refresh/only-export-components': 'off',
+      'react-hooks/exhaustive-deps': 'off',
+      'no-unused-vars': 'off',
+    },
+  },
+  {
     files: ['vite.config.js'],
     languageOptions: { globals: globals.node },
   },

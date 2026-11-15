@@ -11,3 +11,6 @@ export const SITUACION = {
   eliminado_definitivo: { texto: 'Eliminada definitivamente', detalle: 'Su historial se conserva, pero ya no se puede restaurar.' },
 }
 
+
+/** ¿La habitación de esta reserva está eliminada (papelera o definitivo)? Sin check-in ni check-out hasta restaurarla. */
+export const habitacionEliminada = r => Boolean(r?.habitacion_situacion) && r.habitacion_situacion !== 'vigente'

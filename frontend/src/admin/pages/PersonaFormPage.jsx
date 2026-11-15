@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react'
-import { toast } from 'sonner'
+import { LiquidCheckbox } from '@/components/devl/liquid-checkbox'
+import { toast } from '@/admin/toast'
 import { CopyIcon, FloppyDiskIcon, UserPlusIcon, UsersThreeIcon, WarningCircleIcon } from '@phosphor-icons/react'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
+import { Button } from '@/components/coss/button'
+import { Input } from '@/components/coss/input'
+import { Label } from '@/components/coss/label'
 import { SkeletonCard } from '@/components/frida/Skeleton'
-import Selector from '@/components/marca/Selector'
+import Selector from '@/admin/components/Selector'
 import { usePedido } from '@/hooks/usePedido'
 import { useSesion } from '@/lib/sesion'
 import SectionPanel from '../components/SectionPanel'
@@ -29,7 +30,7 @@ export default function PersonaFormPage({ personaId, onBack, onDirtyChange }) {
   if (alta) return <AltaLista alta={alta} onBack={onBack} onOtra={() => setAlta(null)} />
   if (persona.cargando || roles.cargando) {
     return (
-      <SectionPanel eyebrow="Equipo" title={nueva ? 'Nueva persona' : 'Editar persona'} onBack={onBack}>
+      <SectionPanel title={nueva ? 'Nueva persona' : 'Editar persona'} onBack={onBack}>
         <div className={s.columnas}><SkeletonCard height="300px" /><SkeletonCard height="300px" /></div>
       </SectionPanel>
     )
@@ -37,10 +38,10 @@ export default function PersonaFormPage({ personaId, onBack, onDirtyChange }) {
   const error = persona.error ?? roles.error
   if (error) {
     return (
-      <SectionPanel eyebrow="Equipo" title={nueva ? 'Nueva persona' : 'Editar persona'} onBack={onBack}>
+      <SectionPanel title={nueva ? 'Nueva persona' : 'Editar persona'} onBack={onBack}>
         <div className={s.vacio} role="alert">
           <WarningCircleIcon size={28} aria-hidden="true" /><p>{error.message}</p>
-          <Button variant="outline" className="h-11" onClick={() => { persona.recargar(); roles.recargar() }}>Reintentar</Button>
+          <Button variant="outline" size="lg" onClick={() => { persona.recargar(); roles.recargar() }}>Reintentar</Button>
         </div>
       </SectionPanel>
     )
@@ -101,8 +102,8 @@ function Formulario({ persona, roles, onBack, onDirtyChange, onAlta }) {
 
   const acciones = (
     <>
-      <Button type="button" variant="outline" className="h-11" onClick={onBack}>Cancelar</Button>
-      <Button type="submit" form="persona-form" className="h-11" disabled={guardando || !dirty || (!todas && form.propiedades.length === 0)}>
+      <Button type="button" variant="outline" size="lg" onClick={onBack}>Cancelar</Button>
+      <Button type="submit" form="persona-form" size="lg" disabled={guardando || !dirty || (!todas && form.propiedades.length === 0)}>
         {nueva ? <UserPlusIcon size={16} weight="bold" aria-hidden="true" /> : <FloppyDiskIcon size={16} weight="bold" aria-hidden="true" />}
         {nueva ? 'Dar de alta' : 'Guardar cambios'}
       </Button>
@@ -111,7 +112,6 @@ function Formulario({ persona, roles, onBack, onDirtyChange, onAlta }) {
 
   return (
     <SectionPanel
-      eyebrow="Equipo"
       title={nueva ? <>Nueva <em>persona</em></> : <>Editar a <em>{persona.nombre}</em></>}
       subtitle={nueva
         ? 'Al darla de alta se le asigna una contraseña temporal que verás aquí; al entrar tendrá que cambiarla.'
@@ -127,17 +127,17 @@ function Formulario({ persona, roles, onBack, onDirtyChange, onAlta }) {
             <div className={s.campo}>
               <Label htmlFor="p-usuario">Usuario (para entrar)</Label>
               <Input id="p-usuario" required minLength={3} maxLength={40} pattern="[a-zA-Z0-9][a-zA-Z0-9._\-]{2,39}" autoComplete="off"
-                placeholder="ana.pech" value={form.usuario} onChange={set('usuario')} className="h-11" />
+                placeholder="ana.pech" value={form.usuario} onChange={set('usuario')} size="lg" />
               <span className={s.ayuda}>Letras, números, punto, guion o guion bajo. No se puede cambiar después.</span>
             </div>
           )}
           <div className={s.campo}>
             <Label htmlFor="p-nombre">Nombre completo</Label>
-            <Input id="p-nombre" required minLength={2} maxLength={120} value={form.nombre} onChange={set('nombre')} className="h-11" />
+            <Input id="p-nombre" required minLength={2} maxLength={120} value={form.nombre} onChange={set('nombre')} size="lg" />
           </div>
           <div className={s.campo}>
             <Label htmlFor="p-correo">Correo</Label>
-            <Input id="p-correo" type="email" required maxLength={254} value={form.correo} onChange={set('correo')} className="h-11" />
+            <Input id="p-correo" type="email" required maxLength={254} value={form.correo} onChange={set('correo')} size="lg" />
           </div>
         </section>
 
@@ -162,10 +162,7 @@ function Formulario({ persona, roles, onBack, onDirtyChange, onAlta }) {
             ) : (
               <>
                 {propiedades.map(p => (
-                  <label key={p.id} className={s.casilla}>
-                    <input type="checkbox" checked={form.propiedades.includes(p.id)} onChange={() => alternar(p.id)} />
-                    {p.nombre}, {p.lugar.split(',')[0]}
-                  </label>
+                  <LiquidCheckbox key={p.id} checked={form.propiedades.includes(p.id)} onCheckedChange={() => alternar(p.id)} label={`${p.nombre}, ${p.lugar.split(',')[0]}`} />
                 ))}
                 {form.propiedades.length === 0 && <span className={s.ayuda}>Elige al menos una.</span>}
               </>
@@ -181,10 +178,10 @@ function Formulario({ persona, roles, onBack, onDirtyChange, onAlta }) {
 /** Tras el alta: la contraseña temporal, aquí mismo y una sola vez. */
 function AltaLista({ alta, onBack, onOtra }) {
   const copiar = async () => {
-    try { await navigator.clipboard.writeText(alta.clave); toast.success('Contraseña copiada') } catch { toast.error('No se pudo copiar: cópiala a mano') }
+    try { await navigator.clipboard.writeText(alta.clave); toast.success('Contraseña copiada') } catch { toast.error('No se pudo copiar. Cópiala manualmente.') }
   }
   return (
-    <SectionPanel eyebrow="Equipo" title={<>{alta.persona.nombre} <em>ya tiene acceso</em></>} onBack={onBack}>
+    <SectionPanel title={<>{alta.persona.nombre} <em>ya tiene acceso</em></>} onBack={onBack}>
       <section className={s.tarjeta} aria-labelledby="p-clave">
         <h2 className={s.titulo} id="p-clave">Contraseña temporal</h2>
         <p className={s.ayuda}>
@@ -192,12 +189,12 @@ function AltaLista({ alta, onBack, onOtra }) {
         </p>
         <div className={s.clave}>
           <code aria-label="Contraseña temporal">{alta.clave}</code>
-          <Button type="button" variant="outline" className="h-11" onClick={copiar}><CopyIcon size={16} weight="bold" /> Copiar</Button>
+          <Button type="button" variant="outline" size="lg" onClick={copiar}><CopyIcon size={16} weight="bold" /> Copiar</Button>
         </div>
         <p className={s.ayuda}>Usuario: <strong>{alta.persona.usuario}</strong></p>
         <div className={s.botones}>
-          <Button type="button" className="h-11" onClick={onBack}><UsersThreeIcon size={16} weight="bold" /> Ir al personal</Button>
-          <Button type="button" variant="outline" className="h-11" onClick={onOtra}><UserPlusIcon size={16} weight="bold" /> Dar de alta a otra persona</Button>
+          <Button type="button" size="lg" onClick={onBack}><UsersThreeIcon size={16} weight="bold" /> Ir al personal</Button>
+          <Button type="button" variant="outline" size="lg" onClick={onOtra}><UserPlusIcon size={16} weight="bold" /> Dar de alta a otra persona</Button>
         </div>
       </section>
     </SectionPanel>

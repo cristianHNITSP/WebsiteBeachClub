@@ -10,7 +10,11 @@
  *    token una sobre otra y la API lo tomaría por un robo).
  *  - Tope de tiempo en toda petición: ninguna se queda "cargando" para siempre.
  *  - El mensaje de error del backend ya viene escrito para la persona.
+ *  - Si el servidor no responde (502/503/504 o sin respuesta), avisa a `lib/servicio.js`:
+ *    una sola pantalla explica que se está actualizando y se reconecta sola.
  */
+
+import { avisarCaida } from '@/lib/servicio'
 
 const TOPE_AUTH_MS = 12_000
 const TOPE_MS = 30_000
@@ -54,6 +58,7 @@ async function pedir(ruta, { metodo = 'GET', cuerpo, idempotencia, senal } = {})
   } catch (e) {
     if (e.name === 'TimeoutError') throw new ErrorApi('El servidor tardó demasiado. Intenta de nuevo.', 0, null)
     if (e.name === 'AbortError') throw e
+    avisarCaida() // con internet y sin respuesta: casi siempre, un despliegue en curso
     throw new ErrorApi('No hay conexión con el servidor. Revisa tu internet.', 0, null)
   }
 }
@@ -86,6 +91,8 @@ export async function api(ruta, opciones = {}) {
     if (await renovarUnaVez()) r = await pedir(ruta, opciones)
     if (r.status === 401) alPerderSesion()
   }
+  // 502/503/504: Nginx sin API detrás (reiniciando al desplegar). Una sola pantalla lo explica.
+  if (r.status >= 502 && r.status <= 504) avisarCaida()
   // crudo: la respuesta tal cual (descargas), ya con la sesión renovada si hizo falta.
   if (opciones.crudo && r.ok) return r
   const datos = await leer(r)

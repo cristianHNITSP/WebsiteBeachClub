@@ -26,7 +26,12 @@ REVISAR_S = 10
 DURACION_MAX_S = 10 * 60
 REENVIO_MAX = 500
 # Qué permiso hace falta para recibir cada familia de eventos.
-PERMISO_DE = {"reserva": "reservas.ver", "pago": "reservas.ver", "externas": "externas.ver"}
+PERMISO_DE = {
+    "reserva": "reservas.ver",
+    "pago": "reservas.ver",
+    "externas": "externas.ver",
+    "habitacion": "habitaciones.ver",
+}
 
 
 def canal(propiedad_id: UUID | None) -> str:
@@ -47,7 +52,7 @@ def mensaje(e: Outbox) -> dict:
 
 
 def puede_ver(actor: Actor, m: dict) -> bool:
-    permiso = PERMISO_DE.get(m["tipo"].split(".")[0])
+    permiso = PERMISO_DE.get(m["tipo"].split(".")[0])  # bot.progreso: sin permiso, lo ven todos
     if permiso and not actor.puede(permiso):
         return False
     prop = m.get("propiedad_id")
@@ -55,7 +60,10 @@ def puede_ver(actor: Actor, m: dict) -> bool:
 
 
 def sse(m: dict) -> str:
-    return f"id: {m['id']}\ndata: {json.dumps(m, ensure_ascii=False)}\n\n"
+    """Con `id` (eventos del outbox) el navegador lo recuerda para reconectar; los avisos de
+    paso (`publicar_en_vivo`) no llevan, y así no mueven el Last-Event-ID."""
+    marca = f"id: {m['id']}\n" if m.get("id") else ""
+    return f"{marca}data: {json.dumps(m, ensure_ascii=False)}\n\n"
 
 
 async def flujo(

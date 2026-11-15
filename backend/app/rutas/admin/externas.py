@@ -24,11 +24,14 @@ from app.esquemas.externas import (
     CalendarioSalida,
     Canal,
     ExternaSalida,
+    FichaNueva,
+    FichaSalida,
     ImportacionSalida,
     MencionSalida,
 )
-from app.modelos import AjustesBot, CalendarioExterno, MencionExterna
+from app.modelos import AjustesBot, CalendarioExterno, FichaExterna, MencionExterna
 from app.servicios import externas as servicio
+from app.servicios import fichas as servicio_fichas
 from app.servicios.auditoria import auditar
 
 log = logging.getLogger(__name__)
@@ -150,3 +153,48 @@ async def buscar_ahora(_: Editar, sesion: Sesion) -> dict:
     await auditar(sesion, accion="bot.buscar", entidad="ajustes_bot", entidad_id=1)
     _encargar(buscar_menciones)
     return {"encargado": True}
+
+
+# ── Fichas del hotel en otras plataformas: las lee el bot, nadie sincroniza nada ──
+
+
+@router.get("/fichas", response_model=list[FichaSalida])
+async def fichas(
+    _: Ver, alcance: AlcanceActual, sesion: Sesion
+):  # el alcance fija el acceso por propiedad (RLS)
+    return await servicio_fichas.listar(sesion)
+
+
+@router.post("/fichas", status_code=201, response_model=FichaSalida)
+async def crear_ficha(datos: FichaNueva, actor: Editar, alcance: AlcanceActual, sesion: Sesion):
+    f = await servicio_fichas.crear(sesion, actor, alcance, datos.propiedad_id, datos.url)
+    _encargar_ficha(f.id)
+    return f
+
+
+@router.delete("/fichas/{ficha_id}", status_code=204)
+async def borrar_ficha(ficha_id: UUID, actor: Editar, alcance: AlcanceActual, sesion: Sesion) -> None:
+    await servicio_fichas.borrar(sesion, actor, alcance, ficha_id)
+
+
+@router.post("/fichas/leer", status_code=202)
+async def leer_fichas(_: Editar) -> dict:
+    from app.tareas.externas import leer_fichas as tarea
+
+    _encargar(tarea)
+    return {"encargado": True}
+
+
+@router.post("/fichas/{ficha_id}/leer", status_code=202)
+async def leer_ficha(ficha_id: UUID, _: Editar, alcance: AlcanceActual, sesion: Sesion) -> dict:
+    f = await sesion.get(FichaExterna, ficha_id)
+    if f is None or not alcance.permite(f.propiedad_id):
+        raise NoEncontrado("Esa ficha no existe")
+    _encargar_ficha(f.id)
+    return {"encargado": True}
+
+
+def _encargar_ficha(ficha_id: UUID) -> None:
+    from app.tareas.externas import leer_ficha as tarea
+
+    _encargar(tarea, str(ficha_id))

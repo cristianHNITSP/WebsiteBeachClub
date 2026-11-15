@@ -1,0 +1,7 @@
+/* La corona de hoy. --corona-gris y --corona-libre viven en admin.css (cambian en oscuro). */
+.corona { display: block; width: 100%; height: auto; max-height: 260px; overflow: visible; }
+.flor { cursor: pointer; outline: none; border-radius: 50%; } /* la gota del cursor toma su forma */
+.flor:focus-visible circle:first-child { stroke: var(--primary); stroke-width: 3; }
+.nota { min-height: 44px; margin-top: -6px; text-align: center; display: grid; gap: 2px; }
+.nota b { font-size: var(--fs-sm); font-weight: 600; color: var(--foreground); }
+.nota span { font-size: var(--fs-xs); color: var(--muted-foreground); }

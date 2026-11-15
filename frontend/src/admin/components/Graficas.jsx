@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion'
-import Pista, { GrupoPistas } from '@/components/marca/Pista'
+import Pista, { GrupoPistas } from '@/admin/components/Pista'
 import { useTheme } from '@/context/ThemeContext'
 import s from './Graficas.module.css'
 

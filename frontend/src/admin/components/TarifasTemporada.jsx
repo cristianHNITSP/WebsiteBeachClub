@@ -1,9 +1,9 @@
 import { useState } from 'react'
-import { toast } from 'sonner'
+import { toast } from '@/admin/toast'
 import { TrashIcon, PlusIcon } from '@phosphor-icons/react'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
+import { Button } from '@/components/coss/button'
+import { Input } from '@/components/coss/input'
+import { Label } from '@/components/coss/label'
 import { SkeletonCard } from '@/components/frida/Skeleton'
 import SelectorFechas from '@/components/marca/SelectorFechas'
 import { aISO, rangoDeParams } from '@/lib/fechas'
@@ -58,7 +58,7 @@ export default function TarifasTemporada({ habitacionId, base }) {
   return (
     <section className={s.caja} aria-labelledby="t-temporadas">
       <h2 className={s.titulo} id="t-temporadas">Tarifas de temporada</h2>
-      <p className={s.ayuda}>Fuera de estas fechas se cobra la tarifa base ({pesos(base)} por noche). El fin es la primera noche que ya no lleva la tarifa.</p>
+      <p className={s.ayuda}>Fuera de estas fechas aplica la tarifa base ({pesos(base)} por noche). El fin es la primera noche que ya no lleva la tarifa.</p>
       {pedido.cargando ? <SkeletonCard height="80px" /> : pedido.error ? <p role="alert">{pedido.error.message}</p> : (
         pedido.datos.length === 0 ? <p className={s.ayuda}>Sin temporadas: todas las noches a la tarifa base.</p> : (
           <ul className={s.lista}>
@@ -82,12 +82,12 @@ export default function TarifasTemporada({ habitacionId, base }) {
       {edita && (
         <form className={s.formulario} onSubmit={agregar}>
           <div className={s.campo}><Label htmlFor="tt-nombre">Nombre</Label>
-            <Input id="tt-nombre" required minLength={2} maxLength={80} placeholder="Semana Santa" value={f.nombre} onChange={set('nombre')} className="h-11" /></div>
+            <Input id="tt-nombre" required minLength={2} maxLength={80} placeholder="Semana Santa" value={f.nombre} onChange={set('nombre')} size="lg" /></div>
           <div className={s.campo}><Label htmlFor="tt-periodo">Periodo (primera noche → fin)</Label>
-            <SelectorFechas id="tt-periodo" ariaLabel="Periodo de la temporada" textos={{ vacio: 'Primera noche → Fin', sinFin: 'Fin' }}
+            <SelectorFechas id="tt-periodo" className="rounded-lg" ariaLabel="Periodo de la temporada" textos={{ vacio: 'Primera noche → Fin', sinFin: 'Fin' }}
               value={rangoDeParams(f.desde, f.hasta)} onChange={r => setF(x => ({ ...x, desde: aISO(r.from), hasta: aISO(r.to) }))} /></div>
           <div className={s.campo}><Label htmlFor="tt-tarifa">Por noche (MXN)</Label>
-            <Input id="tt-tarifa" type="number" required min="1" step="0.01" value={f.tarifa} onChange={set('tarifa')} className="h-11" /></div>
+            <Input id="tt-tarifa" type="number" required min="1" step="0.01" value={f.tarifa} onChange={set('tarifa')} size="lg" /></div>
           <Button type="submit" disabled={guardando || !f.desde || !f.hasta}><PlusIcon size={16} weight="bold" /> Agregar</Button>
         </form>
       )}

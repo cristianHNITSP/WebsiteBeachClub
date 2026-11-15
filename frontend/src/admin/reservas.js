@@ -25,6 +25,10 @@ export const ESTADOS = {
   completada:  'Completada',
   bloqueo:     'Mantenimiento',
 }
+// De dónde vino una reserva (`fuente`). 'motor' = hecha en el panel.
+export const FUENTES = { booking: 'Booking.com', airbnb: 'Airbnb', expedia: 'Expedia', vrbo: 'Vrbo', otro: 'Otra plataforma' }
+export const deFuera = r => !!r.fuente && r.fuente !== 'motor'
+
 // API → panel. `retenida` (la aparta la website mientras paga) se ve como pendiente.
 const A_PANEL = { retenida: 'pendiente', confirmada: 'confirmada', en_curso: 'en-curso', completada: 'completada' }
 // Las que ocupan o ya ocuparon la habitación (las canceladas y vencidas no se pintan).
@@ -41,6 +45,7 @@ export const alPanel = r => ({
   version: r.version,
   total: r.total_centavos,
   porCobrar: r.por_cobrar_centavos,
+  fuente: r.fuente ?? 'motor',
 })
 
 const consulta = params => {
@@ -54,6 +59,8 @@ const consulta = params => {
 
 export const reservasApi = {
   listar: (params, senal) => api(`${BASE}${consulta(params)}`, { senal }),
+  /** Una página de una columna de Llegadas y salidas: { items, meta: { siguiente, anterior, total } }. */
+  recepcion: (params, senal) => api(`${BASE}/recepcion${consulta(params)}`, { senal }),
   cotizar: (params, senal) => api(`${BASE}/cotizar${consulta(params)}`, { senal }),
   crear: datos => api(BASE, { metodo: 'POST', cuerpo: datos }),
   mover: (id, datos) => api(`${BASE}/${id}/fechas`, { metodo: 'PUT', cuerpo: datos }),
@@ -64,6 +71,20 @@ export const reservasApi = {
   cancelar: (id, version, motivo) => api(`${BASE}/${id}/cancelar`, { metodo: 'POST', cuerpo: { version, motivo } }),
   pagar: (id, datos) => api(`${BASE}/${id}/pagos`, { metodo: 'POST', cuerpo: datos }),
   devolver: (id, datos) => api(`${BASE}/${id}/devoluciones`, { metodo: 'POST', cuerpo: datos }),
+}
+
+// ── Hoy en la recepción (fecha de Mérida): lo comparten Tablero y Llegadas y salidas ──
+export const hoyISO = () => new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Merida' })
+export const menosDias = (iso, n) => { const d = new Date(`${iso}T12:00`); d.setDate(d.getDate() - n); return d.toLocaleDateString('sv-SE') }
+export function agruparHoy(reservas, hoy) {
+  const huespedes = reservas.filter(r => r.tipo === 'reserva')
+  return {
+    llegan: huespedes.filter(r => r.estado === 'confirmada' && r.llegada <= hoy && hoy < r.salida),
+    enCasa: huespedes.filter(r => r.estado === 'en_curso' && r.salida > hoy),
+    salen: huespedes.filter(r => r.estado === 'en_curso' && r.salida <= hoy),
+    // Ya pasó su estancia y nunca se registró la llegada: o no vino, o se olvidó el check-in.
+    sinLlegada: huespedes.filter(r => r.estado === 'confirmada' && r.salida <= hoy),
+  }
 }
 
 export const hoy = () => { const d = new Date(); d.setHours(0, 0, 0, 0); return d }
@@ -111,6 +132,7 @@ export function useReservas({ desde, hasta }) {
     propiedad: claveDe(h.propiedad_id),
     propiedadId: h.propiedad_id,
     capacidad: h.capacidad,
+    cama: h.cama,
     rate: h.tarifa_centavos / 100,
   })) ?? []
   useEffect(() => { if (habs.datos) ultimasHabitaciones = habitaciones })

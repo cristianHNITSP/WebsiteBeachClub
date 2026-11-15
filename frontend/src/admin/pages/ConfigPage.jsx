@@ -1,10 +1,10 @@
-import {
-  ArrowLeftIcon, GlobeIcon, MoonIcon, ShieldCheckIcon, TextAaIcon, PersonArmsSpreadIcon, UserIcon,
-  CircleHalfIcon, PersonSimpleRunIcon,
-} from '@phosphor-icons/react'
+import { LiquidSegments } from '@/components/devl/liquid-segments'
+import { LiquidSwitch } from '@/components/devl/liquid-switch'
+import SectionPanel from '../components/SectionPanel'
+import { MoonIcon, TextAaIcon, CircleHalfIcon, PersonSimpleRunIcon } from '@phosphor-icons/react'
 import { motion } from 'framer-motion'
-import { Button } from '@/components/ui/button'
 import { useTheme } from '@/context/ThemeContext'
+import { PRODUCTO } from '@/lib/producto'
 import { useParametros } from '@/hooks/useParametros'
 import { useSesion } from '@/lib/sesion'
 import SeguridadCuenta from '../components/SeguridadCuenta'
@@ -22,52 +22,36 @@ import s from './ConfigPage.module.css'
  */
 
 const PESTANAS = [
-  { key: 'perfil', label: 'Perfil', Icono: UserIcon },
-  { key: 'seguridad', label: 'Seguridad', Icono: ShieldCheckIcon },
-  { key: 'accesibilidad', label: 'Accesibilidad', Icono: PersonArmsSpreadIcon },
-  { key: 'sitios', label: 'Sitios web', Icono: GlobeIcon, permiso: 'sitios.gestionar' },
+  { key: 'perfil', label: 'Perfil' },
+  { key: 'seguridad', label: 'Seguridad' },
+  { key: 'accesibilidad', label: 'Accesibilidad' },
+  { key: 'sitios', label: 'Sitios web', permiso: 'sitios.gestionar', producto: 'sitiosWeb' },
 ]
 const TAMANOS = [{ value: 'pequeño', label: 'Pequeño' }, { value: 'normal', label: 'Normal' }, { value: 'grande', label: 'Grande' }]
 
 export default function ConfigPage({ onBack }) {
   const [{ pestana }, set] = useParametros({ pestana: 'perfil' })
   const { sesion } = useSesion()
-  const pestanas = PESTANAS.filter(t => !t.permiso || sesion?.permisos?.includes(t.permiso))
+  const pestanas = PESTANAS.filter(t => (!t.producto || PRODUCTO[t.producto]) && (!t.permiso || sesion?.permisos?.includes(t.permiso)))
   const actual = pestanas.some(t => t.key === pestana) ? pestana : 'perfil'
 
   return (
-    <div className={s.pagina}>
-      <Button variant="ghost" onClick={onBack} className="h-11 w-fit"><ArrowLeftIcon size={18} /> Regresar</Button>
-      <div className="admin-page-header">
-        <div>
-          <span className="admin-page-eyebrow">Cuenta</span>
-          <h1 className="admin-page-title">Configuración</h1>
-        </div>
+    <SectionPanel title="Configuración" onBack={onBack}>
+      <div className={s.barra}>
+        <LiquidSegments
+          options={pestanas.map(({ key, label }) => ({ value: key, label }))}
+          value={actual}
+          onValueChange={key => set({ pestana: key })}
+          aria-label="Secciones de configuración"
+        />
       </div>
-      <div className={s.layout}>
-        <nav className={s.nav} aria-label="Secciones de configuración">
-          {pestanas.map(({ key, label, Icono }) => (
-            <button
-              key={key}
-              type="button"
-              className={`${s.pestana} ${actual === key ? s.activa : ''}`}
-              aria-current={actual === key ? 'page' : undefined}
-              onClick={() => set({ pestana: key })}
-            >
-              {actual === key && <motion.span layoutId="config-activa" className={s.marca} transition={{ type: 'spring', stiffness: 500, damping: 40 }} />}
-              <Icono size={18} weight={actual === key ? 'fill' : 'regular'} aria-hidden="true" />
-              <span>{label}</span>
-            </button>
-          ))}
-        </nav>
-        <motion.section key={actual} className={s.contenido} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.18 }}>
-          {actual === 'perfil' && <div className={s.grupo}><DatosCuenta /></div>}
-          {actual === 'seguridad' && <SeguridadCuenta />}
-          {actual === 'accesibilidad' && <Accesibilidad />}
-          {actual === 'sitios' && <SitiosWeb />}
-        </motion.section>
-      </div>
-    </div>
+      <motion.section key={actual} className={s.contenido} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.18 }}>
+        {actual === 'perfil' && <DatosCuenta />}
+        {actual === 'seguridad' && <SeguridadCuenta />}
+        {actual === 'accesibilidad' && <Accesibilidad />}
+        {actual === 'sitios' && <SitiosWeb />}
+      </motion.section>
+    </SectionPanel>
   )
 }
 
@@ -85,14 +69,7 @@ function Accesibilidad() {
           <span id="tam-texto" className={s.titulo}>Tamaño de texto</span>
           <span className={s.ayuda}>El de todo el panel</span>
         </div>
-        <div className={s.opciones} role="group" aria-labelledby="tam-texto">
-          {TAMANOS.map(t => (
-            <Button key={t.value} type="button" variant={fontSize === t.value ? 'default' : 'outline'} className="h-11"
-              aria-pressed={fontSize === t.value} onClick={() => setFontSize(t.value)}>
-              {t.label}
-            </Button>
-          ))}
-        </div>
+        <LiquidSegments options={TAMANOS} value={fontSize} onValueChange={setFontSize} aria-label="Tamaño de texto" size="sm" />
       </div>
     </div>
   )
@@ -106,9 +83,7 @@ function Interruptor({ Icono, titulo, ayuda, valor, onCambio }) {
         <span className={s.titulo}>{titulo}</span>
         <span className={s.ayuda}>{ayuda}</span>
       </div>
-      <button type="button" role="switch" aria-checked={valor} aria-label={titulo} className={`${s.interruptor} ${valor ? s.encendido : ''}`} onClick={() => onCambio(!valor)}>
-        <span className={s.perilla} />
-      </button>
+      <LiquidSwitch checked={valor} onCheckedChange={onCambio} aria-label={titulo} />
     </div>
   )
 }

@@ -92,7 +92,7 @@ async def borrar_definitivo(
     if obj.purgado_en is not None:
         return
     if obj.eliminado_en is None:
-        raise ReglaDeNegocio("Primero mándalo a la papelera", codigo="no_en_papelera")
+        raise ReglaDeNegocio("Primero envíalo a la papelera", codigo="no_en_papelera")
     antes = recurso.foto(obj)
     obj.purgado_en, obj.purgado_por = ahora(), actor.id
     obj.vaciar_contenido()

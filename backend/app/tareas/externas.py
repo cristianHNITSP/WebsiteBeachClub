@@ -2,18 +2,21 @@
 siempre FUERA de las transacciones (se lee, y después se guarda)."""
 
 import logging
+from collections.abc import Callable
 from contextlib import contextmanager
 from datetime import UTC, datetime, timedelta
+from urllib.parse import urlsplit
 
 from sqlalchemy import func, select
 
 from app import contexto, red
 from app.auth.alcance import Alcance, fijar_en_base_sincrona
 from app.db import SesionSincrona
-from app.modelos import CalendarioExterno
-from app.servicios import bot, externas
+from app.modelos import AjustesBot, CalendarioExterno, FichaExterna, Propiedad
+from app.servicios import bot, externas, fichas
 from app.servicios.auditoria import nueva as nueva_auditoria
 from app.tareas import celery
+from app.tareas.outbox import publicar_en_vivo
 
 log = logging.getLogger(__name__)
 
@@ -70,7 +73,7 @@ def leer_calendario(calendario_id: str) -> dict | None:
         if eventos is None:
             return {"sin_cambios": True}  # 304 o el mismo contenido: nada que procesar
         cuenta = externas.guardar(
-            s, propiedad_id=c.propiedad_id, habitacion_id=c.habitacion_id, canal=c.canal, origen="ical",
+            s, propiedad_id=c.propiedad_id, canal=c.canal, origen="ical", publicacion=c.publicacion,
             eventos=eventos, calendario_id=c.id,
         )  # fmt: skip
         c.eventos = len(eventos)
@@ -110,3 +113,149 @@ def leer_calendarios() -> int:
 def buscar_menciones() -> str:
     contexto.abrir("tarea")
     return bot.ejecutar(_transaccion)
+
+
+def _guardar_ficha(
+    ficha_id, estado: str, detalle: str | None, resumen=None, cuartos=None, titulo=None, previo=None
+) -> None:
+    with _transaccion() as s:
+        f = s.get(FichaExterna, ficha_id, with_for_update=True)
+        if f is None:
+            return
+        cambio = (previo or (f.estado, len(f.cuartos))) != (
+            estado,
+            len(cuartos if cuartos is not None else f.cuartos),
+        )
+        f.estado, f.detalle, f.leida_en = estado, detalle, func.now()
+        if resumen is not None:
+            f.resumen, f.cuartos, f.titulo = resumen, cuartos or [], titulo
+        if cambio:  # leer seguido no llena la auditoría: solo lo que cambió
+            s.add(
+                nueva_auditoria(
+                    accion="fichas.leer", entidad="ficha_externa", entidad_id=f.id,
+                    despues={"estado": estado, "cuartos": len(cuartos or [])},
+                )
+            )  # fmt: skip
+
+
+def _fase(ficha_id, texto: str, avisar: Callable[[str], None] | None = None) -> None:
+    """Lo que el panel muestra en vivo: la ficha queda "leyendo" y dice en qué fase va."""
+    with _transaccion() as s:
+        f = s.get(FichaExterna, ficha_id, with_for_update=True)
+        if f is not None:
+            f.estado, f.detalle = "leyendo", texto
+    if avisar:
+        avisar(texto)
+
+
+def _leer_ficha(ficha_id: str, lector: bot.Lector, avisar: Callable[[str], None] | None = None) -> str | None:
+    """Lee UNA ficha (fuera de toda transacción). Cortés y sin saltarse nada: si el
+    robots.txt no la permite, o la plataforma pide verificación anti-robot o rechaza
+    al bot, se detiene y lo dice."""
+    with _transaccion() as s:
+        f = s.get(FichaExterna, ficha_id)
+        if f is None:
+            return None
+        url, previo = f.url, (f.estado, len(f.cuartos))
+    _fase(ficha_id, "Revisando su robots.txt", avisar)
+    if not lector.permiso(url):
+        _guardar_ficha(ficha_id, "bloqueada_robots", "Su robots.txt no permite leerla", previo=previo)
+        return "bloqueada_robots"
+    _fase(ficha_id, "Descargando la página", avisar)
+    try:
+        html = lector.leer(url)
+    except red.ErrorRed as e:
+        rechazo = any(c in str(e) for c in ("403", "429", "503"))
+        detalle = (
+            f"La plataforma rechazó al bot ({e}): no se insiste ni se salta" if rechazo else str(e)[:300]
+        )
+        _guardar_ficha(ficha_id, "verificacion" if rechazo else "error", detalle, previo=previo)
+        return "verificacion" if rechazo else "error"
+    _fase(ficha_id, "Leyendo las habitaciones", avisar)
+    cuartos = fichas.extraer_cuartos(html)
+    datos = bot.extraer(html)
+    resumen = {
+        k: (float(v) if hasattr(v, "as_tuple") else v)
+        for k, v in datos.items()
+        if k != "titulo" and v is not None
+    }
+    if cuartos:
+        estado, detalle = "leida", None
+    elif fichas.pide_verificacion(html):
+        estado, detalle = "verificacion", "La plataforma pidió verificación anti-robot: el bot no la salta"
+    else:
+        estado, detalle = "sin_datos", None  # la página responde; los tipos de habitación ya se conocen
+    _guardar_ficha(ficha_id, estado, detalle, resumen, cuartos, datos["titulo"], previo=previo)
+    return estado
+
+
+def _contacto() -> str | None:
+    with _transaccion() as s:
+        return s.get(AjustesBot, 1).contacto
+
+
+@celery.task
+def leer_ficha(ficha_id: str) -> str | None:
+    contexto.abrir("tarea")
+    contacto = _contacto()
+    if not contacto:
+        _guardar_ficha(
+            ficha_id, "error", "Falta el contacto del bot en el panel: sin él no se lee ninguna página"
+        )
+        return "error"
+    return _leer_ficha(ficha_id, bot.Lector(contacto))
+
+
+class _EnVivo:
+    """Lo que el bot va haciendo, para todas las personas conectadas (SSE, de paso: no se guarda).
+    Cada aviso lleva la lista COMPLETA de páginas: quien abre el panel a media vuelta la ve entera
+    con el siguiente aviso."""
+
+    def __init__(self, filas) -> None:
+        self.inicio = datetime.now(UTC).isoformat()
+        self.paginas = [
+            {"sitio": (urlsplit(url).hostname or url).removeprefix("www."), "plataforma": canal,
+             "propiedad": nombre, "estado": "pendiente", "fase": None}
+            for _, url, canal, nombre in filas
+        ]  # fmt: skip
+
+    def enviar(self, estado: str = "trabajando") -> None:
+        publicar_en_vivo(
+            {"tipo": "bot.progreso", "agregado": "bot", "agregado_id": "fichas", "propiedad_id": None,
+             "por": None, "estado": estado, "inicio": self.inicio, "paginas": [dict(p) for p in self.paginas]}
+        )  # fmt: skip
+
+    def fase(self, i: int, texto: str) -> None:
+        self.paginas[i] |= {"estado": "leyendo", "fase": texto}
+        self.enviar()
+
+    def resultado(self, i: int, estado: str | None) -> None:
+        self.paginas[i] |= {"estado": estado or "error", "fase": None}
+
+
+@celery.task(soft_time_limit=900)
+def leer_fichas() -> int:
+    """Cada día: todas las fichas, una a la vez, con la espera que pida cada sitio. Mientras
+    trabaja, avisa en vivo a todas las personas conectadas qué página visita."""
+    contexto.abrir("tarea")
+    with _transaccion() as s:
+        filas = s.execute(
+            select(FichaExterna.id, FichaExterna.url, FichaExterna.canal, Propiedad.nombre)
+            .join(Propiedad, Propiedad.id == FichaExterna.propiedad_id)
+            .order_by(FichaExterna.creado)
+        ).all()
+    contacto = _contacto()
+    if not contacto:  # sin contacto no visita nada: tampoco lo anuncia
+        for f in filas:
+            _guardar_ficha(
+                str(f.id), "error", "Falta el contacto del bot en el panel: sin él no se lee ninguna página"
+            )
+        return len(filas)
+    lector, vivo = bot.Lector(contacto), _EnVivo(filas)
+    vivo.enviar()
+    try:
+        for i, f in enumerate(filas):
+            vivo.resultado(i, _leer_ficha(str(f.id), lector, lambda texto, i=i: vivo.fase(i, texto)))
+    finally:
+        vivo.enviar("terminado")  # también si se corta: que nadie se quede viendo "trabajando"
+    return len(filas)

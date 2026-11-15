@@ -1,5 +1,5 @@
 /*
- * Qué partes del producto están encendidas. Hoy Hoteles Frida es SOLO el motor
+ * Qué partes del producto están encendidas. Hoy Reservas Frida es SOLO el motor
  * de reservas interno (el panel): la website pública vivirá en Shopify o
  * WordPress y hablará con nuestra API (docs/PLAN-BACKEND.md).
  *
@@ -9,10 +9,13 @@
  *     de la website manda al login.
  *   · huespedes: el rol `huesped` (cuenta de demo "ana", "Continuar con Google",
  *     Mi cuenta). Sus sesiones guardadas se ignoran.
+ *   · sitiosWeb: Configuración → Sitios web (claves y webhooks de la API pública para la website
+ *     externa). Va junto con API_PUBLICA_ACTIVA del backend (apagada: /api/v1 no existe).
  * Para reactivar: cambiar el `false` por `true`. Módulos del panel (Boutique,
  * Restaurante): aparte, en admin/modulos.js.
  */
 export const PRODUCTO = {
   websitePublica: false,
   huespedes: false,
+  sitiosWeb: false,
 }

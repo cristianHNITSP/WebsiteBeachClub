@@ -13,7 +13,7 @@ from app.auth.alcance import Alcance, fijar_en_base_sincrona
 from app.config import obtener_config
 from app.db import SesionSincrona
 from app.modelos import Outbox
-from app.servicios import avisos, externas, metricas, webhooks
+from app.servicios import avisos, metricas, webhooks
 from app.servicios.auth import ahora
 from app.tareas import celery
 from app.tiempo_real import canal, mensaje
@@ -43,7 +43,6 @@ def despachar(sesion) -> list[tuple[str, dict]]:
     for e in filas:
         avisos.guardar_sincrono(sesion, e)
         webhooks.encolar(sesion, e)
-        externas.choque_con_propia(sesion, e)  # ¿cae sobre una de Booking, Airbnb…?
         # Métricas: se recalculan los días que tocó la reserva (los pagos
         # también: cambian lo que falta por cobrar).
         if e.agregado == "reserva" and e.propiedad_id:
@@ -51,6 +50,16 @@ def despachar(sesion) -> list[tuple[str, dict]]:
         e.despachado_en, e.intentos = ahora(), e.intentos + 1
     sesion.flush()
     return [(canal(e.propiedad_id), mensaje(e)) for e in filas]
+
+
+def publicar_en_vivo(m: dict) -> None:
+    """Un aviso DE PASO a todas las personas conectadas (canal global): no se guarda en el
+    outbox ni lleva `id`, así que quien se conecte después no lo recibe. Para lo que solo
+    importa mientras ocurre, como el progreso del bot. Si Redis falla, no pasa nada más."""
+    try:
+        _redis.publish(canal(None), json.dumps(m, ensure_ascii=False))
+    except Exception:
+        log.warning("No se pudo publicar el aviso en vivo %s", m.get("tipo"))
 
 
 @celery.task

@@ -8,9 +8,11 @@ import redis
 from sqlalchemy import select
 
 from app import contexto
+from app.auth.alcance import Alcance, fijar_en_base_sincrona
 from app.config import obtener_config
 from app.db import SesionSincrona
 from app.modelos import Auditoria
+from app.servicios import reservas
 from app.servicios.auditoria import nueva
 from app.tareas import celery
 
@@ -44,3 +46,16 @@ def sellar_auditoria() -> None:
         sello = {"secuencia": fila.secuencia, "hash": fila.hash}
         s.add(nueva(accion="auditoria.sello", entidad="auditoria", despues=sello))
     log_sello.warning(json.dumps({"sello_auditoria": sello}))  # WARNING: sale aunque el nivel sea alto
+
+
+@celery.task
+def cerrar_habitaciones_eliminadas() -> dict:
+    """Cada noche (00:10 de Mérida: ya pasó la última noche del día anterior): las reservas abiertas
+    de una habitación eliminada se cierran solas, sin cancelarse, y la habitación que estaba en la
+    papelera y ya no tiene reservas abiertas se elimina definitivamente."""
+    contexto.abrir("tarea")
+    with SesionSincrona.begin() as s:
+        fijar_en_base_sincrona(s, Alcance(None))
+        cerradas = reservas.cerrar_reservas_de_habitaciones_eliminadas(s)
+        purgadas = reservas.purgar_habitaciones_sin_reservas_abiertas(s)
+    return {"reservas_cerradas": cerradas, "habitaciones_eliminadas": purgadas}

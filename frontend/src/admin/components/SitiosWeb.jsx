@@ -1,9 +1,10 @@
 import { useState } from 'react'
-import { toast } from 'sonner'
+import { LiquidCheckbox } from '@/components/devl/liquid-checkbox'
+import { toast } from '@/admin/toast'
 import { CopyIcon, GlobeIcon, KeyIcon, PlusIcon, WarningCircleIcon } from '@phosphor-icons/react'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
+import { Button } from '@/components/coss/button'
+import { Input } from '@/components/coss/input'
+import { Label } from '@/components/coss/label'
 import { SkeletonCard } from '@/components/frida/Skeleton'
 import ConfirmarDescarte from '@/components/marca/ConfirmarDescarte'
 import { usePedido } from '@/hooks/usePedido'
@@ -24,7 +25,7 @@ const fecha = iso => new Date(iso).toLocaleString('es-MX', { day: 'numeric', mon
 const ESTADO_ENTREGA = { pendiente: 'Pendiente', entregada: 'Entregada', fallida: 'Fallida' }
 
 async function copiar(texto, que) {
-  try { await navigator.clipboard.writeText(texto); toast.success(`${que} copiada`) } catch { toast.error('No se pudo copiar: cópiala a mano') }
+  try { await navigator.clipboard.writeText(texto); toast.success(`${que} copiada`) } catch { toast.error('No se pudo copiar. Cópiala manualmente.') }
 }
 
 export default function SitiosWeb() {
@@ -152,15 +153,12 @@ function Formulario({ sitio, propiedades, onCancelar, onGuardado }) {
       <h3 className={s.titulo}>{sitio ? `Editar «${sitio.nombre}»` : 'Nuevo sitio web'}</h3>
       <div className={s.campo}>
         <Label htmlFor="sw-nombre">Nombre</Label>
-        <Input id="sw-nombre" required minLength={2} maxLength={80} value={form.nombre} onChange={set('nombre')} className="h-11" placeholder="Hoteles Frida (WordPress)" />
+        <Input id="sw-nombre" required minLength={2} maxLength={80} value={form.nombre} onChange={set('nombre')} size="lg" placeholder="Reservas Frida (WordPress)" />
       </div>
       <fieldset className={s.campo}>
         <legend className={s.leyenda}>Propiedades que vende</legend>
         {propiedades.map(p => (
-          <label key={p.id} className={s.casilla}>
-            <input type="checkbox" checked={form.propiedades.includes(p.id)} onChange={() => alternar(p.id)} />
-            {p.nombre}
-          </label>
+          <LiquidCheckbox key={p.id} checked={form.propiedades.includes(p.id)} onCheckedChange={() => alternar(p.id)} label={p.nombre} />
         ))}
       </fieldset>
       <div className={s.campo}>
@@ -170,7 +168,7 @@ function Formulario({ sitio, propiedades, onCancelar, onGuardado }) {
       </div>
       <div className={s.campo}>
         <Label htmlFor="sw-webhook">URL de webhooks (opcional)</Label>
-        <Input id="sw-webhook" type="url" maxLength={500} value={form.webhook_url} onChange={set('webhook_url')} className="h-11" placeholder="https://hotelesfrida.mx/wp-json/frida/webhook" />
+        <Input id="sw-webhook" type="url" maxLength={500} value={form.webhook_url} onChange={set('webhook_url')} size="lg" placeholder="https://hotelesfrida.mx/wp-json/frida/webhook" />
         <span className={s.ayuda}>Aquí avisamos cuando una reserva del sitio vence, se cancela o cambia.</span>
       </div>
       {error && <p className={s.error} role="alert">{error}</p>}
@@ -271,7 +269,7 @@ function Entregas({ sitioId }) {
               {e.ultimo_error ? `. Último error: ${e.ultimo_error}` : ''}
             </span>
           </span>
-          {e.estado === 'fallida' && <Button variant="outline" size="sm" className="h-11" onClick={() => reintentar(e.id)}>Reintentar</Button>}
+          {e.estado === 'fallida' && <Button variant="outline" size="sm" onClick={() => reintentar(e.id)}>Reintentar</Button>}
         </li>
       ))}
     </ul>

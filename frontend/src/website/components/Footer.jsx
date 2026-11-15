@@ -123,7 +123,7 @@ export default function Footer() {
       {/* Bottom bar */}
       <div className={s.bottom}>
         <div className={s.copyright}>
-          <span>© 2026 Hoteles Frida. Todos los derechos reservados.</span>
+          <span>© 2026 Reservas Frida. Todos los derechos reservados.</span>
           {/* Licencia CC BY-SA 2.0: crédito con autor, fuente y licencia */}
           <span className={s.creditos}>
             Fotos de portada: Marysol* en{' '}

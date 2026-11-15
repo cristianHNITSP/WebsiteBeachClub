@@ -18,7 +18,7 @@ from app.esquemas.habitaciones import HabitacionCambios, HabitacionNueva, Habita
 from app.modelos import Habitacion
 from app.repositorios import fotos as repo_fotos
 from app.repositorios import habitaciones as repo
-from app.servicios import papelera
+from app.servicios import outbox, papelera
 from app.servicios.auditoria import auditar
 
 NOMBRE_REPETIDO = "Ya hay una habitación con ese nombre en esa propiedad"
@@ -70,6 +70,14 @@ async def obtener(sesion: AsyncSession, alcance: Alcance, habitacion_id: UUID) -
     return (await con_portada(sesion, [h]))[0]
 
 
+async def _avisar(sesion: AsyncSession, actor: Actor, h: Habitacion, tipo: str) -> None:
+    """Que los paneles abiertos se enteren (SSE): Habitaciones y Otras plataformas se refrescan solos."""
+    await outbox.encolar(
+        sesion, f"habitacion.{tipo}", agregado="habitacion", agregado_id=h.id,
+        propiedad_id=h.propiedad_id, datos={"por": str(actor.id)},
+    )  # fmt: skip
+
+
 async def crear(
     sesion: AsyncSession, actor: Actor, alcance: Alcance, datos: HabitacionNueva, *, ip: str
 ) -> Habitacion:
@@ -88,6 +96,7 @@ async def crear(
         sesion, usuario_id=actor.id, accion="habitacion.crear", entidad="habitacion", entidad_id=h.id,
         despues=_foto(h), ip=ip,
     )  # fmt: skip
+    await _avisar(sesion, actor, h, "creada")
     return h
 
 
@@ -123,6 +132,7 @@ async def editar(
         sesion, usuario_id=actor.id, accion="habitacion.editar", entidad="habitacion", entidad_id=h.id,
         antes=antes, despues=_foto(h), ip=ip,
     )  # fmt: skip
+    await _avisar(sesion, actor, h, "editada")
     return h
 
 
@@ -131,6 +141,7 @@ async def eliminar(
 ) -> None:
     h = await _obtener(sesion, alcance, habitacion_id, incluir_eliminadas=True)
     await papelera.a_papelera(sesion, actor, h, RECURSO, motivo=motivo, ip=ip)
+    await _avisar(sesion, actor, h, "eliminada")
 
 
 async def borrar_definitivo(
@@ -140,6 +151,7 @@ async def borrar_definitivo(
         raise SinPermiso("Solo un gerente puede eliminar definitivamente")
     h = await _obtener(sesion, alcance, habitacion_id, incluir_eliminadas=True)
     await papelera.borrar_definitivo(sesion, actor, h, RECURSO, ip=ip)
+    await _avisar(sesion, actor, h, "eliminada")
 
 
 async def restaurar(
@@ -147,6 +159,7 @@ async def restaurar(
 ) -> Habitacion:
     h = await _obtener(sesion, alcance, habitacion_id, incluir_eliminadas=True)
     await papelera.restaurar(sesion, actor, h, RECURSO, ip=ip)
+    await _avisar(sesion, actor, h, "restaurada")
     return h
 
 

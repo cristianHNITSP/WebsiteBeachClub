@@ -26,6 +26,7 @@ x-ajustes-backend: &ajustes-backend
   API_DB_USUARIO: beachclub_api
   REDIS_URL: redis://redis:6379/0
   FOTOS_DIR: /datos/fotos
+  API_PUBLICA_ACTIVA: "false"  # la website está apagada (PLAN-BACKEND §4); "true" monta /api/v1 y los sitios web
   # Fail-fast: sin estos en .env, Compose ni siquiera compone (y la API, además,
   # se niega a arrancar con un valor de relleno o corto).
   POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Falta POSTGRES_PASSWORD en .env (ver docs/deploy-config-REFERENCIA.md)}

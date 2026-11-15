@@ -27,6 +27,7 @@ ACTIVOS = ("retenida", "confirmada", "en_curso")  # ocupan la habitación
 TIPOS = ("reserva", "bloqueo")  # bloqueo = mantenimiento: ocupa, sin huésped ni dinero
 MODALIDADES = ("completo", "anticipo")
 CONCEPTOS = ("anticipo", "total", "saldo", "abono", "devolucion")  # devolucion: dinero que SALE
+FUENTES = ("motor", "booking", "airbnb", "expedia", "vrbo", "otro")  # motor = hecha en el panel
 METODOS = ("efectivo", "tarjeta", "transferencia")
 ESTADOS_PAGO = ("pendiente", "autorizado", "cobrado", "fallido", "anulado", "reembolsado")
 
@@ -79,6 +80,11 @@ class Reserva(Base):
     anticipo_centavos: Mapped[int] = mapped_column(BigInteger, server_default=text("0"))
     pagado_centavos: Mapped[int] = mapped_column(BigInteger, server_default=text("0"))
     motivo_cancelacion: Mapped[str | None] = mapped_column(String(300))
+    # De dónde vino. Distinta de 'motor' = es de la plataforma: solo llegada, salida o cancelar.
+    fuente: Mapped[str] = mapped_column(String(10), server_default="motor")
+    externa_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("reservas_externas.id", ondelete="SET NULL"), unique=True
+    )
     version: Mapped[int] = mapped_column(server_default=text("1"))
     creada: Mapped[datetime] = mapped_column(server_default=func.now())
     actualizada: Mapped[datetime] = mapped_column(server_default=func.now(), onupdate=func.now())
@@ -157,6 +163,7 @@ class Reserva(Base):
         # Las retenciones por vencer, para la tarea que las vence cada minuto.
         Index("ix_reservas_retenidas_vence", "vence_en", postgresql_where=text("estado = 'retenida'")),
         CheckConstraint(f"tipo IN {TIPOS}", name="tipo"),
+        CheckConstraint(f"fuente IN {FUENTES}", name="fuente"),
         CheckConstraint(
             "tipo = 'bloqueo' OR (huesped_nombre IS NOT NULL AND adultos >= 1 AND modalidad IS NOT NULL)",
             name="huesped",

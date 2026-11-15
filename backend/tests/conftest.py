@@ -9,6 +9,7 @@ import pytest
 if not os.environ.get("POSTGRES_DB_PRUEBAS"):
     raise RuntimeError("Falta POSTGRES_DB_PRUEBAS: las pruebas nunca corren contra la base de desarrollo")
 os.environ["ENTORNO"] = "pruebas"
+os.environ["API_PUBLICA_ACTIVA"] = "true"  # la website está apagada en producción; sus pruebas la encienden
 os.environ["POSTGRES_DB"] = os.environ["POSTGRES_DB_PRUEBAS"]
 # Redis: su propia base (la 15), vaciada antes de cada prueba: los contadores de
 # intentos y las sesiones revocadas no se cuelan de una prueba a otra.

@@ -16,6 +16,12 @@ export const externasApi = {
   menciones: senal => api(`${BASE}/menciones`, { senal }),
   bot: senal => api(`${BASE}/bot`, { senal }),
   cambiarBot: datos => api(`${BASE}/bot`, { metodo: 'PUT', cuerpo: datos }),
+  fichas: senal => api(`${BASE}/fichas`, { senal }),
+  crearFicha: datos => api(`${BASE}/fichas`, { metodo: 'POST', cuerpo: datos }),
+  borrarFicha: id => api(`${BASE}/fichas/${id}`, { metodo: 'DELETE' }),
+  leerFicha: id => api(`${BASE}/fichas/${id}/leer`, { metodo: 'POST' }),
+  leerFichas: () => api(`${BASE}/fichas/leer`, { metodo: 'POST' }),
+  importarCuarto: (id, datos) => api(`${BASE}/fichas/${id}/importar`, { metodo: 'POST', cuerpo: datos }),
   buscarAhora: () => api(`${BASE}/bot/buscar`, { metodo: 'POST' }),
 }
 
@@ -27,3 +33,8 @@ export const CANALES = [
   { value: 'otro', label: 'Otra' },
 ]
 export const nombreCanal = c => CANALES.find(x => x.value === c)?.label ?? c
+
+/** Igual que `etiqueta_de_publicacion` del servidor: así se reconoce el calendario de cada publicación de una plataforma. */
+export const etiquetaDePublicacion = c =>
+  [c.nombre, [c.m2 && `${c.m2} m²`, c.camas, c.capacidad_maxima && `hasta ${c.capacidad_maxima} personas`].filter(Boolean).join(', ')]
+    .filter(Boolean).join(', ').slice(0, 200)

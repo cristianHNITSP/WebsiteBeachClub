@@ -133,3 +133,9 @@ cypress/screenshots/
 
 # Respaldos de producción (scripts/respaldo.sh): datos de huéspedes, nunca a git.
 respaldos/
+
+# Capturas y hojas de la skill de diseño (locales)
+.taste-skill/
+
+# Grafo de graphify: generado, con rutas de la máquina local
+graphify-out/

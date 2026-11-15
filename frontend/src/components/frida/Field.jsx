@@ -1,69 +1,40 @@
-import { useState } from 'react'
+import { Children, isValidElement } from 'react'
+import { Input as InputCoss } from '@/components/coss/input'
+import { Textarea as TextareaCoss } from '@/components/coss/textarea'
+import { Select as SelectCoss, SelectItem, SelectPopup, SelectTrigger, SelectValue } from '@/components/coss/select'
 
-const labelStyle = {
-  fontSize: '11px',
-  fontWeight: 700,
-  textTransform: 'uppercase',
-  letterSpacing: '0.1em',
-  color: 'var(--on-surface-var)',
-}
-
-const inputBase = {
-  width: '100%',
-  padding: '10px 12px',
-  borderRadius: 'var(--radius-md)',
-  border: '1.5px solid var(--outline-var)',
-  background: 'var(--surface-lowest)',
-  color: 'var(--on-surface)',
-  fontSize: '14px',
-  fontFamily: 'var(--font-body)',
-  outline: 'none',
-  transition: 'border-color 0.2s ease',
-}
-
+/* Campos de los formularios del panel: las piezas de coss con la forma de siempre. */
 export function Field({ label, style, children }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', ...style }}>
-      {label && <label style={labelStyle}>{label}</label>}
+      {label && <label className="font-medium text-sm">{label}</label>}
       {children}
     </div>
   )
 }
 
-export function Input({ style, ...props }) {
-  const [focused, setFocused] = useState(false)
+export function Input(props) {
+  return <InputCoss size="lg" {...props} />
+}
+
+/** Recibe <option> y un onChange(e) como un select nativo; la opción vacía es el texto de relleno. */
+export function Select({ value, onChange, children, disabled, required, 'aria-label': ariaLabel }) {
+  const opciones = Children.toArray(children).filter(isValidElement).map(o => ({
+    value: String(o.props.value), label: Children.toArray(o.props.children).join(''), disabled: o.props.disabled,
+  }))
+  const relleno = opciones.find(o => o.value === '')?.label
+  const items = opciones.filter(o => o.value !== '')
   return (
-    <input
-      style={{ ...inputBase, borderColor: focused ? 'var(--primary)' : 'var(--outline-var)', ...style }}
-      onFocus={() => setFocused(true)}
-      onBlur={() => setFocused(false)}
-      {...props}
-    />
+    <SelectCoss value={value === '' ? null : String(value)} onValueChange={v => onChange({ target: { value: v ?? '' } })}
+      items={items} disabled={disabled} required={required}>
+      <SelectTrigger size="lg" aria-label={ariaLabel}><SelectValue placeholder={relleno} /></SelectTrigger>
+      <SelectPopup>
+        {items.map(o => <SelectItem key={o.value} value={o.value} disabled={o.disabled}>{o.label}</SelectItem>)}
+      </SelectPopup>
+    </SelectCoss>
   )
 }
 
-export function Select({ style, children, ...props }) {
-  const [focused, setFocused] = useState(false)
-  return (
-    <select
-      style={{ ...inputBase, borderColor: focused ? 'var(--primary)' : 'var(--outline-var)', appearance: 'none', cursor: 'pointer', ...style }}
-      onFocus={() => setFocused(true)}
-      onBlur={() => setFocused(false)}
-      {...props}
-    >
-      {children}
-    </select>
-  )
-}
-
-export function Textarea({ style, ...props }) {
-  const [focused, setFocused] = useState(false)
-  return (
-    <textarea
-      style={{ ...inputBase, borderColor: focused ? 'var(--primary)' : 'var(--outline-var)', resize: 'vertical', minHeight: '100px', ...style }}
-      onFocus={() => setFocused(true)}
-      onBlur={() => setFocused(false)}
-      {...props}
-    />
-  )
+export function Textarea(props) {
+  return <TextareaCoss {...props} />
 }

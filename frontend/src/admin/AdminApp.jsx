@@ -1,4 +1,4 @@
-import { Activity, useEffect, useState } from 'react'
+import { Activity, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Navigate, useLocation, useNavigate, useParams } from 'react-router-dom'
 import AdminLayout from './AdminLayout'
 import DashboardPage from './pages/DashboardPage'
@@ -22,10 +22,12 @@ import HoyPage from './pages/HoyPage'
 import PersonaFormPage from './pages/PersonaFormPage'
 import ConfigPage from './pages/ConfigPage'
 import { deshabilitada, permitida } from './modulos'
+import { avisarCambio, expandirDesde, recogerHacia } from './transicionPanel'
 import { useSesion, esPersonal, rutaEntrar, rutaSalir } from '@/lib/sesion'
 import { PantallaVerificando } from '@/components/marca/RutaProtegida'
 import { usePaletaSitio } from '@/hooks/usePaletaSitio'
 import ConfirmarDescarte from '@/components/marca/ConfirmarDescarte'
+import NoEncontrada from '@/components/marca/NoEncontrada'
 import './admin.css'
 
 /*
@@ -39,6 +41,8 @@ const VIDA_MS = 5 * 60 * 1000
 const MAX_VIVAS = 4
 
 /* Páginas que reemplazan el contenido completo */
+// Orden de la barra lateral: bajar en la lista entra desde abajo, subir desde arriba.
+const ORDEN = ['dashboard', 'hoy', 'calendar', 'notifications', 'rooms', 'users', 'externas', 'auditoria', 'config', 'account']
 const FULL_PAGES = ['account', 'nueva-reserva', 'nueva-habitacion', 'editar-habitacion', 'gestionar-fotos', 'config', 'nueva-persona', 'editar-persona']
 
 /* ── Guardia de navegación: AlertDialog de shadcn (ConfirmarDescarte) ── */
@@ -80,13 +84,35 @@ const REGRESO = {
 // Páginas cuya URL lleva un id (/admin/editar-habitacion/<id>); sin él, vuelven a su lista.
 const CON_ID = ['editar-habitacion', 'gestionar-fotos', 'editar-persona']
 
+// /admin/<lo que no existe> es un 404 (no un salto silencioso al tablero).
 export default function AdminApp() {
-  usePaletaSitio() // mismo sistema visual que la website (paleta floral, Oswald + Cabin)
+  const { '*': resto = '' } = useParams()
+  const slug = resto.split('/')[0]
+  if (slug && !PAGINA[slug]) return <NoEncontrada a="/admin/tablero" texto="Ir al tablero" />
+  return <PanelAdmin />
+}
+
+function PanelAdmin() {
+  usePaletaSitio() // mismo sistema visual que la website (paleta floral)
+  // `panel` en <body> (como `site`): los portales de Radix también la heredan.
+  // Una sola familia y esquinas chicas, sin tocar la website ni el login.
+  useLayoutEffect(() => {
+    document.body.classList.add('panel')
+    return () => document.body.classList.remove('panel')
+  }, [])
   const navigate = useNavigate()
   const { '*': resto = '' } = useParams()
   const [slug, idTexto] = resto.split('/')
 
   const location = useLocation()
+  useLayoutEffect(avisarCambio, [location])
+  // Lo último que se tocó: de ahí nace el panel que se abra.
+  const tocado = useRef(null)
+  useEffect(() => {
+    const anotar = e => { tocado.current = e.target.closest?.('button, a, [role="button"], [role="menuitem"]') ?? null }
+    document.addEventListener('click', anotar, true)
+    return () => document.removeEventListener('click', anotar, true)
+  }, [])
   const { verificando, sesion } = useSesion()
   const [prevPage, setPrevPage]   = useState(null)
   const [isDirty, setIsDirty]     = useState(false)
@@ -111,6 +137,17 @@ export default function AdminApp() {
     setUltima(actualViva)
     if (ultima) setVivas(v => [{ page: ultima, salio: Date.now() }, ...v.filter(x => x.page !== ultima && x.page !== actualViva)].slice(0, MAX_VIVAS))
   }
+  // Dirección de la entrada, calculada en el mismo render que el cambio de página:
+  // entre secciones según el orden de la barra; al volver de un panel, la lista ya
+  // está en su lugar (el panel se recoge encima de ella).
+  const [paginaAntes, setPaginaAntes] = useState(page)
+  const [dir, setDir] = useState('abajo')
+  if (paginaAntes !== page) {
+    setPaginaAntes(page)
+    if (FULL_PAGES.includes(paginaAntes)) setDir('vuelta')
+    else setDir(ORDEN.indexOf(page) >= ORDEN.indexOf(paginaAntes) ? 'abajo' : 'arriba')
+  }
+
   // Las que pasan VIDA_MS fuera se liberan (se desmontan).
   useEffect(() => {
     if (!vivas.length) return
@@ -127,32 +164,38 @@ export default function AdminApp() {
     if (esPersonal(sesion) && resto !== urlCanonica.slice('/admin/'.length)) navigate(urlCanonica, { replace: true })
   }, [sesion, resto, urlCanonica, navigate])
 
-  const doNavigate = (newPage, conRoom) => {
+  const doNavigate = (newPage, conRoom, consulta) => {
     setIsDirty(false)
     if (newPage === 'login') {            // "Cerrar sesión"
       setPrevPage(null)
       navigate(rutaSalir('/entrar'), { replace: true })
       return
     }
-    if (FULL_PAGES.includes(newPage) && newPage !== page) setPrevPage(page)
-    else if (!FULL_PAGES.includes(newPage)) setPrevPage(null)
-    navigate(`/admin/${SLUG[newPage] ?? SLUG.dashboard}${conRoom ? `/${conRoom.id}` : ''}`)
+    const ir = () => {
+      if (FULL_PAGES.includes(newPage) && newPage !== page) setPrevPage(page)
+      else if (!FULL_PAGES.includes(newPage)) setPrevPage(null)
+      navigate(`/admin/${SLUG[newPage] ?? SLUG.dashboard}${conRoom ? `/${conRoom.id}` : ''}${consulta ? `?${consulta}` : ''}`)
+    }
+    // El panel sale del elemento que lo abrió y, al volver, regresa a él.
+    if (FULL_PAGES.includes(newPage) && !FULL_PAGES.includes(page)) expandirDesde(tocado.current, ir)
+    else if (FULL_PAGES.includes(page) && newPage === backPage) recogerHacia(ir)
+    else ir()
   }
 
-  const handleNavigate = (newPage, conRoom) => {
+  const handleNavigate = (newPage, conRoom, consulta) => {
     if (deshabilitada(newPage) || !permitida(newPage, sesion)) return
     /* Si estamos en un formulario con datos y el destino es otra sección → guardia */
     if (FULL_PAGES.includes(page) && isDirty && newPage !== page) {
-      setPendingNav({ page: newPage, room: conRoom })
+      setPendingNav({ page: newPage, room: conRoom, consulta })
       setShowNavGuard(true)
       return
     }
-    doNavigate(newPage, conRoom)
+    doNavigate(newPage, conRoom, consulta)
   }
 
   const confirmNavGuard = () => {
     setShowNavGuard(false)
-    doNavigate(pendingNav.page, pendingNav.room)
+    doNavigate(pendingNav.page, pendingNav.room, pendingNav.consulta)
     setPendingNav(null)
   }
 
@@ -221,11 +264,12 @@ export default function AdminApp() {
   return (
     <>
       <AdminLayout page={page} navPage={FULL_PAGES.includes(page) ? backPage : undefined} onNavigate={handleNavigate}>
-        {!actualViva && <div key={`form-${page}`} className="pagina-admin">{renderPage()}</div>}
+        {/* Paneles completos: nacen de su botón y regresan a él (transicionPanel.js) */}
+        {!actualViva && <div key={`form-${page}`} className="pagina-panel">{renderPage()}</div>}
         {/* Orden estable (por nombre): mostrar u ocultar no mueve nodos del DOM */}
         {[...new Set([...vivas.map(x => x.page), actualViva].filter(Boolean))].sort().map(pg => (
           <Activity key={pg} mode={pg === actualViva ? 'visible' : 'hidden'}>
-            <div className="pagina-admin">{renderPage(pg)}</div>
+            <div className="pagina-admin" data-dir={dir}>{renderPage(pg)}</div>
           </Activity>
         ))}
       </AdminLayout>

@@ -1,38 +1,36 @@
-import { useEffect, useState } from 'react'
-import { toast } from 'sonner'
+import { useEffect, useRef, useState } from 'react'
+import { toast } from '@/admin/toast'
 import {
   ArrowSquareOutIcon, CaretDownIcon, CheckCircleIcon, LinkIcon, MagnifyingGlassIcon, WarningCircleIcon,
 } from '@phosphor-icons/react'
 import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
+import { Button } from '@/components/coss/button'
+import { Input } from '@/components/coss/input'
+import { Label } from '@/components/coss/label'
 import { SkeletonCard } from '@/components/frida/Skeleton'
+import FichasExternas from '../components/FichasExternas'
+import CalendarioExterno from '../components/CalendarioExterno'
+import { LiquidSegments } from '@/components/devl/liquid-segments'
+import { useParametros } from '@/hooks/useParametros'
+import { StatusPill } from '@/components/status-pill'
+import { WorkingOutLoud } from '@/components/working-out-loud'
 import ConfirmarDescarte from '@/components/marca/ConfirmarDescarte'
 import { usePedido } from '@/hooks/usePedido'
 import { useSesion } from '@/lib/sesion'
 import { escucharEventos } from '@/lib/eventos'
 import { externasApi, nombreCanal } from '../externas'
-import { habitacionesApi } from '../habitaciones'
 import { usePropiedadActual } from '../propiedadActual'
 import s from './ExternasPage.module.css'
 
 /*
- * Otras plataformas (PLAN-BACKEND §13), con `externas.ver`. UNA pantalla que se
- * entiende sin experimentar: cómo funciona, la conexión de cada habitación con
- * cada plataforma (se pega su enlace iCal UNA vez; después se revisa sola cada
- * 5 min) y las próximas reservas de fuera (que además salen en la Línea de
- * tiempo). Conectar pide `ajustes.editar`. El buscador de menciones solo
- * aparece si está configurado. Todo lo que viene de fuera se pinta como texto.
+ * Otras plataformas (PLAN-BACKEND §13), con `externas.ver`. Un AÑADIDO de solo consulta: cómo
+ * aparece el hotel en cada plataforma (sus fichas y lo que publican, a su manera), el calendario
+ * de lo que tienen ocupado y las próximas reservas de fuera. Los calendarios (iCal) se conectan
+ * a cada publicación de la plataforma, NO a las habitaciones del motor: habitaciones y reservas
+ * son del motor y las plataformas no son espejo. Conectar pide `ajustes.editar`. Todo lo que
+ * viene de fuera se pinta como texto.
  */
 
-// Dónde saca cada plataforma el enlace (los menús pueden cambiar de nombre).
-const PLATAFORMAS = [
-  { canal: 'booking', nombre: 'Booking.com', pasos: ['Entra a la Extranet de Booking.com.', 'Tarifas y disponibilidad → Sincronizar calendarios.', 'Elige la habitación → Exportar calendario y copia el enlace.'] },
-  { canal: 'airbnb', nombre: 'Airbnb', pasos: ['Entra a tu cuenta de anfitrión.', 'Calendario → Disponibilidad → Conectar calendarios.', 'Exportar calendario y copia el enlace (uno por anuncio).'] },
-  { canal: 'expedia', nombre: 'Expedia y Hoteles.com', pasos: ['Entra a Expedia Partner Central (sirve para las dos).', 'Busca "Sincronizar calendario" (iCal).', 'Si tu cuenta no tiene esa opción (pasa con propiedades dadas de alta como hotel), se conecta con un channel manager: dínoslo.'] },
-  { canal: 'vrbo', nombre: 'Vrbo', pasos: ['Entra a tu cuenta de Vrbo.', 'Calendario → Importar y exportar.', 'Exportar y copia el enlace.'] },
-]
 const ESTADO_MENCION = {
   leida: 'Leída', sin_leer: 'Sin leer', error: 'No se pudo leer',
   bloqueada_dominio: 'Solo lo del buscador (sus términos prohíben leerla)', bloqueada_robots: 'Solo lo del buscador (su robots.txt no lo permite)',
@@ -41,51 +39,54 @@ const corta = f => new Date(`${f}T12:00:00`).toLocaleDateString('es-MX', { day: 
 const momento = v => (v ? new Date(v).toLocaleString('es-MX', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : 'aún no')
 const iso = d => d.toLocaleDateString('sv-SE', { timeZone: 'America/Merida' })
 
+const PESTANAS = [
+  { value: 'calendario', label: 'Calendario' },
+  { value: 'general', label: 'General' },
+]
+
 export default function ExternasPage() {
+  // La pestaña va en la URL (?pestana=): recargar o compartir el enlace deja la misma pantalla.
+  const [{ pestana }, set] = useParametros({ pestana: 'calendario' })
   const { sesion } = useSesion()
   const editar = Boolean(sesion?.permisos?.includes('ajustes.editar'))
   const { propiedadId } = usePropiedadActual()
-  const habs = usePedido(senal => habitacionesApi.listar({ por_pagina: 100, propiedad: propiedadId }, senal), [propiedadId])
   const cals = usePedido(senal => externasApi.calendarios({ propiedad: propiedadId }, senal), [propiedadId])
   // Una lectura nueva con reservas de fuera (SSE): se refresca sola.
   const recargarCals = cals.recargar
   useEffect(() => escucharEventos(m => { if (m.agregado === 'externas') recargarCals() }), [recargarCals])
   const bot = usePedido(senal => externasApi.bot(senal), [])
+  const ultimaLectura = (cals.datos ?? []).map(c => c.ultima_lectura).filter(Boolean).sort().at(-1)
   return (
     <div className={s.pagina}>
       <div className="admin-page-header">
         <div>
-          <span className="admin-page-eyebrow">Operaciones</span>
-          <h1 className="admin-page-title">Otras <em>plataformas</em></h1>
+          <h1 className="admin-page-title">Otras plataformas</h1>
+          <p className="admin-date">Un añadido: lo que Booking, Hoteles.com y compañía muestran del hotel. Solo consulta; no manda sobre el motor</p>
         </div>
+        <StatusPill
+          phases={['Leyendo calendarios', 'Buscando reservas nuevas']} interval={1200}
+          done={!cals.cargando}
+          doneLabel={ultimaLectura ? `Calendarios revisados ${momento(ultimaLectura)}` : 'Listo'}
+        />
       </div>
 
-      <ol className={s.pasos} aria-label="Cómo funciona">
-        <li><strong>1. Conecta cada habitación una vez.</strong> Pega el enlace de calendario que te da Booking, Airbnb, etc.</li>
-        <li><strong>2. Se revisa sola cada 5 minutos.</strong> Nadie tiene que capturar nada.</li>
-        <li><strong>3. Lo vendido fuera aparece en la Línea de tiempo</strong> y llega un aviso. Si choca con una reserva propia, también se avisa.</li>
-      </ol>
 
-      {habs.cargando || cals.cargando ? (
-        <div className={s.lista}>{[0, 1].map(i => <SkeletonCard key={i} height="120px" />)}</div>
-      ) : habs.error || cals.error ? (
-        <Fallo error={habs.error ?? cals.error} onReintentar={() => { habs.recargar(); cals.recargar() }} />
+      <LiquidSegments options={PESTANAS} value={pestana} onValueChange={v => set({ pestana: v })} aria-label="Vista de Otras plataformas" />
+
+      {pestana === 'calendario' ? (
+        <>
+          <CalendarioExterno propiedadId={propiedadId} />
+          {/* `version`: se vuelve a pedir al conectar, desconectar o leer un calendario. */}
+          <Proximas propiedadId={propiedadId} version={(cals.datos ?? []).map(c => `${c.id}${c.ultima_lectura}${c.eventos}`).join()} />
+        </>
       ) : (
-        <section className={s.lista} aria-labelledby="t-conexiones">
-          <h2 className={s.seccion} id="t-conexiones">Conexiones</h2>
-          {PLATAFORMAS.map(pl => (
-            <Plataforma key={pl.canal} plataforma={pl} habitaciones={habs.datos.items}
-              calendarios={cals.datos.filter(c => c.canal === pl.canal)} editar={editar} onCambio={cals.recargar} />
-          ))}
-        </section>
+        <>
+          <FichasExternas editar={editar} calendarios={cals} />
+          {bot.datos?.tiene_clave
+            ? <Menciones editar={editar} bot={bot} />
+            : <p className={s.nota}><MagnifyingGlassIcon size={14} aria-hidden="true" /> El buscador de menciones en la web está apagado. Falta configurar su clave en el servidor.</p>}
+        </>
       )}
-
-      {/* `version`: se vuelve a pedir al conectar, desconectar o leer un calendario. */}
-      <Proximas propiedadId={propiedadId} version={(cals.datos ?? []).map(c => `${c.id}${c.ultima_lectura}${c.eventos}`).join()} />
-
-      {bot.datos?.tiene_clave
-        ? <Menciones editar={editar} bot={bot} />
-        : <p className={s.nota}><MagnifyingGlassIcon size={14} aria-hidden="true" /> El buscador de menciones en la web está apagado (falta configurar su clave en el servidor).</p>}
     </div>
   )
 }
@@ -94,98 +95,8 @@ function Fallo({ error, onReintentar }) {
   return (
     <div className={s.vacio} role="alert">
       <WarningCircleIcon size={28} aria-hidden="true" /><p>{error.message}</p>
-      <Button variant="outline" className="h-11" onClick={onReintentar}>Reintentar</Button>
+      <Button variant="outline" size="lg" onClick={onReintentar}>Reintentar</Button>
     </div>
-  )
-}
-
-function Plataforma({ plataforma, habitaciones, calendarios, editar, onCambio }) {
-  const conectadas = new Map(calendarios.map(c => [c.habitacion_id, c]))
-  const [abierta, setAbierta] = useState(conectadas.size > 0 && conectadas.size < habitaciones.length)
-  const [quitar, setQuitar] = useState(null)
-  const confirmarQuitar = async () => {
-    const c = quitar
-    setQuitar(null)
-    try { await externasApi.borrarCalendario(c.id); toast.success('Desconectada', { description: 'Sus reservas pasadas se conservan como historia.' }); onCambio() } catch (e) { toast.error(e.message) }
-  }
-  return (
-    <article className={s.tarjeta}>
-      <button type="button" className={s.cabecera} aria-expanded={abierta} onClick={() => setAbierta(a => !a)}>
-        <span className={s.plataforma}>{plataforma.nombre}</span>
-        <Badge variant={conectadas.size ? 'default' : 'outline'}>{conectadas.size} de {habitaciones.length} habitaciones conectadas</Badge>
-        <CaretDownIcon size={18} className={abierta ? s.girado : ''} aria-hidden="true" />
-      </button>
-      {abierta && (
-        <div className={s.cuerpo}>
-          <details className={s.como}>
-            <summary>¿Dónde saco el enlace?</summary>
-            <ol>{plataforma.pasos.map(p => <li key={p}>{p}</li>)}</ol>
-            <p>El enlace termina en <code>.ics</code> y lleva una clave de la plataforma: aquí solo se muestra el dominio y el final.</p>
-          </details>
-          <ul className={s.habitaciones}>
-            {habitaciones.map(h => (
-              <Habitacion key={h.id} habitacion={h} canal={plataforma.canal} calendario={conectadas.get(h.id)} editar={editar}
-                onCambio={onCambio} onQuitar={setQuitar} />
-            ))}
-          </ul>
-        </div>
-      )}
-      <ConfirmarDescarte
-        abierto={quitar !== null} titulo="¿Desconectar esta habitación?" accion="Desconectar" cancelar="Cancelar"
-        texto="Se deja de revisar. Las reservas que ya trajo se conservan como historia."
-        onConfirmar={confirmarQuitar} onCancelar={() => setQuitar(null)}
-      />
-    </article>
-  )
-}
-
-function Habitacion({ habitacion, canal, calendario, editar, onCambio, onQuitar }) {
-  const [url, setUrl] = useState('')
-  const [ocupado, setOcupado] = useState(false)
-  const conectar = async e => {
-    e.preventDefault()
-    setOcupado(true)
-    try {
-      await externasApi.crearCalendario({ habitacion_id: habitacion.id, canal, url: url.trim() })
-      toast.success(`${habitacion.nombre} conectada`, { description: 'Se lee ahora y luego cada 5 minutos.' })
-      setUrl('')
-      setTimeout(onCambio, 4000) // da tiempo a la primera lectura
-      onCambio()
-    } catch (err) { toast.error(err.message) } finally { setOcupado(false) }
-  }
-  const leer = async () => {
-    try { await externasApi.leerCalendario(calendario.id); toast.success('Revisando ahora'); setTimeout(onCambio, 4000) } catch (e) { toast.error(e.message) }
-  }
-  if (calendario) {
-    return (
-      <li className={s.habitacion}>
-        <span className={s.habNombre}>{habitacion.nombre}</span>
-        <span className={s.estado}>
-          {calendario.ultimo_error
-            ? <Badge variant="destructive">No se pudo leer: {calendario.ultimo_error}</Badge>
-            : <><CheckCircleIcon size={16} weight="fill" className={s.ok} aria-hidden="true" /> Conectada. Revisada {momento(calendario.ultima_lectura)}, {calendario.eventos} fechas ocupadas.</>}
-        </span>
-        {editar && (
-          <span className={s.acciones}>
-            <Button variant="outline" className="h-11" onClick={leer}>Revisar ahora</Button>
-            <Button variant="outline" className="h-11" onClick={() => onQuitar(calendario)}>Desconectar</Button>
-          </span>
-        )}
-      </li>
-    )
-  }
-  return (
-    <li className={s.habitacion}>
-      <span className={s.habNombre}>{habitacion.nombre}</span>
-      {editar ? (
-        <form className={s.conectar} onSubmit={conectar}>
-          <Label htmlFor={`url-${canal}-${habitacion.id}`} className="sr-only">Enlace de calendario de {habitacion.nombre}</Label>
-          <Input id={`url-${canal}-${habitacion.id}`} type="url" required maxLength={1000} pattern="https://.*" placeholder="Pega aquí el enlace (https://…)"
-            value={url} onChange={e => setUrl(e.target.value)} className="h-11" />
-          <Button type="submit" className="h-11" disabled={ocupado || !url.trim()}><LinkIcon size={16} weight="bold" aria-hidden="true" /> Conectar</Button>
-        </form>
-      ) : <span className={s.estado}>Sin conectar</span>}
-    </li>
   )
 }
 
@@ -198,10 +109,10 @@ function Proximas({ propiedadId, version }) {
   const lista = (pedido.datos ?? []).filter(x => x.estado === 'vigente')
   return (
     <section className={s.lista} aria-labelledby="t-proximas">
-      <h2 className={s.seccion} id="t-proximas">Próximas reservas de fuera (90 días)</h2>
+      <h2 className={s.seccion} id="t-proximas">Próximas reservas de otras plataformas (90 días)</h2>
       {pedido.cargando ? <SkeletonCard height="72px" />
         : pedido.error ? <Fallo error={pedido.error} onReintentar={pedido.recargar} />
-          : lista.length === 0 ? <p className={s.nota}>Ninguna por ahora. Cuando conectes una habitación, lo que se venda fuera aparece aquí y en la Línea de tiempo.</p>
+          : lista.length === 0 ? <p className={s.nota}>Ninguna por ahora. Cuando conectes el calendario de una publicación, lo que se venda fuera aparece aquí.</p>
             : (
               <ul className={s.filas}>
                 {lista.map(x => (
@@ -209,9 +120,8 @@ function Proximas({ propiedadId, version }) {
                     <Badge variant="outline">{nombreCanal(x.canal)}</Badge>
                     <span className={s.texto}>
                       <strong>{corta(x.llegada)} → {corta(x.salida)}</strong>
-                      <span>{x.habitacion_nombre ?? 'Sin habitación'}{x.titulo ? `, ${x.titulo}` : ''}</span>
+                      <span>{x.publicacion ?? 'Sin publicación'}{x.titulo ? `, ${x.titulo}` : ''}</span>
                     </span>
-                    {x.choca && <Badge variant="destructive"><WarningCircleIcon weight="fill" aria-hidden="true" /> Choca con una reserva propia</Badge>}
                   </li>
                 ))}
               </ul>
@@ -273,15 +183,29 @@ function Bot({ estado, editar, onListo }) {
       onListo()
     } catch (err) { toast.error(err.message) } finally { setOcupado(false) }
   }
+  // "Buscar ahora" corre en el servidor (Celery): se avisa lo que de verdad pasa, sin tiempos inventados.
+  // 0 = reposo, 1 = enviando la orden, 2 = buscando (se consulta cada 3 s hasta que cambie la última vuelta), 3 = listo.
+  const [fase, setFase] = useState(0)
+  const [demora, setDemora] = useState(false)
+  const antes = useRef(estado.ultima_ejecucion)
+  const listoRef = useRef(onListo) // sin esto cada render reiniciaría el sondeo y el límite de espera
+  listoRef.current = onListo
   const buscar = async () => {
-    setOcupado(true)
-    try { await externasApi.buscarAhora(); toast.success('El bot está buscando', { description: 'Respeta el tope del mes. El resultado aparece aquí en unos minutos.' }); setTimeout(onListo, 8000) } catch (e) { toast.error(e.message) } finally { setOcupado(false) }
+    setOcupado(true); setDemora(false); antes.current = estado.ultima_ejecucion; setFase(1)
+    try { await externasApi.buscarAhora(); setFase(2) } catch (e) { toast.error(e.message); setFase(0) } finally { setOcupado(false) }
   }
+  useEffect(() => {
+    if (fase !== 2) return
+    const sondeo = setInterval(() => listoRef.current(), 3000)
+    const limite = setTimeout(() => setDemora(true), 150_000)
+    return () => { clearInterval(sondeo); clearTimeout(limite) }
+  }, [fase])
+  useEffect(() => { if (fase === 2 && estado.ultima_ejecucion !== antes.current) setFase(3) }, [fase, estado.ultima_ejecucion])
   return (
     <form className={s.tarjeta} onSubmit={guardar}>
       <h2 className={s.titulo}><MagnifyingGlassIcon size={18} weight="bold" aria-hidden="true" /> El bot</h2>
       <p className={s.ayuda}>
-        Busca dónde aparece el hotel y lee esas páginas solo si su robots.txt lo permite. Booking, Airbnb, Expedia y compañía nunca se leen: sus términos lo prohíben.
+        Busca dónde aparece el hotel y lee esas páginas solo si su robots.txt lo permite. Lo que encuentra por búsqueda en Booking, Airbnb, Expedia y compañía no se lee (solo lo que dice el buscador); las fichas propias de arriba sí, porque el hotel las dio. Necesita un contacto: va en cada visita del bot.
       </p>
       {!estado.tiene_clave && <p className={s.aviso} role="status">Falta la clave de Brave Search (BRAVE_SEARCH_CLAVE) en el servidor: el bot no busca.</p>}
       <p className={s.estado}>
@@ -291,9 +215,9 @@ function Bot({ estado, editar, onListo }) {
         <>
           <div className={s.formulario}>
             <div className={s.campo}><Label htmlFor="bot-contacto">Contacto (va en cada visita del bot)</Label>
-              <Input id="bot-contacto" maxLength={120} value={form.contacto} onChange={set('contacto')} className="h-11" placeholder="reservas@hotelesfrida.mx" /></div>
+              <Input id="bot-contacto" maxLength={120} value={form.contacto} onChange={set('contacto')} size="lg" placeholder="reservas@hotelesfrida.mx" /></div>
             <div className={s.campo}><Label htmlFor="bot-tope">Tope de búsquedas al mes</Label>
-              <Input id="bot-tope" type="number" min="0" max="10000" required value={form.tope_mensual} onChange={set('tope_mensual')} className="h-11" /></div>
+              <Input id="bot-tope" type="number" min="0" max="10000" required value={form.tope_mensual} onChange={set('tope_mensual')} size="lg" /></div>
           </div>
           <div className={s.formulario}>
             <div className={s.campo}><Label htmlFor="bot-consultas">Qué busca (una por línea)</Label>
@@ -303,8 +227,18 @@ function Bot({ estado, editar, onListo }) {
           </div>
           <div className={s.acciones}>
             <Button type="submit" disabled={ocupado}>Guardar</Button>
-            <Button type="button" variant="outline" disabled={ocupado || !estado.tiene_clave || !estado.contacto} onClick={buscar}>Buscar ahora</Button>
+            <Button type="button" variant="outline" disabled={ocupado || fase === 1 || fase === 2 || !estado.tiene_clave || !estado.contacto} onClick={buscar}>Buscar ahora</Button>
           </div>
+          {fase > 0 && (
+            <>
+              <WorkingOutLoud
+                className="max-w-none" title="El bot está buscando" active={fase === 1 ? 0 : fase === 2 ? 1 : 2} finished={fase === 3}
+                steps={[{ label: 'Enviando la orden al servidor' }, { label: 'Buscando en la web y leyendo solo lo permitido' }]}
+                textos={{ listo: s => `Búsqueda lista en ${s} s`, resumen: () => estado.ultimo_resultado ?? 'Revisa las menciones más abajo' }}
+              />
+              {demora && fase === 2 && <p className={s.ayuda} role="status">Tarda más de lo normal. Sigue en cola y el resultado aparecerá solo cuando termine.</p>}
+            </>
+          )}
         </>
       )}
     </form>

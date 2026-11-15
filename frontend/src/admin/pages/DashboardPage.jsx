@@ -1,25 +1,37 @@
 import { useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { toast } from 'sonner'
+import { toast } from '@/admin/toast'
 import {
-  BedIcon, SunIcon, DownloadSimpleIcon, TrendUpIcon, TrendDownIcon, SignOutIcon, SignInIcon, WrenchIcon, ArrowRightIcon,
+  BedIcon, DownloadSimpleIcon, TrendUpIcon, TrendDownIcon, ArrowRightIcon,
   CurrencyDollarIcon, ReceiptIcon, ForkKnifeIcon, HandCoinsIcon, WarningCircleIcon, BellIcon, CalendarDotsIcon,
 } from '@phosphor-icons/react'
 import { SkeletonCard } from '@/components/frida/Skeleton'
-import { Button } from '@/components/ui/button'
-import SpotlightCard from '@/components/bits/SpotlightCard'
-import CountUp from '@/components/bits/CountUp'
-import AnimatedList from '@/components/bits/AnimatedList'
-import { useTheme } from '@/context/ThemeContext'
+import { Button } from '@/components/coss/button'
+import { LiquidCursor, liquidTarget } from '@/components/devl/liquid-cursor'
+import { GrowthChart } from '@/components/devl/growth-chart'
+import { LiquidSlider } from '@/components/devl/liquid-slider'
+import { MetricCard } from '@/components/devl/metric-card'
+import { PourProgress } from '@/components/devl/pour-progress'
+import { Odometer } from '@/components/devl/odometer'
 import TarjetaCifra from '@/components/marca/TarjetaCifra'
+import { CoronaFlores, Florecita } from '@/components/marca/Wordmark'
 import { api } from '@/lib/api'
 import { usePedido } from '@/hooks/usePedido'
+import { useParametros } from '@/hooks/useParametros'
 import { escucharEventos } from '@/lib/eventos'
+import { useSesion } from '@/lib/sesion'
 import { Columnas, Barras } from '../components/Graficas'
+import Celda from '../components/Celda'
+import c from '../components/Celda.module.css'
+import Corona from '../components/Corona'
+import Inicial from '../components/Inicial'
 import FormasDePago from '../components/FormasDePago'
 import { MODULOS } from '../modulos'
 import { useAvisos, haceCuanto } from '../avisos'
-import { usePropiedadActual } from '../propiedadActual'
+import { habitacionesApi } from '../habitaciones'
+import { florDeLugar, usePropiedadActual } from '../propiedadActual'
+import { agruparHoy, hoyISO, menosDias, reservasApi } from '../reservas'
 import { useRestaurante, periodo, resumen, ventasPorDia, platillosVendidos, categoria, mxn } from '../restaurante'
 import s from './DashboardPage.module.css'
 
@@ -34,21 +46,15 @@ const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'o
 const etiquetaMes = m => MESES[Number(m.slice(5, 7)) - 1]
 const pesos = c => `$${Math.round(c / 100).toLocaleString('es-MX')}`
 const ICONO_AVISO = { reserva: CalendarDotsIcon, pago: CurrencyDollarIcon, operacion: BedIcon, sistema: BellIcon }
-const FLOR_AVISO = { reserva: 'morado', pago: 'orquidea', operacion: 'turquesa', sistema: 'dorado' }
 
-/* Cifra animada (CountUp) o quieta con reducir movimiento */
-function Cifra({ valor, decimales = 0, reduceMotion }) {
-  if (valor == null) return 'Sin dato'
-  if (reduceMotion) return valor.toLocaleString('es-MX', { minimumFractionDigits: decimales, maximumFractionDigits: decimales })
-  return <CountUp to={valor} duration={1.4} separator="," />
-}
-
-/** "+12% vs. …" o "Sin dato para comparar". */
+/** "+12% vs. …" o "Sin dato para comparar". Aquí subir es bueno (ocupación,
+ *  tarifa, ingresos): verde si sube, rojo si baja, gris si no cambia. */
 function Tendencia({ ahora, antes, texto }) {
   if (ahora == null || antes == null || antes === 0) return <div className="metric-card__trend">Sin dato para comparar</div>
   const cambio = Math.round(((ahora - antes) / antes) * 100)
   const Icono = cambio >= 0 ? TrendUpIcon : TrendDownIcon
-  return <div className="metric-card__trend"><Icono size={16} weight="bold" aria-hidden="true" /> {cambio >= 0 ? '+' : ''}{cambio}% {texto}</div>
+  const tono = cambio > 0 ? 'metric-card__trend--bien' : cambio < 0 ? 'metric-card__trend--mal' : ''
+  return <div className={`metric-card__trend ${tono}`}><Icono size={14} weight="bold" aria-hidden="true" /> {cambio > 0 ? '+' : ''}{cambio}% {texto}</div>
 }
 
 const entrada = i => ({
@@ -101,22 +107,37 @@ function SeccionRestaurante({ onNavigate, loading }) {
   )
 }
 
+/** Una celda de las cifras de hoy: punto del color de su flor en la corona. */
+const PORCENTAJE = { style: 'percent', maximumFractionDigits: 0 }
+
 const DashboardPage = ({ onNavigate }) => {
-  const { reduceMotion } = useTheme()
   const { propiedadId } = usePropiedadActual()
+  const { sesion } = useSesion()
+  const navigate = useNavigate()
+  const [{ meses, dias }, setParam] = useParametros({ meses: '6', dias: '7' }) // cuánto se ve en las gráficas
+  const fechaHoy = hoyISO()
   const pedido = usePedido(senal => api(`/api/admin/metricas/tablero${propiedadId ? `?propiedad=${propiedadId}` : ''}`, { senal }), [propiedadId])
+  const habs = usePedido(senal => habitacionesApi.listar({ propiedad: propiedadId, por_pagina: 100 }, senal), [propiedadId])
+  const reservas = usePedido(
+    senal => reservasApi.listar({ propiedad: propiedadId, desde: menosDias(fechaHoy, 60), hasta: menosDias(fechaHoy, -1), estado: ['confirmada', 'en_curso'] }, senal),
+    [propiedadId, fechaHoy],
+  )
   const { avisos } = useAvisos()
-  // En vivo: cualquier cambio de reservas vuelve a pedir el tablero.
+  // En vivo: cualquier cambio de reservas vuelve a pedir el tablero y la corona.
   const { recargar } = pedido
+  const { recargar: recargarReservas } = reservas
   useEffect(() => {
     let espera = null
-    const quitar = escucharEventos(m => { if (m.agregado === 'reserva') { clearTimeout(espera); espera = setTimeout(recargar, 2500) } })
+    const quitar = escucharEventos(m => { if (m.agregado === 'reserva') { clearTimeout(espera); espera = setTimeout(() => { recargar(); recargarReservas() }, 2500) } })
     return () => { clearTimeout(espera); quitar() }
-  }, [recargar])
+  }, [recargar, recargarReservas])
 
   const d = pedido.datos
   const loading = pedido.cargando
-  const hoyTexto = new Date().toLocaleDateString('es-MX', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
+  const fecha = new Date().toLocaleDateString('es-MX', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
+  const hoyTexto = fecha.charAt(0).toUpperCase() + fecha.slice(1) // "Miércoles, 4 de noviembre de 2026"
+  const hora = new Date().getHours()
+  const saludo = hora < 12 ? 'Buenos días' : hora < 19 ? 'Buenas tardes' : 'Buenas noches'
 
   const exportar = () => {
     if (!d) return
@@ -141,150 +162,166 @@ const DashboardPage = ({ onNavigate }) => {
   }
 
   const hoy = d?.hoy
-  const INVENTARIO = d ? [
-    { Icono: BedIcon,     flor: 'morado',   label: 'Ocupadas hoy',     value: hoy.ocupadas, sufijo: `/${hoy.habitaciones}`, sub: hoy.bloqueadas ? `${hoy.bloqueadas} bloqueadas por mantenimiento` : 'Sin bloqueos hoy' },
-    { Icono: SignInIcon,  flor: 'turquesa', label: 'Llegadas hoy',     value: hoy.llegadas, sub: 'Reservas que empiezan hoy' },
-    { Icono: SignOutIcon, flor: 'naranja',  label: 'Salidas hoy',      value: hoy.salidas,  sub: 'Reservas que terminan hoy' },
-    { Icono: WrenchIcon,  flor: 'dorado',   label: 'En mantenimiento', value: hoy.en_mantenimiento, sub: 'Habitaciones fuera de servicio' },
-    { Icono: HandCoinsIcon, flor: 'orquidea', label: 'Por cobrar', prefijo: '$', value: Math.round(hoy.por_cobrar_centavos / 100), sub: 'Reservas confirmadas y en curso' },
-  ] : []
-  const actividad = avisos.slice(0, 6).map(a => ({ ...a, Icono: ICONO_AVISO[a.tipo] ?? BellIcon, flor: FLOR_AVISO[a.tipo] ?? 'morado' }))
+  const lista = reservas.datos ?? []
+  const g = agruparHoy(lista, fechaHoy)
+  const conSaldo = g.llegan.filter(r => r.por_cobrar_centavos > 0)
+  const saldoHoy = conSaldo.filter(r => r.llegada === fechaHoy).length // la nota de "Llegan hoy": sin las vencidas
+  const habitaciones = habs.datos?.items ?? []
+  const fuera = habitaciones.filter(h => h.estado !== 'activa').map(h => h.nombre.split(' ').slice(1).join(' ') || h.nombre)
+  const propiedades = sesion?.propiedades ?? []
+  const propiedadDe = id => propiedades.find(p => p.id === id)
+  const nombrePropiedad = id => { const p = propiedadDe(id); return p ? p.lugar.split(',')[0] : '' }
+  const habitacionDe = id => habitaciones.find(h => h.id === id)
+  const actividad = avisos.slice(0, 5).map(a => ({ ...a, Icono: ICONO_AVISO[a.tipo] ?? BellIcon }))
+  const ingresos = d?.meses.slice(-Number(meses)) ?? []
+  const proximos = d?.proximos.slice(0, Number(dias)) ?? []
+  const totalIngresos = ingresos.reduce((t, m) => t + m.ingreso_centavos, 0)
+  const conDato = proximos.filter(p => p.ocupacion != null)
+  const promedio = conDato.length ? Math.round(conDato.reduce((t, p) => t + p.ocupacion, 0) / conDato.length) : null
+  const anteriores = d?.meses.slice(0, -1).map(m => m.ingreso_centavos) ?? []
+  const esRecord = Boolean(d) && anteriores.some(v => v > 0) && d.meses.at(-1).ingreso_centavos > Math.max(...anteriores)
+  const llegaTexto = n => (n === 1 ? 'llega 1' : `llegan ${n}`)
+  const saleTexto = n => (n === 1 ? 'sale 1' : `salen ${n}`)
 
   return (
     <div>
       {/* ── Cabecera ── */}
       <div className="admin-page-header">
         <div>
-          <span className="admin-page-eyebrow">Resumen operacional</span>
-          <h1 className="admin-page-title">Tablero <em>principal</em></h1>
-          {d && (
-            <div className={s.chips}>
-              <span className={`${s.chip} ${s.chipMarca}`}><BedIcon size={14} weight="bold" aria-hidden="true" /> {hoy.ocupadas}/{hoy.habitaciones} ocupadas</span>
-              <span className={`${s.chip} ${s.chipSol}`}><SunIcon size={14} weight="bold" aria-hidden="true" /> {hoy.llegadas} llegada{hoy.llegadas !== 1 ? 's' : ''} hoy</span>
+          <h1 className="admin-page-title">{d ? `${saludo}. Hoy ${llegaTexto(hoy.llegadas)} y ${saleTexto(hoy.salidas)}` : saludo}</h1>
+          <p className="admin-date">{hoyTexto}</p>
+        </div>
+        <div className="admin-page-header-actions-row">
+          <Button variant="outline" className="rounded-full" disabled={!d} onClick={exportar}>
+            <DownloadSimpleIcon size={16} weight="bold" /> Exportar
+          </Button>
+          <Button variant="outline" className="rounded-full" onClick={() => onNavigate('hoy')}>
+            Ir a recepción <ArrowRightIcon size={14} weight="bold" />
+          </Button>
+        </div>
+      </div>
+
+      {/* ── La corona de hoy ── */}
+      {/* Cursor líquido en toda la tarjeta: la gota toma la forma de lo presionable (liquidTarget) */}
+      <LiquidCursor className={s.hoyCaja} role="region" aria-label="La corona de hoy">
+        <div className={s.hoy}>
+        <span data-mece="" className={s.ramilleteA}><CoronaFlores /></span>
+        <span data-mece="" className={s.ramilleteB}><CoronaFlores /></span>
+        <div>
+          {habs.cargando || reservas.cargando ? <SkeletonCard height="280px" />
+            : <Corona habitaciones={habitaciones} reservas={lista} hoy={fechaHoy} nombrePropiedad={nombrePropiedad} />}
+        </div>
+        {loading ? <SkeletonCard height="280px" /> : (
+          <div className={c.cifras}>
+            <Celda color="var(--primary)" etiqueta="Ocupadas" valor={hoy.ocupadas} sufijo={`/${hoy.habitaciones}`}
+              nota={hoy.ocupacion != null ? `${hoy.ocupacion}% de ocupación` : 'Sin dato'} onClick={() => onNavigate('calendar')}>
+              {hoy.ocupacion != null && <span className={s.vaso}><PourProgress className="!text-primary" value={hoy.ocupacion} size={46} label="Ocupación de hoy" showValue={false} /></span>}
+            </Celda>
+            <Celda color="var(--flor-turquesa)" etiqueta="Llegan hoy" valor={hoy.llegadas}
+              nota={saldoHoy ? `${saldoHoy} con saldo` : 'Sin saldos'} onClick={() => onNavigate('hoy')} />
+            <Celda color="var(--flor-naranja)" etiqueta="Salen hoy" valor={hoy.salidas}
+              nota={g.salen.some(r => r.por_cobrar_centavos > 0) ? 'Con saldo por cobrar' : 'Todo pagado'} onClick={() => onNavigate('hoy')} />
+            <Celda color="var(--corona-gris)" etiqueta="Mantenimiento" valor={hoy.en_mantenimiento}
+              nota={fuera.length ? fuera.join(', ') : 'Todas en servicio'} onClick={() => onNavigate('rooms')} />
+            <div className={c.celdaAncha}>
+              <div>
+                <span className={c.celdaEtiqueta}>Por cobrar en reservas confirmadas</span>
+                <span className={c.celdaValor}>$<Odometer value={Math.round(hoy.por_cobrar_centavos / 100)} locale="es-MX" /></span>
+              </div>
+              <Button {...liquidTarget} variant="outline" size="sm" className="rounded-full" onClick={() => onNavigate('hoy')}>Ver <ArrowRightIcon size={13} weight="bold" /></Button>
             </div>
-          )}
-        </div>
-        <div className="admin-page-header-actions">
-          <div className="admin-date" style={{ textTransform: 'capitalize' }}>{hoyTexto}</div>
-          <div className="admin-page-header-actions-row">
-            <Button variant="outline" disabled={!d} onClick={exportar}>
-              <DownloadSimpleIcon size={16} weight="bold" /> Exportar
-            </Button>
           </div>
-        </div>
-      </div>
-
-      {/* ── Hoy en la operación: lo primero que se ve (check-in, check-out, cobro) ── */}
-      <div className={`inventory-section ${s.hoyArriba}`}>
-        <div className={s.invCabecera}>
-          <div>
-            <span className="admin-page-eyebrow">Hoy</span>
-            <h2 className="admin-section-title" style={{ marginBottom: 0 }}>Resumen operacional</h2>
-          </div>
-          <Button variant="outline" className="h-11" onClick={() => onNavigate('hoy')}>Llegadas y salidas <ArrowRightIcon size={14} weight="bold" /></Button>
-        </div>
-        <div className="inventory-grid">
-          {(loading ? [0, 1, 2, 3, 4] : INVENTARIO).map((item, i) => (
-            <motion.div key={item.label ?? i} {...entrada(i)}>
-              {loading ? <SkeletonCard height="120px" /> : <TarjetaCifra {...item} />}
-            </motion.div>
-          ))}
-        </div>
-      </div>
-
-      {/* ── Métricas ── */}
-      <div className="metrics-grid">
-        {loading ? (
-          <><SkeletonCard height="180px" /><SkeletonCard height="180px" /><SkeletonCard height="180px" /></>
-        ) : (
-          <>
-            <motion.div {...entrada(0)}>
-              <SpotlightCard className="metric-card metric-card--light h-full" spotlightColor="color-mix(in srgb, var(--primary) 12%, transparent)">
-                <div className="metric-card__label">Ocupación de hoy</div>
-                <div>
-                  <div className="metric-card__value"><Cifra valor={hoy.ocupacion} decimales={1} reduceMotion={reduceMotion} />{hoy.ocupacion != null && '%'}</div>
-                  <Tendencia ahora={hoy.ocupacion} antes={d.ultimos_7_dias.ocupacion} texto="vs. promedio de los últimos 7 días" />
-                </div>
-                <div className={s.barra} role="img" aria-label={`Ocupación ${hoy.ocupacion ?? 0}%`}>
-                  <motion.div className={s.barraRelleno} initial={{ scaleX: reduceMotion ? 1 : 0 }} animate={{ scaleX: 1 }}
-                    transition={{ duration: 1.1, ease: [0.16, 1, 0.3, 1], delay: 0.2 }} style={{ width: `${hoy.ocupacion ?? 0}%` }} />
-                </div>
-                <div className={s.barraPie}>
-                  <span>{hoy.habitaciones - hoy.ocupadas - hoy.bloqueadas} disponibles</span>
-                  <span>{hoy.habitaciones} en total</span>
-                </div>
-              </SpotlightCard>
-            </motion.div>
-
-            <motion.div {...entrada(1)} className="metric-card metric-card--primary">
-              <div className="metric-card__label">Tarifa promedio (ADR) del mes</div>
-              <div>
-                <div className="metric-card__value">{d.mes.adr_centavos != null && '$'}<Cifra valor={d.mes.adr_centavos != null ? Math.round(d.mes.adr_centavos / 100) : null} reduceMotion={reduceMotion} /></div>
-                <Tendencia ahora={d.mes.adr_centavos} antes={d.mes_anterior.adr_centavos} texto="vs. el mismo tramo del mes anterior" />
-                <div className="metric-card__sub">{d.mes.noches_vendidas} noches vendidas este mes</div>
-              </div>
-            </motion.div>
-
-            <motion.div {...entrada(2)} className="metric-card metric-card--gold">
-              <div className="metric-card__label">Ingresos reservados del mes</div>
-              <div>
-                <div className="metric-card__value">$<Cifra valor={Math.round(d.mes.ingreso_centavos / 100)} reduceMotion={reduceMotion} /></div>
-                <Tendencia ahora={d.mes.ingreso_centavos} antes={d.mes_anterior.ingreso_centavos} texto="vs. el mismo tramo del mes anterior" />
-                <div className="metric-card__sub">RevPAR {d.mes.revpar_centavos != null ? pesos(d.mes.revpar_centavos) : 'Sin dato'}</div>
-              </div>
-            </motion.div>
-          </>
         )}
+        </div>
+      </LiquidCursor>
+
+      {/* ── Mes récord: solo si este mes ya supera a todos los anteriores ── */}
+      {esRecord && (
+        <div className={s.record}>
+          <GrowthChart title="Mes récord" loop={false} format={v => `$${Math.round(v).toLocaleString('es-MX')}`}
+            data={d.meses.slice(-6).map(m => ({ label: etiquetaMes(m.mes), value: m.ingreso_centavos / 100 }))} />
+        </div>
+      )}
+
+      {/* ── Este mes ── */}
+      {d && (
+        <div className="inventory-grid" aria-label="Este mes">
+          <TarjetaCifra label="Tarifa promedio (ADR) del mes" prefijo={d.mes.adr_centavos != null ? '$' : ''} value={d.mes.adr_centavos != null ? Math.round(d.mes.adr_centavos / 100) : 'Sin dato'}
+            sub={<Tendencia ahora={d.mes.adr_centavos} antes={d.mes_anterior.adr_centavos} texto="vs. el mismo tramo del mes anterior" />} />
+          <TarjetaCifra label="Ingresos reservados del mes" prefijo="$" value={Math.round(d.mes.ingreso_centavos / 100)}
+            sub={<Tendencia ahora={d.mes.ingreso_centavos} antes={d.mes_anterior.ingreso_centavos} texto="vs. el mismo tramo del mes anterior" />} />
+          <TarjetaCifra label="RevPAR del mes" prefijo={d.mes.revpar_centavos != null ? '$' : ''} value={d.mes.revpar_centavos != null ? Math.round(d.mes.revpar_centavos / 100) : 'Sin dato'} sub={`${d.mes.noches_vendidas} noches vendidas este mes`} />
+          <TarjetaCifra label="Ocupación vs. últimos 7 días" value={hoy.ocupacion ?? 'Sin dato'} sufijo={hoy.ocupacion != null ? '%' : ''}
+            sub={<Tendencia ahora={hoy.ocupacion} antes={d.ultimos_7_dias.ocupacion} texto="vs. promedio de 7 días" />} />
+        </div>
+      )}
+
+      {/* ── Gráficas (MetricCard de devl): línea que se recorre; el deslizador elige el tramo ── */}
+      <div className={s.dos}>
+        <section className={s.grafica}>
+          {loading ? <SkeletonCard height="280px" /> : (
+            <MetricCard className="max-w-none" key={`m${meses}`} title="Ingresos reservados" series={[{ name: 'Ingresos', color: 'var(--primary)' }]} locale="es-MX"
+              format={{ style: 'currency', currency: 'MXN', maximumFractionDigits: 0 }}
+              ranges={[{ id: 'r', label: `${meses} meses`, caption: `Últimos ${meses} meses, ${pesos(totalIngresos)} en total`,
+                points: ingresos.map(m => ({ label: `${etiquetaMes(m.mes)} ${m.mes.slice(2, 4)}`, values: [m.ingreso_centavos / 100] })) }]} />
+          )}
+          <LiquidSlider className={s.rango} label="Meses" min={3} max={12} defaultValue={Number(meses)}
+            onValueChange={v => setParam({ meses: String(v) })} formatValue={v => `${v} meses`} />
+        </section>
+        <section className={s.grafica}>
+          {loading ? <SkeletonCard height="280px" /> : (
+            <MetricCard className="max-w-none" key={`d${dias}`} title="Ocupación de los próximos días" series={[{ name: 'Ocupación', color: 'var(--flor-turquesa)' }]} locale="es-MX"
+              format={PORCENTAJE} axisFormat={PORCENTAJE} maxValue={1}
+              ranges={[{ id: 'r', label: `${dias} días`, caption: promedio != null ? `${promedio}% en promedio, próximos ${dias} días` : `Próximos ${dias} días`,
+                points: proximos.map(x => ({ label: new Date(`${x.dia}T12:00`).toLocaleDateString('es-MX', { weekday: 'short', day: 'numeric' }), values: [(x.ocupacion ?? 0) / 100] })) }]} />
+          )}
+          <LiquidSlider className={s.rango} label="Días" min={3} max={14} defaultValue={Number(dias)}
+            onValueChange={v => setParam({ dias: String(v) })} formatValue={v => `${v} días`} />
+        </section>
       </div>
 
-      {/* ── Gráficas + actividad ── */}
-      <div className="dashboard-charts-row">
-        <div className={s.graficas}>
-          <div className="chart-area">
-            <div className="chart-title">Ingresos reservados por mes</div>
-            {loading ? <SkeletonCard height="200px" /> : (
-              <Columnas titulo="Ingresos reservados por mes" alto={200} marcar={d.meses.at(-1)?.mes}
-                datos={d.meses.map(m => ({ clave: m.mes, etiqueta: etiquetaMes(m.mes), valor: m.ingreso_centavos / 100,
-                  pista: `${etiquetaMes(m.mes)} ${m.mes.slice(0, 4)}: ${pesos(m.ingreso_centavos)}, ocupación ${m.ocupacion ?? 'sin dato'}${m.ocupacion != null ? '%' : ''}` }))} />
-            )}
+      {/* ── Quién llega con saldo y la actividad ── */}
+      <div className={s.dos}>
+        <section className={s.tarjeta}>
+          <div className={s.tarjetaCabeza}>
+            <h2 className={s.titulo}>Llegan hoy con saldo</h2>
+            <Button variant="ghost" size="sm" onClick={() => onNavigate('hoy')}>Ver todas</Button>
           </div>
-          <div className="chart-area">
-            <div className="chart-title">Ocupación de los próximos 14 días</div>
-            {loading ? <SkeletonCard height="160px" /> : (
-              <Columnas titulo="Ocupación de los próximos 14 días" alto={160} marcar={d.proximos[0]?.dia}
-                datos={d.proximos.map(p => {
-                  const dia = new Date(`${p.dia}T12:00`)
-                  const etiqueta = dia.toLocaleDateString('es-MX', { weekday: 'narrow', day: 'numeric' })
-                  return { clave: p.dia, etiqueta, valor: p.ocupacion ?? 0, pista: `${dia.toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'short' })}: ${p.ocupacion ?? 'sin dato'}${p.ocupacion != null ? '%' : ''}, ${p.noches_vendidas} ocupadas` }
-                })} />
-            )}
-          </div>
-        </div>
-
-        {/* Actividad: los avisos más recientes (los mismos de la campana) */}
-        <div className="activity-feed">
-          <div className="activity-feed__title">Actividad reciente</div>
-          {actividad.length === 0 ? <p className={s.sinActividad}>Aún no hay actividad.</p> : (
-            <AnimatedList
-              items={actividad}
-              showGradients={false}
-              displayScrollbar={false}
-              maxHeight={520}
-              renderItem={item => (
-                <div className="activity-item">
-                  <div className={s.actIcono} style={{ background: `var(--flor-${item.flor})`, color: `var(--flor-${item.flor}-fg)` }}>
-                    <item.Icono size={18} weight="fill" aria-hidden="true" />
-                  </div>
-                  <div>
-                    <div className="activity-title">{item.titulo}</div>
-                    <div className="activity-sub">{item.texto}</div>
-                    <div className="activity-time">{haceCuanto(item.fecha)}</div>
-                  </div>
-                </div>
-              )}
-            />
+          {conSaldo.length === 0 ? <p className={s.sinActividad}>Nadie llega hoy con saldo pendiente.</p> : (
+            <ul className={s.lista}>
+              {conSaldo.slice(0, 4).map(r => {
+                const h = habitacionDe(r.habitacion_id)
+                const lugar = h ? nombrePropiedad(h.propiedad_id) : ''
+                return (
+                  <li key={r.id}>
+                    <Inicial nombre={r.huesped_nombre} />
+                    <span className={s.listaTexto}><b>{r.huesped_nombre}</b><span>{r.habitacion_nombre}</span></span>
+                    {lugar && <span className={s.chip}><Florecita color={florDeLugar(lugar)} tamano={11} />{lugar}</span>}
+                    <b className={s.monto}>{pesos(r.por_cobrar_centavos)}</b>
+                    <Button variant="outline" size="sm" className="rounded-full" onClick={() => navigate(`/admin/llegadas-y-salidas?reserva=${r.id}&accion=pago`)}>Cobrar</Button>
+                  </li>
+                )
+              })}
+            </ul>
           )}
-        </div>
+        </section>
+        <section className={s.tarjeta}>
+          <div className={s.tarjetaCabeza}>
+            <h2 className={s.titulo}>Actividad reciente</h2>
+            {avisos.length > 0 && <Button variant="ghost" size="sm" onClick={() => onNavigate('notifications')}>Ver todos</Button>}
+          </div>
+          {actividad.length === 0 ? <p className={s.sinActividad}>Aún no hay actividad.</p> : (
+            <ul className={s.lista}>
+              {actividad.map(item => (
+                <li key={item.id}>
+                  <span className={s.iconoAviso}><item.Icono size={16} aria-hidden="true" /></span>
+                  <span className={s.listaTexto}><b>{item.titulo}</b><span>{item.texto}</span></span>
+                  <span className={s.tiempo}>{haceCuanto(item.fecha)}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
       </div>
 
       {/* ── Cómo pagan los huéspedes ── */}

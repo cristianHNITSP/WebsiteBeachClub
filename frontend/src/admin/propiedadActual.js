@@ -17,6 +17,9 @@ let elegida = leer()
 const oyentes = new Set()
 const suscribir = o => { oyentes.add(o); return () => oyentes.delete(o) }
 
+/** La flor de cada propiedad, por su lugar: Chelem turquesa (el mar), Chuburná orquídea. */
+export const florDeLugar = lugar => (/chelem/i.test(lugar ?? '') ? 'var(--flor-turquesa)' : /chubur/i.test(lugar ?? '') ? 'var(--flor-orquidea)' : 'var(--flor-morado)')
+
 export function elegirPropiedad(valor) {
   elegida = valor
   try { localStorage.setItem(CLAVE, valor) } catch { /* sin almacenamiento */ }

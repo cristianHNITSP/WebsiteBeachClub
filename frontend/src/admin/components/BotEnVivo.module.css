@@ -1,0 +1,11 @@
+/* Abajo a la izquierda, junto a la barra lateral (los avisos van abajo a la derecha). */
+.bot {
+  position: fixed; z-index: 60; bottom: 1.25rem;
+  left: calc(var(--ancho-lateral, 0px) + 1.25rem);
+  width: min(24rem, calc(100vw - 2.5rem));
+  transition: left 0.3s cubic-bezier(0.23, 1, 0.32, 1);
+}
+.cerrar { position: absolute; top: 0.6rem; right: 0.6rem; }
+/* Con la barra como cajón (pantallas chicas) no hay barra fija a la izquierda. */
+@media (max-width: 1023px) { .bot { left: 1.25rem; } }
+@media (prefers-reduced-motion: reduce) { .bot { transition: none; } }

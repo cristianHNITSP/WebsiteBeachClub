@@ -63,6 +63,7 @@ async def crear_habitacion(sesion, propiedad_clave="chelem", **campos):
                 "tipo": "Suite",
                 "capacidad": 2,
                 "tarifa_centavos": 100_000,
+                "venta_en_linea": True,
             }
             | campos
         )

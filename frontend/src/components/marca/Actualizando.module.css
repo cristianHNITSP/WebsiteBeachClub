@@ -1,0 +1,6 @@
+/* Cubre todo (también el login) sin desenfoque: alfa sobre el fondo, como pide el sistema de diseño. */
+.velo {
+  position: fixed; inset: 0; z-index: 100;
+  display: grid; place-items: center; padding: 1rem;
+  background: color-mix(in srgb, var(--background) 94%, transparent);
+}

@@ -13,6 +13,15 @@ function Flor({ x, y, r, color }) {
   )
 }
 
+/** La flor del logotipo como punto de color (propiedades, estados, chips). */
+export function Florecita({ color = 'var(--flor-morado)', tamano = 12, className = '' }) {
+  return (
+    <svg data-flor="" viewBox="-12 -12 24 24" width={tamano} height={tamano} className={`shrink-0 ${className}`} aria-hidden="true">
+      <Flor x={0} y={0} r={11} color={color} />
+    </svg>
+  )
+}
+
 function Hoja({ x, y, rot }) {
   return <ellipse cx={x} cy={y} rx="7" ry="3" fill="var(--flor-hoja)" transform={`rotate(${rot} ${x} ${y})`} />
 }
@@ -51,7 +60,7 @@ export default function Wordmark({ tono = 'normal', tamano = 1.6, subtitulo }) {
           className="font-sans font-bold uppercase tracking-[0.2em]"
           style={{ fontSize: `max(0.62rem, ${tamano * 0.4}rem)`, color: sobreNoche ? 'var(--noche-fg-suave)' : 'var(--muted-foreground)' }}
         >
-          Hoteles
+          Reservas
         </span>
         <span
           className="font-display"

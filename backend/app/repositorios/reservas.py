@@ -4,7 +4,7 @@ filtra por RLS."""
 from datetime import date
 from uuid import UUID
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import func, or_, select, tuple_
 from sqlalchemy.dialects.postgresql import Range
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -52,6 +52,50 @@ async def listar(
         )
     consulta = consulta.order_by(func.lower(Reserva.estancia), Reserva.id).limit(limite)
     return list((await sesion.execute(consulta)).scalars())
+
+
+def _recepcion(columna: str, dia: date):
+    """(condiciones, clave de orden) de cada columna de Llegadas y salidas."""
+    llegada, salida = func.lower(Reserva.estancia), func.upper(Reserva.estancia)
+    confirmada, en_curso = Reserva.estado == "confirmada", Reserva.estado == "en_curso"
+    return {
+        "llegan": ((confirmada, llegada <= dia, salida > dia), llegada),
+        "en_casa": ((en_curso, salida > dia), salida),
+        "salen": ((en_curso, salida <= dia), salida),
+        # Ya pasó su estancia y nunca se registró la llegada.
+        "sin_llegada": ((confirmada, salida <= dia), llegada),
+    }[columna]
+
+
+async def recepcion(
+    sesion: AsyncSession,
+    alcance: Alcance,
+    *,
+    columna: str,
+    dia: date,
+    desde: tuple[date, UUID] | None,
+    hacia_atras: bool,
+    limite: int,
+) -> list[Reserva]:
+    """Una página de la columna por cursor (clave, id). Hacia atrás se lee al
+    revés desde el cursor: quien llama voltea el resultado."""
+    condiciones, clave = _recepcion(columna, dia)
+    consulta = _base(alcance).where(Reserva.tipo == "reserva", *condiciones)
+    if desde:
+        par = tuple_(clave, Reserva.id)
+        consulta = consulta.where(par < tuple_(*desde) if hacia_atras else par > tuple_(*desde))
+    orden = (clave.desc(), Reserva.id.desc()) if hacia_atras else (clave, Reserva.id)
+    return list((await sesion.execute(consulta.order_by(*orden).limit(limite))).scalars())
+
+
+async def contar_recepcion(sesion: AsyncSession, alcance: Alcance, *, columna: str, dia: date) -> int:
+    condiciones, _ = _recepcion(columna, dia)
+    consulta = (
+        select(func.count())
+        .select_from(Reserva)
+        .where(alcance.filtro(Reserva.propiedad_id), Reserva.tipo == "reserva", *condiciones)
+    )
+    return (await sesion.execute(consulta)).scalar_one()
 
 
 async def por_id(

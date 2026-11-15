@@ -245,3 +245,14 @@ async def test_la_base_exige_papelera_antes_del_definitivo(cliente, sesion):
         raise AssertionError("debió rechazarse")
     except Exception as e:
         assert "ck_habitaciones_lapida" in str(e)
+
+
+async def test_venta_en_linea_va_apagada_y_se_edita(cliente, sesion):
+    p = await propiedad(sesion, "chelem")
+    await entrar_como(cliente, sesion, "gerente")
+    h = await crear(cliente, p.id)
+    assert h["venta_en_linea"] is False
+    cambio = datos(p.id, venta_en_linea=True, version=h["version"])
+    del cambio["propiedad_id"]
+    r = await cliente.put(f"{URL}/{h['id']}", json=cambio, headers=csrf(cliente))
+    assert r.status_code == 200 and r.json()["venta_en_linea"] is True

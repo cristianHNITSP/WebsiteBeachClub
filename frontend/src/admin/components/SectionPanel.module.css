@@ -1,10 +1,10 @@
 /* ── Título: botón volver + textos ── */
 .titleGroup {
   display: flex;
-  align-items: flex-start;
-  gap: 16px;
+  align-items: center;
+  gap: 14px;
 }
-.backBtn { margin-top: 4px; flex-shrink: 0; }
+.backBtn { flex-shrink: 0; border-radius: 999px; }
 .subtitle {
   font-size: var(--fs-sm);
   color: var(--muted-foreground);
