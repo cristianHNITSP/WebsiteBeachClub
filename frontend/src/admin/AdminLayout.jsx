@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'motion/react'
 import { KeyIcon } from '@phosphor-icons/react'
@@ -61,19 +61,30 @@ export default function AdminLayout({ children, page, navPage, onNavigate }) {
     return () => { window.removeEventListener('offline', caida); window.removeEventListener('online', vuelta) }
   }, [mostrarAviso, quitarAviso])
 
+  // Al cambiar de página se sube al inicio (también si se navegó desde el cajón: ver abajo).
+  const volverA = useRef(null)
   useEffect(() => {
-    if (!tomarConservarScroll()) window.scrollTo({ top: 0, left: 0, behavior: 'instant' })
+    if (!tomarConservarScroll()) { volverA.current = 0; window.scrollTo({ top: 0, left: 0, behavior: 'instant' }) }
     setCajon(false)
   }, [page])
 
-  // Con el cajón móvil abierto la página de atrás no se desplaza (ni por rueda ni por arrastre).
+  // Con el cajón móvil abierto la página de atrás queda quieta: ni rueda, ni arrastre, ni "jalar para
+  // recargar". En iPhone `overflow: hidden` no basta: el body se fija donde estaba y al cerrar vuelve ahí.
   useEffect(() => {
     if (!cajon) return
     const { documentElement: raiz, body } = document
-    const antes = [raiz.style.overflow, body.style.overflow]
+    const y = window.scrollY
+    volverA.current = null
+    const antes = { overflow: raiz.style.overflow, overscroll: raiz.style.overscrollBehavior, cuerpo: body.style.cssText }
     raiz.style.overflow = 'hidden'
-    body.style.overflow = 'hidden'
-    return () => { raiz.style.overflow = antes[0]; body.style.overflow = antes[1] }
+    raiz.style.overscrollBehavior = 'none'
+    Object.assign(body.style, { position: 'fixed', top: `-${y}px`, left: '0', right: '0', overflow: 'hidden' })
+    return () => {
+      raiz.style.overflow = antes.overflow
+      raiz.style.overscrollBehavior = antes.overscroll
+      body.style.cssText = antes.cuerpo
+      window.scrollTo({ top: volverA.current ?? y, left: 0, behavior: 'instant' })
+    }
   }, [cajon])
 
   useEffect(() => {
@@ -109,7 +120,8 @@ export default function AdminLayout({ children, page, navPage, onNavigate }) {
           )}
         </AnimatePresence>
 
-        <div className={s.columna}>
+        {/* Con el cajón abierto lo de atrás no se puede tocar ni enfocar. */}
+        <div className={s.columna} inert={cajon || undefined}>
           <main className={s.hoja}>
             <BarraSuperior page={page} onNavigate={onNavigate} onMenu={() => setCajon(true)} />
             <div className={s.content}>

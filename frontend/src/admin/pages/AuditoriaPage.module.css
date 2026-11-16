@@ -5,19 +5,28 @@
 
 /* Resultado de verificar la cadena, con su sello */
 .verificacion {
-  display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 14px;
+  position: relative; display: grid; grid-template-columns: auto 1fr auto; align-items: start; gap: 4px 14px;
   margin: 0 0 20px; padding: 16px 18px; border-radius: 1rem; overflow: hidden;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, currentColor 22%, transparent);
 }
+.verificacion > svg { margin-top: 2px; }
 .integra { background: color-mix(in srgb, var(--success) 10%, var(--card)); color: var(--success-foreground); }
 .rota { background: color-mix(in srgb, var(--destructive) 10%, var(--card)); color: var(--destructive-foreground); }
-.verificacionTexto { display: grid; gap: 2px; min-width: 0; color: var(--foreground); }
+.verificacionTexto { display: grid; gap: 4px; min-width: 0; color: var(--foreground); }
 .verificacionTexto strong { font-size: var(--fs-base); font-weight: 600; }
-.verificacionTexto span { font-size: var(--fs-sm); color: var(--muted-foreground); }
-.verificacionTexto code { font-family: var(--font-mono); font-size: var(--fs-xs); color: var(--muted-foreground); overflow-wrap: anywhere; }
-.sello { font-size: 1.1rem; margin-inline-end: 6px; }
+.verificacionTexto span { font-size: var(--fs-sm); line-height: 1.45; color: var(--muted-foreground); }
+/* El hash en una línea: se corta con "…" a la vista, pero se copia completo. */
+.verificacionTexto code {
+  display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-family: var(--font-mono); font-size: var(--fs-xs); color: var(--muted-foreground);
+}
+.sello { align-self: center; font-size: 1.1rem; margin-inline-end: 6px; }
+/* En el teléfono: el escudo y el sello arriba (uno a cada lado), el texto debajo a todo lo ancho. */
 @media (max-width: 560px) {
-  .verificacion { grid-template-columns: auto 1fr; }
-  .sello { grid-column: 1 / -1; justify-self: end; }
+  .verificacion { grid-template-columns: auto 1fr; grid-template-areas: 'icono sello' 'texto texto'; gap: 10px 12px; padding: 14px 16px; }
+  .verificacion > svg { grid-area: icono; align-self: center; margin: 0; }
+  .verificacionTexto { grid-area: texto; }
+  .sello { grid-area: sello; justify-self: end; font-size: 0.8rem; margin: 0; }
 }
 
 .filtros { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(180px, 280px)); margin-bottom: 20px; }

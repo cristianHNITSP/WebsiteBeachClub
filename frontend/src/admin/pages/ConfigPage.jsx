@@ -3,12 +3,14 @@ import { LiquidSwitch } from '@/components/devl/liquid-switch'
 import SectionPanel from '../components/SectionPanel'
 import { MoonIcon, TextAaIcon, CircleHalfIcon, PersonSimpleRunIcon } from '@phosphor-icons/react'
 import { motion } from 'framer-motion'
+import ControlZoom from '@/components/marca/ControlZoom'
 import { useTheme } from '@/context/ThemeContext'
 import { PRODUCTO } from '@/lib/producto'
 import { useParametros } from '@/hooks/useParametros'
 import { useSesion } from '@/lib/sesion'
 import SeguridadCuenta from '../components/SeguridadCuenta'
 import SitiosWeb from '../components/SitiosWeb'
+import PropiedadesConfig from '../components/PropiedadesConfig'
 import { DatosCuenta } from './AdminAccountPage'
 import s from './ConfigPage.module.css'
 
@@ -25,9 +27,9 @@ const PESTANAS = [
   { key: 'perfil', label: 'Perfil' },
   { key: 'seguridad', label: 'Seguridad' },
   { key: 'accesibilidad', label: 'Accesibilidad' },
+  { key: 'propiedades', label: 'Propiedades', permiso: 'propiedades.gestionar' },
   { key: 'sitios', label: 'Sitios web', permiso: 'sitios.gestionar', producto: 'sitiosWeb' },
 ]
-const TAMANOS = [{ value: 'pequeño', label: 'Pequeño' }, { value: 'normal', label: 'Normal' }, { value: 'grande', label: 'Grande' }]
 
 export default function ConfigPage({ onBack }) {
   const [{ pestana }, set] = useParametros({ pestana: 'perfil' })
@@ -49,6 +51,7 @@ export default function ConfigPage({ onBack }) {
         {actual === 'perfil' && <DatosCuenta />}
         {actual === 'seguridad' && <SeguridadCuenta />}
         {actual === 'accesibilidad' && <Accesibilidad />}
+        {actual === 'propiedades' && <PropiedadesConfig />}
         {actual === 'sitios' && <SitiosWeb />}
       </motion.section>
     </SectionPanel>
@@ -56,7 +59,7 @@ export default function ConfigPage({ onBack }) {
 }
 
 function Accesibilidad() {
-  const { isDark, toggleDark, fontSize, setFontSize, highContrast, setHighContrast, reduceMotion, setReduceMotion } = useTheme()
+  const { isDark, toggleDark, highContrast, setHighContrast, reduceMotion, setReduceMotion } = useTheme()
   return (
     <div className={s.tarjeta}>
       <p className={s.ayuda}>Se aplican al instante y se recuerdan en este navegador. Funcionan todas a la vez.</p>
@@ -66,10 +69,10 @@ function Accesibilidad() {
       <div className={s.fila}>
         <TextAaIcon size={20} className={s.icono} aria-hidden="true" />
         <div className={s.texto}>
-          <span id="tam-texto" className={s.titulo}>Tamaño de texto</span>
-          <span className={s.ayuda}>El de todo el panel</span>
+          <span className={s.titulo}>Zoom</span>
+          <span className={s.ayuda}>Todo el panel más chico o más grande. También se cambia desde el botón del sol o la luna, arriba.</span>
         </div>
-        <LiquidSegments options={TAMANOS} value={fontSize} onValueChange={setFontSize} aria-label="Tamaño de texto" size="sm" />
+        <div className="w-64 max-w-full"><ControlZoom /></div>
       </div>
     </div>
   )

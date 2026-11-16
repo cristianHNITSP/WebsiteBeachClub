@@ -104,7 +104,7 @@ export default function AuditoriaPage() {
             <span>{verificacion.integra
               ? `Se revisaron ${verificacion.revisadas.toLocaleString('es-MX')} eventos y ninguno se alteró ni se borró.`
               : 'Algo se alteró o se borró a partir de ese evento.'}</span>
-            <code>{verificacion.integra ? 'Último hash' : 'Último hash bueno'}: {verificacion.ultimo_hash}</code>
+            <code title={verificacion.ultimo_hash}>{verificacion.integra ? "Último hash" : "Último hash bueno"}: {verificacion.ultimo_hash}</code>
           </div>
           <InkStamp className={s.sello} label={verificacion.integra ? 'Íntegra' : 'Rota'} tone={verificacion.integra ? 'emerald' : 'rose'} stampKey={sellos} />
         </StampSurface>

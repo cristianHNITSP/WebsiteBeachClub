@@ -69,9 +69,6 @@
 
 /* ===== ACCESSIBILITY ===== */
 
-/* Font size — zoom scales everything including hardcoded px inline styles */
-.font-small { zoom: 0.875; }
-.font-large { zoom: 1.15;  }
 
 /* High contrast — override key tokens for WCAG AA compliance */
 .high-contrast {

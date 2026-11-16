@@ -322,7 +322,7 @@ export default function LineaTiempo({ onNuevaHabitacion }) {
                         <motion.div
                           initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }}
                           transition={reduceMotion ? { duration: 0 } : { duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
-                          style={{ overflow: 'hidden' }}
+                          style={{ overflow: 'clip' }} // clip, no hidden: hidden vuelve a este div un contenedor de scroll y la columna de nombres deja de quedarse fija
                         >
                           {g.habitaciones.map(hab => (
                             <div key={hab.id} className={s.fila}>

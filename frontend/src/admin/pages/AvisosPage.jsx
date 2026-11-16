@@ -50,6 +50,11 @@ const TIPO = {
   sistema:   { Icono: GearSixIcon,      flor: 'naranja',  nombre: 'Sistema' },
 }
 
+const VISTAS = [
+  { value: 'avisos', label: 'Avisos' },
+  { value: 'resumen', label: 'Estadísticas' },
+]
+
 const FILTROS = [
   { value: 'todos',     label: 'Todos' },
   { value: 'sin-leer',  label: 'Sin leer' },
@@ -63,7 +68,7 @@ export default function AvisosPage({ onNavigate }) {
   const { avisos, sinLeer, cargando, error, recargar, marcarLeido, marcarTodos, borrar, restaurar } = useAvisos()
   const navigate = useNavigate()
   // Filtro y página en la URL (?filtro=pago&pagina=2): recargar conserva la vista.
-  const [p, set] = useParametros({ filtro: 'todos', pagina: 1 })
+  const [p, set] = useParametros({ filtro: 'todos', pagina: 1, vista: 'avisos' })
 
   const filtrados = useMemo(() => avisos.filter(a =>
     p.filtro === 'todos' ? true : p.filtro === 'sin-leer' ? !a.leido : a.tipo === p.filtro,
@@ -79,8 +84,8 @@ export default function AvisosPage({ onNavigate }) {
     const n = avisos.filter(a => a.tipo === tipo && mismoDia(a.fecha, new Date())).length
     return n ? `${n} de hoy` : 'Ninguno hoy'
   }
-  // Tocar la cifra del filtro activo lo quita.
-  const filtrar = f => set({ filtro: p.filtro === f ? 'todos' : f, pagina: 1 })
+  // Tocar una cifra de las estadísticas lleva a la lista con ese filtro (la del filtro activo lo quita).
+  const filtrar = f => set({ filtro: p.filtro === f ? 'todos' : f, pagina: 1, vista: 'avisos' })
 
   const quitar = aviso => {
     borrar(aviso.id)
@@ -119,7 +124,10 @@ export default function AvisosPage({ onNavigate }) {
         </div>
       </div>
 
-      {/* El mismo resumen del Tablero: la semana en una línea y las cifras tocables filtran */}
+      {/* Lo que importa es la lista; las estadísticas quedan a un toque, para quien quiera verlas. */}
+      <LiquidSegments className={s.vistas} options={VISTAS} value={p.vista} onValueChange={v => set({ vista: v })} aria-label="Qué ver" size="default" />
+
+      {p.vista === 'resumen' ? (
       <LiquidCursor className={s.resumen} role="region" aria-label="Resumen de avisos">
         <div className={s.resumenCaja}>
           <span data-mece="" className={s.ramillete}><CoronaFlores /></span>
@@ -135,7 +143,7 @@ export default function AvisosPage({ onNavigate }) {
           </div>
         </div>
       </LiquidCursor>
-
+      ) : (<>
       {/* Filtros: LiquidSegments (devl.dev). Cambiar de filtro vuelve a la página 1 */}
       <div className={s.filtros}>
         <LiquidSegments options={FILTROS} value={p.filtro} onValueChange={v => set({ filtro: v, pagina: 1 })} aria-label="Filtrar avisos" size="default" />
@@ -210,6 +218,7 @@ export default function AvisosPage({ onNavigate }) {
 
       <Paginador id="avisos" etiqueta="Páginas de avisos" pagina={pagina} total={total}
         onCambiar={n => set({ pagina: n }, { historial: true })} />
+      </>)}
     </div>
   )
 }

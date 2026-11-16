@@ -9,8 +9,16 @@ function getInitialDark() {
   return window.matchMedia('(prefers-color-scheme: dark)').matches
 }
 
-function getInitialFontSize() {
-  return localStorage.getItem('frida-font-size') || 'normal'
+// Zoom de toda la app en %, a gusto de cada persona (sobre todo en el teléfono). Hereda el tamaño
+// de texto de antes (pequeño 87.5 %, grande 115 %).
+const ZOOM = { min: 70, max: 130, paso: 5 }
+function getInitialZoom() {
+  try {
+    const z = Number(localStorage.getItem('frida-zoom'))
+    if (z >= ZOOM.min && z <= ZOOM.max) return z
+    const viejo = localStorage.getItem('frida-font-size')
+    return viejo === 'pequeño' ? 85 : viejo === 'grande' ? 115 : 100
+  } catch { return 100 }
 }
 
 function getInitialHighContrast() {
@@ -25,7 +33,7 @@ function getInitialReduceMotion() {
 
 export function ThemeProvider({ children }) {
   const [isDark,        setIsDark]        = useState(getInitialDark)
-  const [fontSize,      setFontSizeState] = useState(getInitialFontSize)
+  const [zoom,          setZoomState]     = useState(getInitialZoom)
   const [highContrast,  setHighContrastState] = useState(getInitialHighContrast)
   const [reduceMotion,  setReduceMotionState] = useState(getInitialReduceMotion)
 
@@ -49,13 +57,15 @@ export function ThemeProvider({ children }) {
     return () => mq.removeEventListener('change', handler)
   }, [])
 
-  /* ── Font size ── */
+  /* ── Zoom (CSS zoom en <html>: escala también los px sueltos) ── */
   useLayoutEffect(() => {
-    const html = document.documentElement
-    html.classList.remove('font-small', 'font-large')
-    if (fontSize !== 'normal') html.classList.add(`font-${fontSize === 'pequeño' ? 'small' : 'large'}`)
-    localStorage.setItem('frida-font-size', fontSize)
-  }, [fontSize])
+    document.documentElement.style.zoom = zoom === 100 ? '' : String(zoom / 100)
+    try {
+      localStorage.removeItem('frida-font-size')
+      if (zoom === 100) localStorage.removeItem('frida-zoom')
+      else localStorage.setItem('frida-zoom', String(zoom))
+    } catch { /* sin almacenamiento: vale para esta visita */ }
+  }, [zoom])
 
   /* ── High contrast ── */
   useLayoutEffect(() => {
@@ -72,7 +82,7 @@ export function ThemeProvider({ children }) {
   return (
     <ThemeContext.Provider value={{
       isDark,        toggleDark: () => setIsDark(d => !d),
-      fontSize,      setFontSize: setFontSizeState,
+      zoom,          setZoom: z => setZoomState(Math.min(ZOOM.max, Math.max(ZOOM.min, Math.round(z / ZOOM.paso) * ZOOM.paso))),
       highContrast,  setHighContrast: setHighContrastState,
       reduceMotion,  setReduceMotion: setReduceMotionState,
     }}>

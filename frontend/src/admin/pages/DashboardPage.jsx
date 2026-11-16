@@ -107,6 +107,52 @@ function SeccionRestaurante({ onNavigate, loading }) {
   )
 }
 
+/*
+ * El foco del tablero: LO ÚNICO que hay que atender hoy, en grande y con su acción al lado.
+ * Por prioridad: cobrar a quien llega, cobrar a quien sale, recibir a quien ya pagó; sin
+ * movimiento, cómo viene la semana. El resto del tablero es contexto y va más callado.
+ */
+function hallazgo({ conSaldo, salenConSaldo, llegan, promedio, dias }) {
+  const suma = l => l.reduce((t, r) => t + r.por_cobrar_centavos, 0)
+  const nombres = l => (l.length === 1 ? l[0].huesped_nombre : `${l[0].huesped_nombre} y ${l.length - 1} más`)
+  const unaReserva = (l, accion) => (l.length === 1 ? `/admin/llegadas-y-salidas?reserva=${l[0].id}&accion=${accion}` : '/admin/llegadas-y-salidas')
+  if (conSaldo.length) return {
+    tono: 'cobro', prefijo: '$', valor: Math.round(suma(conSaldo) / 100), unidad: 'por cobrar al llegar',
+    frase: `Llega${conSaldo.length > 1 ? 'n' : ''} hoy ${nombres(conSaldo)}. Al registrar la llegada se cobra al menos la primera noche.`,
+    accion: 'Cobrar y hacer check-in', ir: unaReserva(conSaldo, 'llegada'),
+  }
+  if (salenConSaldo.length) return {
+    tono: 'cobro', prefijo: '$', valor: Math.round(suma(salenConSaldo) / 100), unidad: 'por cobrar antes de la salida',
+    frase: `Sale${salenConSaldo.length > 1 ? 'n' : ''} hoy ${nombres(salenConSaldo)} con saldo pendiente.`,
+    accion: 'Cobrar y hacer check-out', ir: unaReserva(salenConSaldo, 'salida'),
+  }
+  if (llegan.length) return {
+    tono: 'calma', valor: llegan.length, unidad: llegan.length === 1 ? 'llegada hoy, ya pagada' : 'llegadas hoy, todas pagadas',
+    frase: `Llega${llegan.length > 1 ? 'n' : ''} ${nombres(llegan)}. Solo falta registrar la llegada.`,
+    accion: 'Ir a llegadas y salidas', ir: '/admin/llegadas-y-salidas',
+  }
+  return {
+    tono: 'calma', valor: promedio ?? 0, sufijo: '%', unidad: `de ocupación los próximos ${dias} días`,
+    frase: 'Hoy no llega ni sale nadie y no hay saldos pendientes.',
+    accion: 'Nueva reserva', ir: '/admin/nueva-reserva',
+  }
+}
+
+function Foco({ datos, navigate }) {
+  return (
+    <section className={`${s.foco} ${datos.tono === 'cobro' ? s.focoCobro : ''}`} aria-label="Lo de hoy">
+      <div className={s.focoCifra}>
+        <span className={s.focoValor}>{datos.prefijo}<Odometer value={datos.valor} locale="es-MX" />{datos.sufijo}</span>
+        <span className={s.focoUnidad}>{datos.unidad}</span>
+      </div>
+      <p className={s.focoFrase}>{datos.frase}</p>
+      <Button size="lg" className="rounded-full" onClick={() => navigate(datos.ir)}>
+        {datos.accion} <ArrowRightIcon size={16} weight="bold" />
+      </Button>
+    </section>
+  )
+}
+
 /** Una celda de las cifras de hoy: punto del color de su flor en la corona. */
 const PORCENTAJE = { style: 'percent', maximumFractionDigits: 0 }
 
@@ -200,6 +246,11 @@ const DashboardPage = ({ onNavigate }) => {
           </Button>
         </div>
       </div>
+
+      {/* ── El foco: lo que hay que atender hoy ── */}
+      {d && !reservas.cargando ? (
+        <Foco navigate={navigate} datos={hallazgo({ conSaldo, salenConSaldo: g.salen.filter(r => r.por_cobrar_centavos > 0), llegan: g.llegan, promedio, dias })} />
+      ) : <SkeletonCard height="168px" />}
 
       {/* ── La corona de hoy ── */}
       {/* Cursor líquido en toda la tarjeta: la gota toma la forma de lo presionable (liquidTarget) */}

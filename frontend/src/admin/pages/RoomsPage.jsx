@@ -31,7 +31,7 @@ import SectionPanel from '../components/SectionPanel'
 import s from './RoomsPage.module.css'
 
 // Una destacada y el resto: con múltiplos de 6 la rejilla de 3 columnas cierra exacta.
-const TAMANOS = [6, 12, 24, 48]
+const POR_PAGINA = 12
 const CAMA = { king: 'King', queen: 'Queen', matrimonial: 'Matrimonial', individuales: 'Individuales' }
 const datosDe = r => [`Hasta ${r.capacidad} personas`, r.tamano_m2 && `${r.tamano_m2} m²`, r.cama && `cama ${CAMA[r.cama].toLowerCase()}`].filter(Boolean).join(', ')
 
@@ -76,11 +76,10 @@ export default function RoomsPage({ onNavigate, onEditRoom, onGestionarFotos }) 
   const nombrePropiedad = id => sesion?.propiedades?.find(p => p.id === id)?.nombre ?? 'Sin dato'
 
   // Pantalla en la URL: búsqueda, filtro, página, habitación elegida y vista.
-  const [{ q, estado, pagina, por_pagina: porPaginaUrl, habitacion: elegidaId, vista }, setParams] = useParametros({
-    q: '', estado: 'todos', pagina: 1, por_pagina: 6, habitacion: '', vista: 'habitaciones',
+  const [{ q, estado, pagina, habitacion: elegidaId, vista }, setParams] = useParametros({
+    q: '', estado: 'todos', pagina: 1, habitacion: '', vista: 'habitaciones',
   })
-
-  const porPagina = TAMANOS.includes(porPaginaUrl) ? porPaginaUrl : TAMANOS[0]
+  const porPagina = POR_PAGINA
 
   // La propiedad la elige el selector de la SideNav (para todo el panel).
   const { propiedadId } = usePropiedadActual()
@@ -400,17 +399,9 @@ export default function RoomsPage({ onNavigate, onEditRoom, onGestionarFotos }) 
           {lista.datos && lista.datos.meta.total > 0 && (
             <div className={s.pie}>
               <p className={s.rango} aria-live="polite">
-                Mostrando {(pagina - 1) * porPagina + 1} a {Math.min(pagina * porPagina, lista.datos.meta.total)} de {lista.datos.meta.total}
-                <strong className={s.paginaActual}>Página {pagina} de {totalPages}</strong>
+                {(pagina - 1) * porPagina + 1} a {Math.min(pagina * porPagina, lista.datos.meta.total)} de {lista.datos.meta.total}
               </p>
-              <div className={s.porPagina}>
-                <span id="por-pagina-etiqueta" className={s.rango}>Por página</span>
-                <LiquidSegments
-                  options={TAMANOS.map(n => ({ value: String(n), label: String(n) }))} value={String(porPagina)}
-                  onValueChange={v => setParams({ por_pagina: Number(v), pagina: 1 })} size="sm" aria-label="Habitaciones por página"
-                />
-              </div>
-              {totalPages > 1 && <Paginador id="pag-habitaciones" pagina={pagina} total={totalPages} onCambiar={v => setParams({ pagina: v })} etiqueta="Páginas de habitaciones" />}
+              <Paginador id="pag-habitaciones" pagina={pagina} total={totalPages} onCambiar={v => setParams({ pagina: v })} etiqueta="Páginas de habitaciones" />
             </div>
           )}
         </div>

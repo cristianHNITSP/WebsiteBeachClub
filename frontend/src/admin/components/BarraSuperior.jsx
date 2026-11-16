@@ -4,7 +4,7 @@ import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'motion/react'
 import {
   BedDoubleIcon, BellIcon, CalendarDaysIcon, CalendarPlusIcon, DoorOpenIcon, FingerprintIcon, GlobeIcon,
-  LayoutGridIcon, MenuIcon, PlusIcon, SettingsIcon, UserRoundIcon, UsersIcon,
+  LayoutGridIcon, MenuIcon, MoonIcon, PlusIcon, SettingsIcon, SunIcon, UserRoundIcon, UsersIcon,
 } from 'lucide-react'
 import { Button } from '@/components/coss/button'
 import { DripBadge } from '@/components/devl/drip-badge'
@@ -12,6 +12,9 @@ import { DropletButton } from '@/components/devl/droplet-button'
 import { Launcher } from '@/components/devl/launcher'
 import { OverflowBreadcrumb } from '@/components/devl/overflow-breadcrumb'
 import { MorphIcon } from '@/components/devl/morph-icons'
+import { LiquidSegments } from '@/components/devl/liquid-segments'
+import { Popover, PopoverPopup, PopoverTrigger } from '@/components/coss/popover'
+import ControlZoom from '@/components/marca/ControlZoom'
 import { useTheme } from '@/context/ThemeContext'
 import { alternarTemaConCirculo } from '@/lib/transicionTema'
 import { useSesion } from '@/lib/sesion'
@@ -105,16 +108,38 @@ export default function BarraSuperior({ page, onNavigate, onMenu }) {
   return (
     <header className="sticky top-0 z-30 flex h-13 shrink-0 items-center gap-2 rounded-t-2xl border-b bg-background px-3 sm:px-4">
       {onMenu && <Button aria-label="Abrir menú" className="lg:hidden" onClick={onMenu} size="icon-sm" variant="ghost"><MenuIcon /></Button>}
-      <OverflowBreadcrumb className="flex-1" segments={migas} onNavigate={m => onNavigate(m.id === 'panel' ? 'calendar' : m.id)} />
+      <OverflowBreadcrumb className="flex-1 max-sm:hidden" segments={migas} onNavigate={m => onNavigate(m.id === 'panel' ? 'calendar' : m.id)} />
+      {/* En el teléfono no caben las migas: solo dónde estás (con el icono de la sección). */}
+      <p className="flex min-w-0 flex-1 items-center gap-1.5 font-medium text-sm sm:hidden [&_svg]:size-4 [&_svg]:shrink-0">
+        {IconoPagina && <IconoPagina className="text-primary" aria-hidden="true" />}
+        <span className="truncate">{NOMBRE[page] ?? 'Panel'}</span>
+      </p>
 
       <div className="flex shrink-0 items-center gap-1.5">
         <Globo abierto={globo} onCambiar={v => (v ? abrir() : setGlobo(false))} acciones={acciones} />
         <DripBadge count={sinLeer} tone="destructive">
           <Button aria-label={sinLeer ? `Avisos, ${sinLeer} sin leer` : 'Avisos'} onClick={() => onNavigate('notifications')} size="icon" variant="ghost"><BellIcon /></Button>
         </DripBadge>
-        <Button aria-label={isDark ? 'Cambiar a tema claro' : 'Cambiar a tema oscuro'} onClick={e => alternarTemaConCirculo(e, toggleDark, reduceMotion)} size="icon" variant="ghost">
-          <MorphIcon name="theme" morphed={isDark} className="size-5" />
-        </Button>
+        {/* Vista: tema y zoom (el zoom, sobre todo para el teléfono). */}
+        <Popover>
+          <PopoverTrigger render={<Button aria-label="Vista: tema y zoom" size="icon" variant="ghost" />}>
+            <MorphIcon name="theme" morphed={isDark} className="size-5" />
+          </PopoverTrigger>
+          <PopoverPopup align="end" sideOffset={8} className="w-72">
+            <div className="grid gap-4">
+              <div className="grid gap-2">
+                <span className="font-medium text-sm">Tema</span>
+                <LiquidSegments fullWidth aria-label="Tema" value={isDark ? 'oscuro' : 'claro'}
+                  options={[{ value: 'claro', label: 'Claro', icon: <SunIcon /> }, { value: 'oscuro', label: 'Oscuro', icon: <MoonIcon /> }]}
+                  onValueChange={v => { if ((v === 'oscuro') !== isDark) alternarTemaConCirculo(null, toggleDark, reduceMotion) }} />
+              </div>
+              <div className="grid gap-2">
+                <span className="font-medium text-sm">Zoom</span>
+                <ControlZoom />
+              </div>
+            </div>
+          </PopoverPopup>
+        </Popover>
         {permitida('nueva-reserva', sesion) && (
           <DropletButton onClick={() => onNavigate('nueva-reserva')}>
             <PlusIcon />
@@ -125,14 +150,16 @@ export default function BarraSuperior({ page, onNavigate, onMenu }) {
       {createPortal(
         <AnimatePresence>
           {capa && (
-            <motion.div key="capa" className="fixed inset-0 z-[60] flex items-start justify-center bg-black/24 px-4 pt-[12vh]"
+            <motion.div key="capa" className="fixed inset-0 z-[60] flex items-start justify-center bg-black/24 px-3 pt-[max(12px,env(safe-area-inset-top))] sm:px-4 sm:pt-[12vh]"
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0, transition: { duration: 0.12 } }}
               onMouseDown={e => { if (e.target === e.currentTarget) setCapa(false) }}
               role="dialog" aria-modal="true" aria-label="Buscar o ir a">
               <motion.div ref={caja} className="w-full max-w-xl" initial={{ y: -8, scale: 0.98 }} animate={{ y: 0, scale: 1 }} exit={{ y: -6, scale: 0.98, transition: { duration: 0.12 } }}
                 transition={{ type: 'spring', stiffness: 520, damping: 38 }}>
                 {/* El Launcher de devl, montado ya abierto: el cierre lo maneja esta capa */}
-                <Launcher defaultOpen actions={acciones} placeholder="Busca una pantalla o una acción" triggerLabel="Buscar o ir a…" recentLimit={3} />
+                <Launcher defaultOpen actions={acciones} placeholder="Busca una pantalla o una acción" triggerLabel="Buscar o ir a…" recentLimit={3} className="max-w-none" />
+                {/* En el teléfono no hay Esc: un botón para cerrar, al alcance del pulgar. */}
+                <Button variant="outline" size="lg" className="mt-3 w-full bg-popover pointer-fine:hidden" onClick={() => setCapa(false)}>Cerrar</Button>
               </motion.div>
             </motion.div>
           )}

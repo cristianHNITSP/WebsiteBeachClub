@@ -275,15 +275,13 @@
 .chipVerde { background: color-mix(in srgb, var(--success) 14%, transparent); color: var(--success-foreground); }
 .chipDorado { background: color-mix(in srgb, var(--flor-dorado) 20%, transparent); color: var(--warning-foreground); }
 
-/* Pie de la lista: rango visible y paginación (offset: página × POR_PAGINA) */
+/* Pie de la lista: rango visible y UN paginador (12 por página, fijo) */
 .pie {
-  position: sticky; bottom: 0; z-index: 5; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px;
-  margin-top: 20px; padding: 12px 0; background: var(--background); box-shadow: 0 -1px 0 var(--border);
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px;
+  margin-top: 20px; padding-top: 12px; border-top: 1px solid var(--border);
 }
 .rango { margin: 0; font-size: var(--fs-sm); color: var(--muted-foreground); }
-.porPagina { display: inline-flex; align-items: center; gap: 8px; }
 .amenidades { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
-.paginaActual { margin-inline-start: 12px; font-weight: 600; color: var(--foreground); }
 
 /* Encabezado de cada sucursal en la lista (con "Todas las propiedades"): ocupa toda la fila. */
 .sucursal {

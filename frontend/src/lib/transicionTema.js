@@ -15,7 +15,9 @@ let enCurso = false
  */
 export function alternarTemaConCirculo(evento, cambiar, reducirMovimiento) {
   if (enCurso) return
-  if (!document.startViewTransition || reducirMovimiento) {
+  // En el teléfono el círculo se rompía (la foto de la página no cuadra con la barra del navegador
+  // que se esconde y aparece): ahí cambia al instante.
+  if (!document.startViewTransition || reducirMovimiento || matchMedia('(pointer: coarse)').matches) {
     cambiar()
     return
   }

@@ -28,13 +28,25 @@ export function LiquidSegments(
   const buttonRefs = useRef([]);
   const [rects, setRects] = useState([]);
   const [trackWidth, setTrackWidth] = useState(0);
+  const [desborda, setDesborda] = useState(false);
+  const [bordes, setBordes] = useState({ izq: false, der: true }); // ¿quedan opciones a cada lado?
+  const verBordes = () => {
+    const tr = trackRef.current;
+    if (tr) setBordes({ izq: tr.scrollLeft > 2, der: tr.scrollLeft + tr.clientWidth < tr.scrollWidth - 2 });
+  };
   const drag = useRef(null);
   const suppressClick = useRef(false);
   const [dragX, setDragX] = useState(null);
 
+  // Frida: si las opciones no caben (teléfono), la pista se desliza de lado. Las capas de la gota y
+  // de las etiquetas elegidas miden lo que mide el CONTENIDO, no la caja visible, para no cortarse.
   const measure = useCallback(() => {
-    setRects(buttonRefs.current.map((b) => (b ? { x: b.offsetLeft, w: b.offsetWidth } : { x: 0, w: 0 })));
-    setTrackWidth(trackRef.current?.offsetWidth ?? 0);
+    const r = buttonRefs.current.map((b) => (b ? { x: b.offsetLeft, w: b.offsetWidth } : { x: 0, w: 0 }));
+    setRects(r);
+    const visible = trackRef.current?.clientWidth ?? 0;
+    const contenido = r.length ? r.at(-1).x + r.at(-1).w + 4 : visible;
+    setTrackWidth(Math.max(visible, contenido));
+    setDesborda(contenido > visible + 1);
   }, []);
 
   useLayoutEffect(() => {
@@ -46,6 +58,18 @@ export function LiquidSegments(
     for (const b of buttonRefs.current) if (b) observer.observe(b);
     return () => observer.disconnect();
   }, [measure, options.length]);
+
+  // La opción elegida siempre a la vista cuando la pista se desliza.
+  useLayoutEffect(() => {
+    const track = trackRef.current;
+    const b = buttonRefs.current[selectedIndex];
+    if (!desborda || !track || !b) return;
+    const izq = b.offsetLeft - 8;
+    const der = b.offsetLeft + b.offsetWidth + 8 - track.clientWidth;
+    if (track.scrollLeft > izq) track.scrollLeft = izq;
+    else if (track.scrollLeft < der) track.scrollLeft = der;
+    verBordes();
+  }, [selectedIndex, desborda]);
 
   const select = (index) => {
     const option = options[index];
@@ -84,6 +108,12 @@ export function LiquidSegments(
       event.currentTarget.setPointerCapture(event.pointerId);
     }
     if (state.moved) setDragX(localX(event));
+  };
+
+  // Si el navegador toma el gesto (deslizar la pista), no se elige nada.
+  const cancelDrag = () => {
+    drag.current = null;
+    setDragX(null);
   };
 
   const endDrag = (event) => {
@@ -172,11 +202,14 @@ export function LiquidSegments(
     <div
       aria-label={ariaLabel}
       className={cn(
-        "relative isolate inline-flex touch-pan-y select-none rounded-full bg-muted p-1",
+        "relative isolate inline-flex max-w-full select-none overflow-x-auto overscroll-x-contain rounded-full bg-muted p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
+        desborda ? "touch-auto" : "touch-pan-y",
         fullWidth && "@container flex w-full",
         className,
       )}
-      onPointerCancel={endDrag}
+      onPointerCancel={cancelDrag}
+      onScroll={desborda ? verBordes : undefined}
+      style={desborda ? { maskImage: `linear-gradient(to right, ${bordes.izq ? "transparent, black 28px" : "black"}, ${bordes.der ? "black calc(100% - 28px), transparent" : "black"})` } : undefined}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={endDrag}
@@ -192,8 +225,8 @@ export function LiquidSegments(
       </svg>
       <span
         aria-hidden
-        className={cn("pointer-events-none absolute inset-y-1 left-0 -z-10 w-full", !settled && "hidden")}
-        style={{ filter: `url(#${filterId})` }}
+        className={cn("pointer-events-none absolute inset-y-1 left-0 -z-10", !settled && "hidden")}
+        style={{ filter: `url(#${filterId})`, width: trackWidth || "100%" }}
       >
         <motion.span className="absolute inset-y-px left-0 rounded-full bg-primary" style={{ x: trailX, width: trailW }} />
         <motion.span className="absolute inset-y-0 left-0 rounded-full bg-primary" style={{ x: leadX, width: leadW }} />
@@ -230,8 +263,8 @@ export function LiquidSegments(
       })}
       <motion.div
         aria-hidden
-        className={cn("pointer-events-none absolute inset-0 flex p-1 text-primary-foreground", !settled && "hidden")}
-        style={{ clipPath }}
+        className={cn("pointer-events-none absolute inset-y-0 left-0 flex p-1 text-primary-foreground", !settled && "hidden")}
+        style={{ clipPath, width: trackWidth || "100%" }}
       >
         {options.map((option, index) => (
           <span className={segmentClass} key={option.value}>

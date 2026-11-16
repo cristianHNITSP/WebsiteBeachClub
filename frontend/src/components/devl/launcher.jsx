@@ -241,7 +241,7 @@ export function Launcher({
                   aria-controls={`${baseId}-list`}
                   aria-expanded
                   aria-label="Command"
-                  className="h-11 min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground/72"
+                  className="h-11 min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground/72 pointer-coarse:h-13 pointer-coarse:text-base"
                   onChange={(e) => setQuery(e.target.value)}
                   onKeyDown={onInputKey}
                   placeholder={page ? (pages[page]?.placeholder ?? "Search…") : placeholder}
@@ -249,14 +249,14 @@ export function Launcher({
                   role="combobox"
                   value={query}
                 />
-                <Kbd>esc</Kbd>
+                <Kbd className="pointer-coarse:hidden">esc</Kbd>
               </div>
 
               <motion.div animate={{ height }} className="overflow-hidden" initial={false} transition={spring}>
                 <div
                   aria-label="Resultados"
                   className={cn(
-                    "max-h-74 overflow-y-auto overscroll-contain outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset",
+                    "max-h-74 pointer-coarse:max-h-[60dvh] overflow-y-auto overscroll-contain outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset",
                     more && "mask-[linear-gradient(to_bottom,black_calc(100%-32px),transparent)]",
                   )}
                   onScroll={checkMore}
@@ -294,7 +294,7 @@ export function Launcher({
                               <div
                                 aria-selected={isActive}
                                 className={cn(
-                                  "relative flex h-9 cursor-pointer select-none items-center gap-2.5 rounded-lg px-2 text-sm [&_svg:not([class*='size-'])]:size-4",
+                                  "relative flex h-9 cursor-pointer select-none items-center gap-2.5 rounded-lg px-2 text-sm [&_svg:not([class*='size-'])]:size-4 pointer-coarse:h-12 pointer-coarse:text-base pointer-coarse:[&_svg:not([class*='size-'])]:size-5",
                                   isActive ? "text-foreground" : "text-foreground/80",
                                 )}
                                 id={optionId(section.title, item.id)}
@@ -317,7 +317,7 @@ export function Launcher({
                                   <ChevronRightIcon className="relative size-4 text-muted-foreground" />
                                 ) : (
                                   item.shortcut && (
-                                    <KbdGroup className="relative">
+                                    <KbdGroup className="relative pointer-coarse:hidden">
                                       {item.shortcut.map((k) => (
                                         <Kbd className="bg-background ring-1 ring-border" key={k}>
                                           {k}
@@ -336,7 +336,7 @@ export function Launcher({
                 </div>
               </motion.div>
 
-              <div className="flex items-center gap-3 border-t px-3 py-2 text-muted-foreground text-xs">
+              <div className="flex items-center gap-3 border-t px-3 py-2 text-muted-foreground text-xs pointer-coarse:hidden">
                 <span className="flex items-center gap-1">
                   <Kbd>↑</Kbd>
                   <Kbd>↓</Kbd>
