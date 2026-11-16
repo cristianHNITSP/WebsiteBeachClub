@@ -6,7 +6,7 @@ import { Button } from '@/components/coss/button'
 import { Input } from '@/components/coss/input'
 import { Label } from '@/components/coss/label'
 import { SkeletonCard } from '@/components/frida/Skeleton'
-import ConfirmarDescarte from '@/components/marca/ConfirmarDescarte'
+import ConfirmarRiesgo from '@/components/marca/ConfirmarRiesgo'
 import { usePedido } from '@/hooks/usePedido'
 import { useParametros } from '@/hooks/useParametros'
 import { useSesion } from '@/lib/sesion'
@@ -197,8 +197,8 @@ function Sitio({ sitio, propiedades, onEditar, onListo }) {
       texto: 'Los avisos se firmarán con el secreto nuevo: el sitio rechazará los que lleguen hasta que lo actualice.',
     },
     revocar: {
-      titulo: '¿Revocar este sitio?', accion: 'Revocar', hacer: () => sitiosApi.revocar(sitio.id), listo: 'Sitio revocado',
-      texto: 'Sus claves dejan de funcionar y no recibe más avisos. No se deshace: si vuelve, se da de alta otro. Sus reservas se conservan.',
+      titulo: '¿Revocar este sitio?', accion: 'Revocar', riesgo: 'alto', hacer: () => sitiosApi.revocar(sitio.id), listo: 'Sitio revocado',
+      texto: 'Sus claves dejan de funcionar y no recibe más avisos. Si vuelve, se da de alta otro sitio. Sus reservas se conservan.',
     },
   }
   const ejecutar = async () => {
@@ -237,8 +237,9 @@ function Sitio({ sitio, propiedades, onEditar, onListo }) {
         </div>
       )}
       {verEntregas && <Entregas sitioId={sitio.id} />}
-      <ConfirmarDescarte
+      <ConfirmarRiesgo
         abierto={confirmar !== null}
+        riesgo={ACCIONES[confirmar]?.riesgo ?? 'medio'}
         titulo={ACCIONES[confirmar]?.titulo}
         texto={ACCIONES[confirmar]?.texto}
         accion={ACCIONES[confirmar]?.accion}

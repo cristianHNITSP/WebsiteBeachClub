@@ -13,7 +13,7 @@ import { Label } from '@/components/coss/label'
 import { SkeletonCard } from '@/components/frida/Skeleton'
 import Selector from '@/admin/components/Selector'
 import Inicial from './Inicial'
-import ConfirmarDescarte from '@/components/marca/ConfirmarDescarte'
+import ConfirmarRiesgo from '@/components/marca/ConfirmarRiesgo'
 import OpcionesCobro from './OpcionesCobro'
 import { usePedido } from '@/hooks/usePedido'
 import { useSesion } from '@/lib/sesion'
@@ -351,6 +351,7 @@ function Contenido({ reservaId, accion, onCambio }) {
 
       <CancelarConMotivo
         abierto={aCancelar}
+        reserva={r}
         bloqueo={r.tipo === 'bloqueo'}
         onCancelar={() => setACancelar(false)}
         onConfirmar={motivo => { setACancelar(false); hacer(() => reservasApi.cancelar(r.id, r.version, motivo), r.tipo === 'bloqueo' ? 'Bloqueo quitado' : 'Reserva cancelada') }}
@@ -440,28 +441,45 @@ function FormularioDinero({ reserva, tipo, salida, monto, maximo, ocupado, onCan
   )
 }
 
-function CancelarConMotivo({ abierto, bloqueo, onCancelar, onConfirmar }) {
+function CancelarConMotivo({ abierto, reserva: r, bloqueo, onCancelar, onConfirmar }) {
   const [motivo, setMotivo] = useState('')
+  const rango = `${fecha(r.llegada)} → ${fecha(r.salida)}`
   if (bloqueo) {
     return (
-      <ConfirmarDescarte abierto={abierto} titulo="¿Quitar el bloqueo?" texto="Las noches quedan libres para reservar." accion="Quitar bloqueo" cancelar="Volver"
-        onConfirmar={() => onConfirmar('')} onCancelar={onCancelar} />
+      <ConfirmarRiesgo
+        abierto={abierto}
+        riesgo="medio"
+        titulo="¿Quitar el bloqueo de mantenimiento?"
+        consecuencias={[`${r.habitacion_nombre} queda libre para reservar del ${rango}.`]}
+        deshacer="Puedes volver a bloquear esas fechas desde el calendario."
+        accion="Quitar bloqueo"
+        cancelar="Volver"
+        onConfirmar={() => onConfirmar('')}
+        onCancelar={onCancelar}
+      />
     )
   }
+  const deFuera = esDeFuera(r)
+  const consecuencias = [
+    `Las noches del ${rango} en ${r.habitacion_nombre} quedan libres para otras reservas.`,
+    r.pagado_centavos > 0
+      ? `Ya pagó ${pesos(r.pagado_centavos)}: si corresponde devolverlo, regístralo después en el detalle.`
+      : 'No tiene pagos registrados.',
+    ...(deFuera ? [`Viene de ${FUENTES[r.fuente]}: cancélala también allá. Aquí no vuelve a salir aunque la plataforma la siga mostrando.`] : []),
+  ]
   return (
-    <ConfirmarDescarte
+    <ConfirmarRiesgo
       abierto={abierto}
-      titulo="¿Cancelar la reserva?"
-      texto={(
-        <span className={s.campo}>
-          Las noches quedan libres. Si hubo pagos, registra después la devolución que corresponda.
-          <Input aria-label="Motivo de la cancelación" placeholder="Motivo (opcional)" maxLength={300} value={motivo} onChange={e => setMotivo(e.target.value)} size="lg" />
-        </span>
-      )}
+      riesgo="alto"
+      titulo={`¿Cancelar la reserva de ${r.huesped_nombre}?`}
+      consecuencias={consecuencias}
       accion="Cancelar reserva"
       cancelar="Volver"
       onConfirmar={() => onConfirmar(motivo.trim())}
       onCancelar={onCancelar}
-    />
+    >
+      <Input aria-label="Motivo de la cancelación" placeholder="Motivo (opcional), queda en el historial" maxLength={300}
+        value={motivo} onChange={e => setMotivo(e.target.value)} size="lg" />
+    </ConfirmarRiesgo>
   )
 }

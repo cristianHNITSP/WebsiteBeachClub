@@ -9,10 +9,8 @@ import { Input } from '@/components/coss/input'
 import { Label } from '@/components/coss/label'
 import { Popover, PopoverPopup } from '@/components/coss/popover'
 import { Sheet, SheetDescription, SheetFooter, SheetHeader, SheetPanel, SheetPopup, SheetTitle } from '@/components/coss/sheet'
-import {
-  AlertDialog, AlertDialogClose, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogPopup, AlertDialogTitle,
-} from '@/components/coss/alert-dialog'
 import { DropletButton } from '@/components/devl/droplet-button'
+import ConfirmarRiesgo from '@/components/marca/ConfirmarRiesgo'
 import { CoronaFlores, Florecita } from '@/components/marca/Wordmark'
 import Pista, { GrupoPistas } from '@/admin/components/Pista'
 import { useParametros } from '@/hooks/useParametros'
@@ -439,38 +437,36 @@ export default function LineaTiempo({ onNuevaReserva, onNuevaHabitacion }) {
         <span className={s.leyendaAyuda}>Arrastra para mover. Estira el borde para cambiar noches. Clic en un hueco para crear.</span>
       </div>
 
-      {/* ── Confirmar cambio ── */}
-      <AlertDialog open={!!propuesta} onOpenChange={o => { if (!o) setPropuesta(null) }}>
-        <AlertDialogPopup>
-          {propuesta && (() => {
-            const { reserva: r, cambios } = propuesta
-            const sig = { ...r, ...cambios }
-            const hA = habitacionDe(r.habitacionId), hB = habitacionDe(sig.habitacionId)
-            return (
-              <>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>¿Aplicar el cambio a la reserva de {r.huesped}?</AlertDialogTitle>
-                  <AlertDialogDescription>Revisa cómo queda antes de confirmarlo.</AlertDialogDescription>
-                  <div className={s.cambio}>
-                    <div><span className={s.cambioRotulo}>Antes</span>{hA.name}, {corto(deISO(r.llegada))} → {corto(deISO(r.salida))} ({dias(r.llegada, r.salida)} noches)</div>
-                    <div><span className={s.cambioRotulo}>Después</span>{hB.name}, {corto(deISO(sig.llegada))} → {corto(deISO(sig.salida))} ({dias(sig.llegada, sig.salida)} noches)</div>
-                  </div>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogClose render={<Button variant="outline" />}>Cancelar</AlertDialogClose>
-                  <AlertDialogClose render={<Button />} onClick={async () => {
-                    const fallo = await mover(r, cambios)
-                    if (fallo) toast.error('No se aplicó el cambio', { description: fallo.message })
-                    else toast.success('Reserva actualizada', { description: `${r.huesped}, ${hB.name}.` })
-                  }}>
-                    Aplicar cambio
-                  </AlertDialogClose>
-                </AlertDialogFooter>
-              </>
-            )
-          })()}
-        </AlertDialogPopup>
-      </AlertDialog>
+      {/* ── Confirmar cambio: el antes y el después a la vista (ConfirmarRiesgo, riesgo medio) ── */}
+      {(() => {
+        if (!propuesta) return <ConfirmarRiesgo abierto={false} onConfirmar={() => {}} onCancelar={() => {}} />
+        const { reserva: r, cambios } = propuesta
+        const sig = { ...r, ...cambios }
+        const hA = habitacionDe(r.habitacionId), hB = habitacionDe(sig.habitacionId)
+        const nA = dias(r.llegada, r.salida), nB = dias(sig.llegada, sig.salida)
+        const linea = (h, x, n) => `${h.name}, ${corto(deISO(x.llegada))} → ${corto(deISO(x.salida))} (${n} noche${n !== 1 ? 's' : ''})`
+        return (
+          <ConfirmarRiesgo
+            abierto
+            riesgo="medio"
+            titulo={`¿Aplicar el cambio a la reserva de ${r.huesped}?`}
+            cambio={{ antes: linea(hA, r, nA), despues: linea(hB, sig, nB) }}
+            consecuencias={[
+              ...(nA !== nB ? [`El total se ajusta en proporción: de ${nA} a ${nB} noche${nB !== 1 ? 's' : ''}, con la tarifa que se pactó.`] : []),
+              ...(hA.id !== hB.id ? [`La habitación ${hA.name} queda libre esas noches.`] : []),
+              'Quien tenga el panel abierto ve el cambio al momento.',
+            ]}
+            deshacer="Puedes volver a moverla o cambiar sus noches desde el calendario."
+            accion="Aplicar cambio"
+            onConfirmar={async () => {
+              const fallo = await mover(r, cambios)
+              if (fallo) toast.error('No se aplicó el cambio', { description: fallo.message })
+              else toast.success('Reserva actualizada', { description: `${r.huesped}, ${hB.name}.` })
+            }}
+            onCancelar={() => setPropuesta(null)}
+          />
+        )
+      })()}
 
       {/* ── Nueva reserva rápida: entra desde la derecha. Una reserva SIGUE en el formulario
           completo (forma de pago y abono), con todo lo de aquí ya puesto; el mantenimiento se

@@ -1,31 +1,19 @@
-import {
-  AlertDialog, AlertDialogClose, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogPopup, AlertDialogTitle,
-} from '@/components/coss/alert-dialog'
-import { Button } from '@/components/coss/button'
+import ConfirmarRiesgo from './ConfirmarRiesgo'
 
 /**
- * "¿Descartar cambios?" del panel (AlertDialog de coss): foco atrapado, Esc para
- * cancelar y la acción destructiva a la derecha. `titulo`, `accion` y `cancelar`
- * lo reutilizan para otras confirmaciones destructivas (papelera, borrar, dar de baja).
+ * "¿Descartar cambios?": salir de un formulario con datos sin guardar. Es `ConfirmarRiesgo`
+ * (riesgo medio) con sus textos por omisión; lo que se capturó no se recupera.
+ * Para cualquier otra acción con consecuencias, usa `ConfirmarRiesgo` directamente.
  */
 export default function ConfirmarDescarte({
-  abierto, onConfirmar, onCancelar, texto,
-  titulo = '¿Descartar cambios?', accion = 'Descartar y salir', cancelar = 'Seguir editando',
+  titulo = '¿Descartar cambios?', accion = 'Descartar y salir', cancelar = 'Seguir editando', texto, ...resto
 }) {
   return (
-    <AlertDialog open={abierto} onOpenChange={o => { if (!o) onCancelar() }}>
-      <AlertDialogPopup>
-        <AlertDialogHeader>
-          <AlertDialogTitle>{titulo}</AlertDialogTitle>
-          <AlertDialogDescription render={<div />}>
-            {texto ?? 'Tienes cambios sin guardar. Si sales ahora, toda la información capturada se perderá.'}
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogClose render={<Button variant="outline" />}>{cancelar}</AlertDialogClose>
-          <AlertDialogClose render={<Button variant="destructive" />} onClick={onConfirmar}>{accion}</AlertDialogClose>
-        </AlertDialogFooter>
-      </AlertDialogPopup>
-    </AlertDialog>
+    <ConfirmarRiesgo
+      titulo={titulo} accion={accion} cancelar={cancelar} riesgo="medio"
+      consecuencias={texto ? [] : ['Se pierde todo lo que capturaste en este formulario.']}
+      texto={texto}
+      {...resto}
+    />
   )
 }

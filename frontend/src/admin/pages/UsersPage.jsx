@@ -11,7 +11,7 @@ import {
 import { Button } from '@/components/coss/button'
 import { Input } from '@/components/coss/input'
 import Skeleton from '@/components/frida/Skeleton'
-import ConfirmarDescarte from '@/components/marca/ConfirmarDescarte'
+import ConfirmarRiesgo from '@/components/marca/ConfirmarRiesgo'
 import Paginador from '@/components/marca/Paginador'
 import Selector from '@/admin/components/Selector'
 import Pista, { GrupoPistas } from '@/admin/components/Pista'
@@ -230,21 +230,30 @@ export default function UsersPage({ onNavigate }) {
         <Paginador pagina={pagina} total={lista.datos?.meta.paginas ?? 0} onCambiar={n => set({ pagina: n }, { historial: true })} etiqueta="Páginas del personal" />
       </div>
 
-      <ConfirmarDescarte
+      <ConfirmarRiesgo
         abierto={!!aBaja}
-        titulo="¿Dar de baja?"
-        texto={aBaja ? `${aBaja.nombre} deja de tener acceso al panel y se cierran sus sesiones al instante. Su historial se conserva y se puede reactivar.` : ''}
+        riesgo="medio"
+        titulo={aBaja ? `¿Dar de baja a ${aBaja.nombre}?` : ''}
+        consecuencias={[
+          'Deja de tener acceso al panel.',
+          'Se cierran sus sesiones al instante, en todos sus dispositivos.',
+          'Su historial y su auditoría se conservan.',
+        ]}
+        deshacer="Se reactiva desde Personal."
         accion="Dar de baja"
-        cancelar="Cancelar"
         onConfirmar={() => baja(aBaja)}
         onCancelar={() => setABaja(null)}
       />
-      <ConfirmarDescarte
+      <ConfirmarRiesgo
         abierto={!!aRestablecer}
-        titulo="¿Poner una contraseña temporal?"
-        texto={aRestablecer ? `Se cierran las sesiones de ${aRestablecer.nombre} y tendrá que entrar con una contraseña nueva que verás una sola vez. Al entrar, se le pedirá cambiarla.` : ''}
+        riesgo="medio"
+        titulo={aRestablecer ? `¿Poner una contraseña temporal a ${aRestablecer.nombre}?` : ''}
+        consecuencias={[
+          'Su contraseña actual deja de servir y se cierran sus sesiones.',
+          'Verás la contraseña temporal una sola vez, para dársela.',
+          'Al entrar, el panel le pedirá cambiarla.',
+        ]}
         accion="Generar contraseña"
-        cancelar="Cancelar"
         onConfirmar={() => restablecer(aRestablecer)}
         onCancelar={() => setARestablecer(null)}
       />

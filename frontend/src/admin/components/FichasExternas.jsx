@@ -9,6 +9,7 @@ import { StatusPill } from '@/components/status-pill'
 import { WorkingOutLoud } from '@/components/working-out-loud'
 import { SkeletonCard } from '@/components/frida/Skeleton'
 import { Florecita } from '@/components/marca/Wordmark'
+import ConfirmarRiesgo from '@/components/marca/ConfirmarRiesgo'
 import { usePedido } from '@/hooks/usePedido'
 import { useSesion } from '@/lib/sesion'
 import { etiquetaDePublicacion, externasApi } from '../externas'
@@ -168,11 +169,28 @@ function Propiedad({ propiedad, fichas, editar, calendarios, onCalendario, leyen
 function Ficha({ ficha, editar, calendarios, onCalendario, leyendo, onLeer, onCambio }) {
   const m = marcaDe(ficha.url)
   const [etiqueta, variante] = ESTADO[ficha.estado] ?? ESTADO.error
+  const [aQuitar, setAQuitar] = useState(false)
   const quitar = async () => {
-    try { await externasApi.borrarFicha(ficha.id); toast.success('Ficha quitada'); onCambio() } catch (e) { toast.error(e.message) }
+    try { await externasApi.borrarFicha(ficha.id); toast.success('Ficha quitada', { description: `${m.nombre} ya no se revisa.` }); onCambio() } catch (e) { toast.error(e.message) }
   }
   return (
     <li className={s.ficha}>
+      <ConfirmarRiesgo
+        abierto={aQuitar}
+        riesgo={calendarios.length ? 'alto' : 'medio'}
+        titulo={`¿Quitar la ficha de ${m.nombre}?`}
+        consecuencias={[
+          'El bot deja de revisar esta página cada día.',
+          ...(calendarios.length
+            ? [`Se desconecta${calendarios.length > 1 ? 'n sus' : ' su'} ${calendarios.length} calendario${calendarios.length > 1 ? 's' : ''}: dejan de llegar reservas nuevas de ${m.nombre}.`,
+              'Las reservas que ya trajo se conservan.']
+            : []),
+        ]}
+        deshacer={calendarios.length ? undefined : 'Puedes volver a agregarla pegando su enlace.'}
+        accion="Quitar ficha"
+        onConfirmar={quitar}
+        onCancelar={() => setAQuitar(false)}
+      />
       <span className={s.marca} style={{ background: `var(--flor-${m.flor})`, color: `var(--flor-${m.flor}-fg)` }} aria-hidden="true">{m.letra}</span>
       <span className={s.fichaTexto}>
         <a className={s.enlace} href={ficha.url} target="_blank" rel="noopener noreferrer nofollow" aria-label={`Abrir ${host(ficha.url)} en otra pestaña`}>
@@ -191,7 +209,7 @@ function Ficha({ ficha, editar, calendarios, onCalendario, leyendo, onLeer, onCa
       {editar && (
         <span className={s.acciones}>
           <Button variant="ghost" size="icon" aria-label={`Leer ahora ${m.nombre}`} disabled={leyendo} onClick={onLeer}><ArrowClockwiseIcon size={16} aria-hidden="true" /></Button>
-          <Button variant="ghost" size="icon" aria-label={`Quitar la ficha de ${m.nombre}`} onClick={quitar}><TrashIcon size={16} aria-hidden="true" /></Button>
+          <Button variant="ghost" size="icon" aria-label={`Quitar la ficha de ${m.nombre}`} onClick={() => setAQuitar(true)}><TrashIcon size={16} aria-hidden="true" /></Button>
         </span>
       )}
       {ficha.detalle && ficha.estado !== 'leyendo' && ficha.estado !== 'leida' && ficha.estado !== 'sin_datos' && <p className={s.detalle}>{ficha.detalle}</p>}
@@ -287,11 +305,27 @@ function Publicacion({ ficha, cuarto, indice, calendario, editar, onCambio }) {
     try { await externasApi.leerCalendario(calendario.id); toast.success('Revisando ahora'); setTimeout(onCambio, 4000) } catch (e) { toast.error(e.message) }
     setTimeout(() => setLeyendo(false), 4000)
   }
+  const [aDesconectar, setADesconectar] = useState(false)
   const quitar = async () => {
-    try { await externasApi.borrarCalendario(calendario.id); toast.success('Calendario desconectado', { description: 'Sus reservas pasadas se conservan como historia.' }); onCambio() } catch (e) { toast.error(e.message) }
+    try { await externasApi.borrarCalendario(calendario.id); toast.success('Calendario desconectado', { description: 'Las reservas que ya trajo se conservan.' }); onCambio() } catch (e) { toast.error(e.message) }
   }
   return (
     <li className={s.publicacion}>
+      {calendario && (
+        <ConfirmarRiesgo
+          abierto={aDesconectar}
+          riesgo="medio"
+          titulo={`¿Desconectar el calendario de «${cuarto.nombre}»?`}
+          consecuencias={[
+            'Dejan de llegar reservas nuevas de esta publicación, y sus cambios y cancelaciones tampoco se reflejan.',
+            'Las reservas que ya trajo se conservan, en el calendario y en la Línea de tiempo.',
+          ]}
+          deshacer="Vuelve a conectarlo pegando su enlace iCal."
+          accion="Desconectar"
+          onConfirmar={quitar}
+          onCancelar={() => setADesconectar(false)}
+        />
+      )}
       <span className={s.publicacionTexto}><strong>{cuarto.nombre}</strong>{datosDe(cuarto) ? `: ${datosDe(cuarto)}` : ''}</span>
       {conectable && calendario && (
         <span className={s.calendario}>
@@ -302,7 +336,7 @@ function Publicacion({ ficha, cuarto, indice, calendario, editar, onCambio }) {
             <span className={s.acciones}>
               {leyendo && <StatusPill size="sm" phases={['Pidiendo el calendario', 'Leyendo las fechas']} interval={1000} done={false} />}
               <Button variant="outline" size="sm" disabled={leyendo} onClick={leer}>Revisar ahora</Button>
-              <Button variant="ghost" size="sm" onClick={quitar}>Desconectar</Button>
+              <Button variant="ghost" size="sm" onClick={() => setADesconectar(true)}>Desconectar</Button>
             </span>
           )}
         </span>

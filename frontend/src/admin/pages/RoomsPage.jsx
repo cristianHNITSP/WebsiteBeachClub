@@ -10,7 +10,7 @@ import { SkeletonRoomCard, SkeletonReservationList } from '@/components/frida/Sk
 import { Button } from '@/components/coss/button'
 import { DropletButton } from '@/components/devl/droplet-button'
 import TarjetaCifra from '@/components/marca/TarjetaCifra'
-import ConfirmarDescarte from '@/components/marca/ConfirmarDescarte'
+import ConfirmarRiesgo from '@/components/marca/ConfirmarRiesgo'
 import Imagen from '@/components/marca/Imagen'
 import Paginador from '@/components/marca/Paginador'
 import { Florecita } from '@/components/marca/Wordmark'
@@ -298,12 +298,17 @@ export default function RoomsPage({ onNavigate, onEditRoom, onGestionarFotos }) 
             </div>
           </div>
 
-          <ConfirmarDescarte
+          <ConfirmarRiesgo
             abierto={!!aBorrar}
-            titulo="¿Mandar a la papelera?"
-            texto={aBorrar ? `«${aBorrar.nombre}» deja de aparecer en el panel y no se puede reservar. Puedes restaurarla desde la papelera. Si tiene reservas abiertas, NO se cancelan: seguirán, pero no se podrá registrar su check-in ni su check-out a menos que la restaures. Al pasar la noche de la última de sus reservas, la habitación se elimina sola.` : ''}
+            riesgo="medio"
+            titulo={aBorrar ? `¿Mandar «${aBorrar.nombre}» a la papelera?` : ''}
+            consecuencias={[
+              'Deja de aparecer en el panel y no se puede reservar.',
+              'Sus reservas abiertas NO se cancelan, pero no se podrá registrar su llegada ni su salida.',
+              'Al pasar la última noche de sus reservas, la habitación se elimina sola.',
+            ]}
+            deshacer="Se restaura desde la papelera, con todo y sus reservas."
             accion="Mandar a la papelera"
-            cancelar="Cancelar"
             onConfirmar={mandarAPapelera}
             onCancelar={() => setABorrar(null)}
           />
@@ -464,12 +469,15 @@ function Papelera({ puedeVaciar, nombrePropiedad, onBack }) {
         )}
       </div>
 
-      <ConfirmarDescarte
+      <ConfirmarRiesgo
         abierto={!!aBorrar}
-        titulo="¿Eliminar definitivamente?"
-        texto={aBorrar ? `«${aBorrar.nombre}» se elimina para siempre y no se puede deshacer. Su historial (reservas, auditoría) se conserva y la mostrará como eliminada definitivamente.` : ''}
+        riesgo="alto"
+        titulo={aBorrar ? `¿Eliminar «${aBorrar.nombre}» definitivamente?` : ''}
+        consecuencias={[
+          'Se borran sus datos y sus fotos.',
+          'Su historial de reservas y la auditoría se conservan y la mostrarán como eliminada.',
+        ]}
         accion="Eliminar definitivamente"
-        cancelar="Cancelar"
         onConfirmar={() => { const h = aBorrar; setABorrar(null); hacer(h.id, habitacionesApi.borrarDefinitivo, `«${h.nombre}» se eliminó definitivamente`) }}
         onCancelar={() => setABorrar(null)}
       />
