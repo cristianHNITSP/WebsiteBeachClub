@@ -134,6 +134,11 @@ export function useReservas({ desde, hasta }) {
     capacidad: h.capacidad,
     cama: h.cama,
     rate: h.tarifa_centavos / 100,
+    // Quiénes cubre la tarifa y el extra por noche de quien va de más (habitaciones.js: incluye)
+    adultos_incluidos: h.adultos_incluidos,
+    menores_incluidos: h.menores_incluidos,
+    extra_adulto_centavos: h.extra_adulto_centavos,
+    extra_menor_centavos: h.extra_menor_centavos,
   })) ?? []
   useEffect(() => { if (habs.datos) ultimasHabitaciones = habitaciones })
 

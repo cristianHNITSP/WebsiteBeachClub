@@ -2,13 +2,15 @@
 // Vectorial y con tokens: se ve igual de nítido en claro, oscuro y sobre el
 // hero (el PNG original trae fondo blanco y "CABAÑAS" en negro).
 
+import { centroDe } from './flor'
+
 function Flor({ x, y, r, color }) {
   return (
     <g transform={`translate(${x} ${y})`}>
       {[0, 60, 120, 180, 240, 300].map(a => (
         <ellipse key={a} rx={r * 0.42} ry={r * 0.62} cy={-r * 0.5} fill={color} transform={`rotate(${a})`} />
       ))}
-      <circle r={r * 0.3} fill="var(--flor-dorado)" />
+      <circle r={r * 0.3} fill={centroDe(color)} />
     </g>
   )
 }

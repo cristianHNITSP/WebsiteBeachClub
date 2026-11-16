@@ -48,4 +48,16 @@ export const CAMAS = { king: 'King', queen: 'Queen', matrimonial: 'matrimonial',
 export const fichaHabitacion = h => [h.tipo, h.cama && `cama ${CAMAS[h.cama] ?? h.cama}`, `hasta ${h.capacidad} persona${h.capacidad !== 1 ? 's' : ''}`]
   .filter(Boolean).join(', ')
 
+/** Qué cubre la tarifa y cuánto paga por noche quien va de más (regla del 2026-11-15: un lugar
+ *  de adulto libre lo ocupan hasta 2 menores sin costo). */
+export const incluye = h => {
+  const menores = h.menores_incluidos ? ` y ${h.menores_incluidos} menor${h.menores_incluidos > 1 ? 'es' : ''}` : ''
+  const extras = [
+    h.extra_adulto_centavos > 0 && `adulto de más ${pesos(h.extra_adulto_centavos)}`,
+    h.extra_menor_centavos > 0 && `menor de más ${pesos(h.extra_menor_centavos)}`,
+  ].filter(Boolean)
+  return `La tarifa incluye ${h.adultos_incluidos ?? h.capacidad} adulto${(h.adultos_incluidos ?? h.capacidad) > 1 ? 's' : ''}${menores}, hasta ${h.capacidad} personas.`
+    + (extras.length ? ` Por noche: ${extras.join(', ')}.` : '')
+}
+
 export const pesos = centavos => `MXN $${(centavos / 100).toLocaleString('es-MX', { maximumFractionDigits: 2 })}`

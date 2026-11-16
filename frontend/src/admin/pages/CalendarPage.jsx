@@ -13,12 +13,7 @@ export default function CalendarPage({ onNavigate }) {
           <h1 className="admin-page-title">Calendario de <em>reservaciones</em></h1>
         </div>
       </div>
-      {/* Una reserva nueva desde el calendario sigue en el formulario completo (pago y abono),
-          con la habitación, las fechas y el huésped ya puestos en la URL. */}
-      <LineaTiempo
-        onNuevaReserva={datos => onNavigate('nueva-reserva', null, new URLSearchParams(datos).toString())}
-        onNuevaHabitacion={() => onNavigate('nueva-habitacion')}
-      />
+      <LineaTiempo onNuevaHabitacion={() => onNavigate('nueva-habitacion')} />
     </div>
   )
 }

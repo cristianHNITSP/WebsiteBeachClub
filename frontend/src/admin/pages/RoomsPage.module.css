@@ -284,3 +284,11 @@
 .porPagina { display: inline-flex; align-items: center; gap: 8px; }
 .amenidades { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
 .paginaActual { margin-inline-start: 12px; font-weight: 600; color: var(--foreground); }
+
+/* Encabezado de cada sucursal en la lista (con "Todas las propiedades"): ocupa toda la fila. */
+.sucursal {
+  grid-column: 1 / -1; display: flex; align-items: center; gap: 8px; margin: 10px 0 0;
+  font-size: var(--fs-lg, 1.125rem); font-weight: 600; color: var(--foreground);
+}
+.sucursal:first-child { margin-top: 0; }
+.sucursalLugar { font-size: var(--fs-sm); font-weight: 400; color: var(--muted-foreground); }

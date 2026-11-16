@@ -30,12 +30,60 @@ def precios_por_noche(base: int, temporadas: list[Tarifa], llegada: date, salida
     return precios
 
 
-async def total_de(sesion: AsyncSession, h: Habitacion, llegada: date, salida: date) -> int:
-    return sum(
-        precios_por_noche(
-            h.tarifa_centavos, await repo.que_tocan(sesion, h.id, llegada, salida), llegada, salida
-        )
+def extra_por_noche(
+    adultos: int,
+    menores: int,
+    *,
+    adultos_incluidos: int,
+    menores_incluidos: int,
+    extra_adulto: int,
+    extra_menor: int,
+) -> int:
+    """Lo que suman las personas de más, por noche (decisión del hotel, 2026-11-15). La tarifa
+    incluye `adultos_incluidos` y `menores_incluidos`; cada adulto de más paga su extra; cada
+    lugar de adulto que no se usa lo ocupan hasta 2 menores sin costo (un adulto consume más);
+    los menores que ya no caben pagan el suyo."""
+    adultos_extra = max(0, adultos - adultos_incluidos)
+    libres = max(0, adultos_incluidos - adultos)
+    menores_extra = max(0, menores - menores_incluidos - 2 * libres)
+    return adultos_extra * extra_adulto + menores_extra * extra_menor
+
+
+def personas_de_mas(h: Habitacion, adultos: int, menores: int) -> tuple[int, int, int]:
+    """(extra por noche, adultos de más, menores de más) para esa habitación."""
+    reglas = {"adultos_incluidos": h.adultos_incluidos, "menores_incluidos": h.menores_incluidos}
+    adultos_extra = extra_por_noche(adultos, menores, **reglas, extra_adulto=1, extra_menor=0)
+    menores_extra = extra_por_noche(adultos, menores, **reglas, extra_adulto=0, extra_menor=1)
+    extra = adultos_extra * h.extra_adulto_centavos + menores_extra * h.extra_menor_centavos
+    return extra, adultos_extra, menores_extra
+
+
+async def precios_de(
+    sesion: AsyncSession,
+    h: Habitacion,
+    llegada: date,
+    salida: date,
+    adultos: int | None = None,
+    menores: int = 0,
+) -> list[int]:
+    """El precio de cada noche: temporada o tarifa base, más lo que suman las personas de más.
+    Sin `adultos`, solo la habitación (la API pública aún no distingue adultos de menores)."""
+    precios = precios_por_noche(
+        h.tarifa_centavos, await repo.que_tocan(sesion, h.id, llegada, salida), llegada, salida
     )
+    extra = personas_de_mas(h, adultos, menores)[0] if adultos is not None else 0
+    return [p + extra for p in precios]
+
+
+async def total_de(
+    sesion: AsyncSession,
+    h: Habitacion,
+    llegada: date,
+    salida: date,
+    adultos: int | None = None,
+    menores: int = 0,
+) -> int:
+    return sum(await precios_de(sesion, h, llegada, salida, adultos, menores))
 
 
 def a_salida(t: Tarifa) -> dict:

@@ -69,8 +69,15 @@ async def test_cada_columna_aplica_su_regla(cliente, sesion):
     assert [r["id"] for r in llegan["items"]] == [hoy_llega["id"]]
     assert (await pagina(cliente, "en_casa", limite=10))["meta"]["total"] == 0
 
+    cobro = await cliente.post(
+        f"{RESERVAS}/{hoy_llega['id']}/pagos",
+        json={"concepto": "abono", "metodo": "efectivo", "monto_centavos": hoy_llega["total_centavos"]},
+        headers=csrf(cliente),
+    )  # al llegar se cobra al menos la primera noche
     r = await cliente.post(
-        f"{RESERVAS}/{hoy_llega['id']}/llegada", json={"version": hoy_llega["version"]}, headers=csrf(cliente)
+        f"{RESERVAS}/{hoy_llega['id']}/llegada",
+        json={"version": cobro.json()["version"]},
+        headers=csrf(cliente),
     )
     assert r.status_code == 200, r.text
     assert (await pagina(cliente, "llegan", limite=10))["meta"]["total"] == 0

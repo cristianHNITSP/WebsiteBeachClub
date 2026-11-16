@@ -86,8 +86,14 @@
 :global(.reduce-motion) :is(.sol, .brote, .ola1, .ola2, .gotaBola, .gotaToque) { animation: none; }
 
 @media (max-width: 900px) {
-  .hoja { grid-template-columns: minmax(0, 1fr); min-height: calc(100svh - 20px); }
-  .escenaCaja { display: none; }
+  .hoja { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto 1fr; min-height: calc(100svh - 20px); }
+  /* En el teléfono, la escena se queda como una franja baja arriba del formulario (pedido del
+     hotel, 2026-11-15): la corona a la mitad, el sol más chico y sin el lema ni la gota del tema
+     (el tema va en el botón de arriba). Decora sin empujar el formulario. */
+  .escenaCaja { order: -1; height: 9.5rem; }
+  .brote { scale: 0.5; }
+  .sol { width: 22%; top: 34%; }
+  .lema, .gota { display: none; }
   .temaMovil { display: block; }
   .lado { padding: 12px 10px 24px; }
 }

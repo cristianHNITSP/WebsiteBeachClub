@@ -52,6 +52,12 @@ async def test_sin_llegada_ni_salida_hasta_restaurar_la_habitacion(cliente, sesi
     assert x.status_code == 422 and x.json()["codigo"] == "habitacion_eliminada"
 
     assert (await cliente.post(f"{HAB}/{hab.id}/restaurar", headers=csrf(cliente))).status_code == 200
+    cobro = await cliente.post(
+        f"{URL}/{r['id']}/pagos",
+        json={"concepto": "abono", "metodo": "efectivo", "monto_centavos": r["total_centavos"]},
+        headers=csrf(cliente),
+    )  # al llegar se cobra al menos la primera noche
+    accion = {"version": cobro.json()["version"]}
     x = await cliente.post(f"{URL}/{r['id']}/llegada", json=accion, headers=csrf(cliente))
     assert x.status_code == 200 and x.json()["estado"] == "en_curso"
 

@@ -58,6 +58,9 @@ export default function HoyPage() {
   const [ocupada, setOcupada] = useState(null)
 
   const abrir = (r, a = '') => set({ reserva: r.id, accion: a }, { historial: true })
+  // ¿Le falta pagar la primera noche? (aprox.: el total entre las noches; el detalle usa la noche exacta)
+  const faltaPrimera = r => (r.fuente ?? 'motor') === 'motor' && r.tipo === 'reserva'
+    && r.pagado_centavos < Math.ceil(r.total_centavos / Math.max(r.noches, 1))
   const rapido = async (r, pedir, exito) => {
     setOcupada(r.id)
     try { await pedir(); toast.success(exito, { description: `${r.huesped_nombre}, ${r.habitacion_nombre}` }); recargar() } catch (e) { toast.error(e.message) } finally { setOcupada(null) }
@@ -96,13 +99,19 @@ export default function HoyPage() {
             <Columna color="var(--flor-turquesa)" titulo="Llegan hoy" vacio="No hay más llegadas hoy." columna={cLlegan} onIr={c => set({ llegan: c })}>
               {r => (
                 <Fila key={r.id} r={r} lugar={lugarDe(r.propiedad_id)} onAbrir={() => abrir(r)} vencido={r.llegada < hoy} detalle={r.llegada < hoy ? `Debía llegar el ${corta(r.llegada)}` : `${r.noches} noche${r.noches !== 1 ? 's' : ''}, sale el ${corta(r.salida)}`}>
-                  {editar && (
+                  {/* Al llegar se cobra al menos la primera noche (regla del hotel, 2026-11-15): si falta,
+                      el botón abre el cobro; el detalle calcula la noche exacta y la API lo exige. */}
+                  {editar && (faltaPrimera(r) ? (cobrar && (
+                    <Button variant="outline" size="sm" disabled={habitacionEliminada(r)} onClick={() => abrir(r, 'llegada')}>
+                      <SignInIcon size={16} weight="bold" aria-hidden="true" /> Cobrar y hacer check-in
+                    </Button>
+                  )) : (
                     <Button variant="outline" size="sm" disabled={ocupada === r.id || habitacionEliminada(r)}
                       onClick={() => rapido(r, () => reservasApi.llegada(r.id, r.version), 'Check-in registrado')}>
                       <SignInIcon size={16} weight="bold" aria-hidden="true" /> Check-in
                     </Button>
-                  )}
-                  {cobrar && r.por_cobrar_centavos > 0 && (
+                  ))}
+                  {cobrar && r.por_cobrar_centavos > 0 && !faltaPrimera(r) && (
                     <Button variant="ghost" size="sm" onClick={() => abrir(r, 'pago')}>
                       <CurrencyDollarIcon size={16} weight="bold" aria-hidden="true" /> Cobrar {dinero(r.por_cobrar_centavos)}
                     </Button>

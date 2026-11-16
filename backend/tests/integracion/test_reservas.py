@@ -221,6 +221,18 @@ async def test_estancia_completa_llegada_cobro_y_salida(cliente, sesion):
     assert temprano.status_code == 422 and temprano.json()["codigo"] == "fuera_de_fecha"
 
     r = await reservar(cliente, hab, llegada=0, noches=2)  # llega hoy
+    pago = lambda monto: cliente.post(  # noqa: E731
+        f"{URL}/{r['id']}/pagos",
+        json={"concepto": "saldo", "metodo": "efectivo", "monto_centavos": monto},
+        headers=csrf(cliente),
+    )
+    # Al llegar se cobra al menos la primera noche (decisión del hotel, 2026-11-15).
+    sin_cobro = await cliente.post(
+        f"{URL}/{r['id']}/llegada", json={"version": r["version"]}, headers=csrf(cliente)
+    )
+    assert sin_cobro.status_code == 422 and sin_cobro.json()["codigo"] == "cobro_al_llegar"
+    assert sin_cobro.json()["minimo_centavos"] == 100_000
+    r = (await pago(100_000)).json()
     r = (
         await cliente.post(f"{URL}/{r['id']}/llegada", json={"version": r["version"]}, headers=csrf(cliente))
     ).json()
@@ -235,13 +247,8 @@ async def test_estancia_completa_llegada_cobro_y_salida(cliente, sesion):
         f"{URL}/{r['id']}/salida", json={"version": r["version"]}, headers=csrf(cliente)
     )
     assert sin_pagar.status_code == 422 and sin_pagar.json()["codigo"] == "saldo_pendiente"
-    pago = lambda monto: cliente.post(  # noqa: E731
-        f"{URL}/{r['id']}/pagos",
-        json={"concepto": "saldo", "metodo": "efectivo", "monto_centavos": monto},
-        headers=csrf(cliente),
-    )
-    assert (await pago(200_001)).json()["codigo"] == "excede"
-    r = (await pago(200_000)).json()
+    assert (await pago(100_001)).json()["codigo"] == "excede"
+    r = (await pago(100_000)).json()
     assert r["pagado_centavos"] == 200_000 and r["por_cobrar_centavos"] == 0
     r = (
         await cliente.post(f"{URL}/{r['id']}/salida", json={"version": r["version"]}, headers=csrf(cliente))
@@ -257,6 +264,7 @@ async def test_estancia_completa_llegada_cobro_y_salida(cliente, sesion):
     ]
     assert eventos == [
         ("crear", None, "confirmada"),
+        ("pago", None, "confirmada"),
         ("llegada", "confirmada", "en_curso"),
         ("pago", None, "en_curso"),
         ("salida", "en_curso", "completada"),
@@ -297,3 +305,24 @@ async def test_una_reserva_de_habitacion_eliminada_dice_donde_esta(cliente, sesi
     )
     vista = (await cliente.get(f"{URL}/{r['id']}")).json()
     assert (vista["habitacion_nombre"], vista["habitacion_situacion"]) == (hab.nombre, "eliminado_definitivo")
+
+
+# ── Personas (2026-11-15): la tarifa incluye unos adultos y menores; lo de más paga su extra ──
+
+
+async def test_personas_de_mas_suman_su_extra_por_noche(cliente, sesion):
+    await entrar_como(cliente, sesion)
+    hab = await crear_habitacion(
+        sesion, tarifa_centavos=100_000, capacidad=6, adultos_incluidos=2, menores_incluidos=1,
+        extra_adulto_centavos=30_000, extra_menor_centavos=15_000,
+    )  # fmt: skip
+    q = {"habitacion_id": str(hab.id), "llegada": D(3), "salida": D(5), "adultos": 3, "ninos": 0}
+    c = (await cliente.get(f"{URL}/cotizar", params=q)).json()
+    assert c["precios_noche_centavos"] == [130_000, 130_000] and c["total_centavos"] == 260_000
+    assert (c["extra_noche_centavos"], c["adultos_extra"], c["menores_extra"]) == (30_000, 1, 0)
+    # 1 adulto + 3 menores: el lugar de adulto libre lo ocupan 2 menores; sin extra.
+    sin_extra = await reservar(cliente, hab, llegada=3, noches=2, adultos=1, ninos=3)
+    assert sin_extra["total_centavos"] == 200_000
+    # 2 adultos + 2 menores: un menor ya no cabe en lo incluido.
+    con_menor = await reservar(cliente, hab, llegada=10, noches=2, adultos=2, ninos=2)
+    assert con_menor["total_centavos"] == 230_000

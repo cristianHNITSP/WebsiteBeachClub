@@ -91,11 +91,14 @@ async def cotizar(
     llegada: date,
     salida: date,
     excluir: UUID | None = None,
+    adultos: Annotated[int, Query(ge=1, le=20)] = 1,
+    ninos: Annotated[int, Query(ge=0, le=20)] = 0,
 ):
-    """Total, anticipo y saldo calculados por el servidor (el panel nunca los calcula)."""
+    """Total, anticipo y saldo calculados por el servidor (el panel nunca los calcula), con lo que
+    suman los adultos y menores de más."""
     if not 0 < (salida - llegada).days <= MAX_NOCHES:
         raise ReglaDeNegocio(f"De 1 a {MAX_NOCHES} noches", codigo="noches")
-    return await servicio.cotizar(sesion, alcance, habitacion_id, llegada, salida, excluir)
+    return await servicio.cotizar(sesion, alcance, habitacion_id, llegada, salida, excluir, adultos, ninos)
 
 
 @router.get("/{reserva_id}", response_model=ReservaDetalle)

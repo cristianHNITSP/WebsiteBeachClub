@@ -53,6 +53,10 @@ const aFormulario = h => ({
   tarifa: h ? String(h.tarifa_centavos / 100) : '',
   estado: h?.estado ?? 'activa',
   venta_en_linea: h?.venta_en_linea ?? false,
+  adultos_incluidos: String(h?.adultos_incluidos ?? h?.capacidad ?? 2),
+  menores_incluidos: String(h?.menores_incluidos ?? 0),
+  extra_adulto: h ? String((h.extra_adulto_centavos ?? 0) / 100) : '0',
+  extra_menor: h ? String((h.extra_menor_centavos ?? 0) / 100) : '0',
   descripcion: h?.descripcion ?? '',
   amenidades: h?.amenidades ?? [],
 })
@@ -120,6 +124,10 @@ function Formulario({ room, onBack, onDirtyChange, onRecargar }) {
       tarifa_centavos: Math.round(Number(form.tarifa) * 100),
       estado: form.estado,
       venta_en_linea: form.venta_en_linea,
+      adultos_incluidos: Math.min(Number(form.adultos_incluidos), Number(form.capacidad)),
+      menores_incluidos: Number(form.menores_incluidos),
+      extra_adulto_centavos: Math.round(Number(form.extra_adulto || 0) * 100),
+      extra_menor_centavos: Math.round(Number(form.extra_menor || 0) * 100),
     }
     try {
       if (nueva) await habitacionesApi.crear({ ...cuerpo, propiedad_id: form.propiedad_id })
@@ -235,6 +243,32 @@ function Formulario({ room, onBack, onDirtyChange, onRecargar }) {
                 <Input type="number" required min="1" max="100000" step="0.01" placeholder="3500"
                   value={form.tarifa} onChange={set('tarifa')} />
               </Field>
+              {/* Quiénes cubre la tarifa y cuánto paga por noche quien va de más. Un lugar de adulto
+                  libre lo ocupan hasta 2 menores sin costo (regla del hotel, 2026-11-15). */}
+              <div className={s.twoCol}>
+                <Field label="Adultos incluidos">
+                  <Input type="number" required min="1" max={form.capacidad || 20} step="1"
+                    value={form.adultos_incluidos} onChange={set('adultos_incluidos')} />
+                </Field>
+                <Field label="Menores incluidos">
+                  <Input type="number" required min="0" max="20" step="1"
+                    value={form.menores_incluidos} onChange={set('menores_incluidos')} />
+                </Field>
+              </div>
+              <div className={s.twoCol}>
+                <Field label="Adulto de más, por noche (MXN)">
+                  <Input type="number" min="0" max="100000" step="0.01" placeholder="0"
+                    value={form.extra_adulto} onChange={set('extra_adulto')} />
+                </Field>
+                <Field label="Menor de más, por noche (MXN)">
+                  <Input type="number" min="0" max="100000" step="0.01" placeholder="0"
+                    value={form.extra_menor} onChange={set('extra_menor')} />
+                </Field>
+              </div>
+              <p className={s.ayuda}>
+                Cada lugar de adulto que no se usa lo pueden ocupar hasta 2 menores sin costo. Con los extras en
+                cero, nadie paga de más.
+              </p>
               <Field label="Estado">
                 <Select value={form.estado} onChange={set('estado')}>
                   <option value="activa">Disponible</option>

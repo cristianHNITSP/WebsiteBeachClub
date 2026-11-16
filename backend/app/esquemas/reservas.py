@@ -106,6 +106,9 @@ class Cotizacion(Salida):
     disponible: bool
     choque: str | None  # «la reserva de Ana Pech (12 abr → 15 abr)»
     precios_noche_centavos: list[int]  # la parte de cada noche (suman el total): para cobrar "N noches"
+    extra_noche_centavos: int = 0  # lo que suman las personas de más, por noche (ya va en cada noche)
+    adultos_extra: int = 0
+    menores_extra: int = 0
 
 
 class ReservaSalida(Salida):

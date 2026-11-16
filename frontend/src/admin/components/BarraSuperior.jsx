@@ -105,7 +105,7 @@ export default function BarraSuperior({ page, onNavigate, onMenu }) {
   return (
     <header className="sticky top-0 z-30 flex h-13 shrink-0 items-center gap-2 rounded-t-2xl border-b bg-background px-3 sm:px-4">
       {onMenu && <Button aria-label="Abrir menú" className="lg:hidden" onClick={onMenu} size="icon-sm" variant="ghost"><MenuIcon /></Button>}
-      <OverflowBreadcrumb className="flex-1" segments={migas} onNavigate={m => onNavigate(m.id === 'panel' ? 'dashboard' : m.id)} />
+      <OverflowBreadcrumb className="flex-1" segments={migas} onNavigate={m => onNavigate(m.id === 'panel' ? 'calendar' : m.id)} />
 
       <div className="flex shrink-0 items-center gap-1.5">
         <Globo abierto={globo} onCambiar={v => (v ? abrir() : setGlobo(false))} acciones={acciones} />

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { Fragment, useState, useEffect, useRef } from 'react'
 import { LiquidSegments } from '@/components/devl/liquid-segments'
 import { toast } from '@/admin/toast'
 import {
@@ -354,8 +354,18 @@ export default function RoomsPage({ onNavigate, onEditRoom, onGestionarFotos }) 
                   const lugar = lugarDe(room.propiedad_id)
                   const color = florDeLugar(lugar)
                   const h = dia[room.id]
+                  // Con todas las propiedades, un encabezado al empezar cada sucursal (vienen ordenadas
+                  // por propiedad desde la API, también entre páginas).
+                  const sucursal = !propiedadId && room.propiedad_id !== items[i - 1]?.propiedad_id
+                    && sesion?.propiedades?.find(p => p.id === room.propiedad_id)
                   return (
-                    <button key={room.id} type="button" data-habitacion={room.id} onClick={e => handleSelectRoom(room, e)} aria-label={`Abrir ${room.nombre}`}
+                    <Fragment key={room.id}>
+                    {sucursal && (
+                      <h3 className={s.sucursal}>
+                        <Florecita color={color} tamano={16} />{sucursal.nombre}<span className={s.sucursalLugar}>{sucursal.lugar}</span>
+                      </h3>
+                    )}
+                    <button type="button" data-habitacion={room.id} onClick={e => handleSelectRoom(room, e)} aria-label={`Abrir ${room.nombre}`}
                       className={`${s.cuarto} ${i === 0 ? s.cuartoDestacado : ''}`}>
                       <span className={s.portada}>
                         {room.foto ? <Imagen src={room.foto} alt="" /> : <PortadaHabitacion tipo={room.tipo} color={color} grande={i === 0} />}
@@ -380,6 +390,7 @@ export default function RoomsPage({ onNavigate, onEditRoom, onGestionarFotos }) 
                         )}
                       </span>
                     </button>
+                    </Fragment>
                   )
                 })}
               </div>

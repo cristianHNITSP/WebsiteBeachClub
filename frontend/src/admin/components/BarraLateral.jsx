@@ -27,9 +27,10 @@ import { TODAS, elegirPropiedad, florDeLugar, usePropiedadActual } from '../prop
 
 const GRUPOS = [
   { titulo: 'Recepción', items: [
-    { key: 'dashboard', label: 'Tablero', Icono: LayoutGridIcon },
-    { key: 'hoy', label: 'Llegadas y salidas', Icono: DoorOpenIcon },
+    // Orden pedido por la recepción (2026-11-15): lo primero es Reservaciones, luego Llegadas y salidas.
     { key: 'calendar', label: 'Reservaciones', Icono: CalendarDaysIcon },
+    { key: 'hoy', label: 'Llegadas y salidas', Icono: DoorOpenIcon },
+    { key: 'dashboard', label: 'Tablero', Icono: LayoutGridIcon },
     { key: 'notifications', label: 'Avisos', Icono: BellIcon, cuenta: 'avisos' },
   ] },
   { titulo: 'Operación', items: [
@@ -99,7 +100,7 @@ export default function BarraLateral({ page, onNavigate, plegada = false, onPleg
 
         {/* ── Logotipo: el Wordmark de la marca, con su ADMIN ── */}
         <div className={cn('flex h-16 shrink-0 items-end gap-2 px-3 pb-2', plegada && 'justify-center px-0')}>
-          <button type="button" aria-label="Reservas Frida, tablero" onClick={() => onNavigate('dashboard')} className="cursor-pointer rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-ring">
+          <button type="button" aria-label="Reservas Frida, reservaciones" onClick={() => onNavigate('calendar')} className="cursor-pointer rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-ring">
             {plegada ? <CoronaFlores className="w-10" /> : <Wordmark tamano={1.15} />}
           </button>
           {!plegada && <span className="mb-0.5 rounded-full bg-accent px-2 py-0.5 font-semibold text-[0.65rem] text-accent-foreground tracking-wider">ADMIN</span>}

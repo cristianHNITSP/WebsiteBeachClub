@@ -29,7 +29,8 @@ import s from './DetalleReserva.module.css'
  * desglose por noche (cuál ya está pagada), los datos, los pagos y el historial.
  * Todo lo decide y lo calcula la API; aquí solo se muestra y se pide.
  *
- * `accion` ('pago' | 'salida'): abre ya el cobro; con 'salida', al cobrar lo
+ * `accion` ('pago' | 'llegada' | 'salida'): abre ya el cobro; con 'llegada' cobra al menos la primera
+ * noche y registra el check-in (regla del hotel, 2026-11-15); con 'salida', al cobrar lo
  * pendiente registra también el check-out (la salida exige no deber nada).
  */
 
@@ -105,7 +106,10 @@ function Contenido({ reservaId, accion, onCambio }) {
   const detalle = usePedido(senal => reservasApi.detalle(reservaId, senal), [reservaId])
   const historial = usePedido(senal => reservasApi.historial(reservaId, senal), [reservaId])
   // null | { tipo: 'pago' | 'devolucion', monto?, salida? }
-  const [formulario, setFormulario] = useState(accion === 'pago' || accion === 'salida' ? { tipo: 'pago', salida: accion === 'salida' } : null)
+  const [formulario, setFormulario] = useState(
+    accion === 'pago' || accion === 'salida' || accion === 'llegada'
+      ? { tipo: 'pago', salida: accion === 'salida', llegada: accion === 'llegada' } : null,
+  )
   const [aCancelar, setACancelar] = useState(false)
   const [ocupado, setOcupado] = useState(false)
   const [sello, setSello] = useState(null) // se estampa "Pagado" al liquidar
@@ -142,22 +146,29 @@ function Contenido({ reservaId, accion, onCambio }) {
       setOcupado(false)
     }
   }
-  // Cobrar y, si se pidió, hacer el check-out con la versión NUEVA (cobrar la cambia).
-  const cobrar = (datos, salida) => hacer(async () => {
+  // Al llegar se cobra al menos la primera noche (regla del hotel, 2026-11-15). Lo pagado cubre las
+  // noches en orden: lo que falta de la primera es lo mínimo para el check-in.
+  const faltaPrimera = reserva && !deFuera && r.desglose?.[0] ? r.desglose[0].monto_centavos - r.desglose[0].pagado_centavos : 0
+  // Cobrar y, si se pidió, hacer el check-in o el check-out con la versión NUEVA (cobrar la cambia).
+  const cobrar = (datos, despues) => hacer(async () => {
     await reservasApi.pagar(r.id, datos)
     if (datos.monto_centavos >= r.por_cobrar_centavos) setSello(Date.now())
-    if (salida) {
+    if (despues) {
       const fresca = await reservasApi.detalle(r.id)
-      await reservasApi.salida(r.id, fresca.version)
+      await reservasApi[despues](r.id, fresca.version)
     }
-  }, salida ? 'Pago y check-out registrados' : 'Pago registrado')
+  }, despues === 'llegada' ? 'Pago y check-in registrados' : despues === 'salida' ? 'Pago y check-out registrados' : 'Pago registrado')
 
   const devuelve = reserva && !deFuera && r.pagado_centavos > 0 && puede('pagos.registrar')
   const acciones = [
-    reserva && r.estado === 'confirmada' && r.llegada <= hoy && hoy < r.salida && puede('reservas.editar') && {
+    reserva && r.estado === 'confirmada' && r.llegada <= hoy && hoy < r.salida && puede('reservas.editar') && (faltaPrimera > 0 ? {
+      Icono: SignInIcon, texto: 'Cobrar y hacer check-in', principal: true, bloqueo: sinHabitacion || !puede('pagos.registrar'),
+      ayuda: sinHabitacion ? 'Habitación eliminada' : `Primera noche: falta ${pesos(faltaPrimera)}`,
+      fn: () => setFormulario({ tipo: 'pago', llegada: true }),
+    } : {
       Icono: SignInIcon, texto: 'Check-in', ayuda: sinHabitacion ? 'Habitación eliminada' : 'Registrar la llegada', principal: true, bloqueo: sinHabitacion,
       fn: () => hacer(() => reservasApi.llegada(r.id, r.version), 'Check-in registrado'),
-    },
+    }),
     r.estado === 'en_curso' && puede('reservas.editar') && r.por_cobrar_centavos === 0 && {
       Icono: SignOutIcon, texto: 'Check-out', ayuda: sinHabitacion ? 'Habitación eliminada' : 'Registrar la salida', principal: true, bloqueo: sinHabitacion,
       fn: () => hacer(() => reservasApi.salida(r.id, r.version), 'Check-out registrado'),
@@ -251,18 +262,20 @@ function Contenido({ reservaId, accion, onCambio }) {
               ))}
             </div>
           ) : !deFuera && <p className={s.nadaQueHacer}>No queda nada por hacer con esta reserva.</p>}
-          {formulario && (
+          {formulario && !(formulario.llegada && faltaPrimera <= 0) && (
             <FormularioDinero
-              key={`${formulario.tipo}-${formulario.monto ?? 'todo'}-${formulario.salida ? 's' : ''}`}
+              key={`${formulario.tipo}-${formulario.monto ?? 'todo'}-${formulario.salida ? 's' : ''}${formulario.llegada ? 'l' : ''}`}
               reserva={r}
               tipo={formulario.tipo}
               salida={formulario.salida}
-              monto={formulario.monto}
+              llegada={formulario.llegada}
+              minimo={formulario.llegada ? faltaPrimera : 0}
+              monto={formulario.llegada ? faltaPrimera : formulario.monto}
               maximo={formulario.tipo === 'pago' ? r.por_cobrar_centavos : r.pagado_centavos}
               ocupado={ocupado}
               onCancelar={() => setFormulario(null)}
               onEnviar={datos => formulario.tipo === 'pago'
-                ? cobrar(datos, formulario.salida)
+                ? cobrar(datos, formulario.llegada ? 'llegada' : formulario.salida ? 'salida' : null)
                 : hacer(() => reservasApi.devolver(r.id, datos), 'Devolución registrada')}
             />
           )}
@@ -381,14 +394,15 @@ function coberturaDePagos(r) {
   return resultado
 }
 
-function FormularioDinero({ reserva, tipo, salida, monto, maximo, ocupado, onCancelar, onEnviar }) {
+function FormularioDinero({ reserva, tipo, salida, llegada, minimo = 0, monto, maximo, ocupado, onCancelar, onEnviar }) {
   const pago = tipo === 'pago'
   const inicial = Math.min(monto ?? maximo, maximo)
   const [f, setF] = useState({ metodo: 'efectivo', monto: (inicial / 100).toFixed(2), referencia: '', motivo: '' })
   const set = k => e => setF(x => ({ ...x, [k]: e.target.value }))
   const centavos = aCentavos(f.monto)
-  // Check-out: hay que cubrir TODO lo pendiente (la API no deja salir debiendo).
-  const corto = salida && centavos < maximo
+  // Check-out: hay que cubrir TODO lo pendiente (la API no deja salir debiendo). Check-in: al
+  // menos la primera noche (la API tampoco deja llegar sin ella).
+  const corto = (salida && centavos < maximo) || (llegada && centavos < minimo)
   const enviar = e => {
     e.preventDefault()
     const base = { metodo: f.metodo, monto_centavos: centavos, referencia: f.referencia || null }
@@ -396,7 +410,8 @@ function FormularioDinero({ reserva, tipo, salida, monto, maximo, ocupado, onCan
   }
   return (
     <form className={s.formulario} onSubmit={enviar}>
-      <h3 className={s.subtitulo}>{!pago ? 'Registrar devolución' : salida ? 'Cobrar lo pendiente y hacer check-out' : 'Registrar pago'}</h3>
+      <h3 className={s.subtitulo}>{!pago ? 'Registrar devolución' : salida ? 'Cobrar lo pendiente y hacer check-out' : llegada ? 'Cobrar y hacer check-in' : 'Registrar pago'}</h3>
+      {llegada && <p className={s.ayuda}>Al llegar se cobra al menos la primera noche ({pesos(minimo)}). Si deja más, elige cuánto.</p>}
       {pago && !salida && (
         <OpcionesCobro
           pendientes={reserva.desglose.filter(n => n.estado !== 'pagada').map(n => n.monto_centavos - n.pagado_centavos)}
@@ -413,7 +428,9 @@ function FormularioDinero({ reserva, tipo, salida, monto, maximo, ocupado, onCan
             {centavos >= maximo ? ': con esto queda todo pagado.' : `: quedarán ${pesos(maximo - centavos)} por cobrar.`}
           </span>
         )}
-        {corto && <span className={s.error}>Para hacer el check-out hay que cobrar todo lo pendiente ({pesos(maximo)}).</span>}
+        {corto && <span className={s.error}>{llegada
+          ? `Para el check-in cobra al menos la primera noche (${pesos(minimo)}).`
+          : `Para hacer el check-out hay que cobrar todo lo pendiente (${pesos(maximo)}).`}</span>}
       </div>
       <div className={s.campo}>
         <span className="text-sm font-medium">Método</span>
@@ -434,7 +451,7 @@ function FormularioDinero({ reserva, tipo, salida, monto, maximo, ocupado, onCan
       <div className={s.botones}>
         <Button type="button" variant="outline" onClick={onCancelar}>Cancelar</Button>
         <Button type="submit" disabled={ocupado || corto || centavos <= 0 || centavos > maximo}>
-          {!pago ? 'Registrar devolución' : salida ? 'Cobrar y hacer check-out' : 'Registrar pago'}
+          {!pago ? 'Registrar devolución' : salida ? 'Cobrar y hacer check-out' : llegada ? 'Cobrar y hacer check-in' : 'Registrar pago'}
         </Button>
       </div>
     </form>

@@ -222,7 +222,7 @@ export default function LoginPage() {
               <h1 className={s.tituloTexto}>Entra al panel</h1>
               <p className={s.subtitulo}>{PRODUCTO.huespedes
                 ? 'Entra con tu usuario o correo. Te llevamos a tu cuenta o al panel, según tu perfil.'
-                : 'Motor de reservas de Reservas Frida. Entra con tu usuario o correo.'}</p>
+                : 'Panel de reservas de Cabañas Frida y Casa Frida. Entra con tu usuario o correo.'}</p>
             </motion.div>
 
             {/* ── Bloqueo por intentos ── */}

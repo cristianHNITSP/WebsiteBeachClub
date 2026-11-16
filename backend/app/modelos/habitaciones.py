@@ -37,6 +37,12 @@ class Habitacion(ConBorradoLogico, Base):
     amenidades: Mapped[list[str]] = mapped_column(ARRAY(String(40)), server_default=text("'{}'"))
     descripcion: Mapped[str] = mapped_column(String(2000), server_default="")
     tarifa_centavos: Mapped[int] = mapped_column(BigInteger)  # tarifa base por noche, IVA incluido
+    # Quiénes cubre la tarifa y cuánto paga por noche quien va de más (migración 0026,
+    # servicios/tarifas.py: extra_por_noche). Un lugar de adulto libre lo ocupan 2 menores.
+    adultos_incluidos: Mapped[int] = mapped_column(SmallInteger, server_default=text("2"))
+    menores_incluidos: Mapped[int] = mapped_column(SmallInteger, server_default=text("0"))
+    extra_adulto_centavos: Mapped[int] = mapped_column(BigInteger, server_default=text("0"))
+    extra_menor_centavos: Mapped[int] = mapped_column(BigInteger, server_default=text("0"))
     estado: Mapped[str] = mapped_column(String(20), server_default="activa")
     # Se vende en plataformas (Booking, web): a estas se asignan las de fuera. Las demás, solo recepción.
     venta_en_linea: Mapped[bool] = mapped_column(server_default=text("false"))
@@ -54,6 +60,10 @@ class Habitacion(ConBorradoLogico, Base):
         CheckConstraint("capacidad BETWEEN 1 AND 20", name="capacidad"),
         CheckConstraint("tamano_m2 IS NULL OR tamano_m2 BETWEEN 5 AND 2000", name="tamano"),
         CheckConstraint("tarifa_centavos > 0", name="tarifa"),
+        CheckConstraint(
+            "adultos_incluidos BETWEEN 1 AND 20 AND menores_incluidos BETWEEN 0 AND 20", name="incluidos"
+        ),
+        CheckConstraint("extra_adulto_centavos >= 0 AND extra_menor_centavos >= 0", name="extras"),
         CheckConstraint(f"estado IN {ESTADOS}", name="estado"),
         CheckConstraint(f"cama IS NULL OR cama IN {CAMAS}", name="cama"),
         # Para la llave compuesta de reservas: una reserva apunta a una habitación

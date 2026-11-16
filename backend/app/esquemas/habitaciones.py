@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import Literal
 from uuid import UUID
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 
 from app.esquemas.base import Entrada, Salida
 from app.esquemas.texto import Texto
@@ -38,6 +38,12 @@ class _Campos(Entrada):
     amenidades: list[Amenidad] = Field(default_factory=list, max_length=12)
     descripcion: Texto = Field(default="", max_length=2000)
     tarifa_centavos: int = Field(gt=0, le=TARIFA_MAXIMA)
+    # Personas que cubre la tarifa y extra por noche de quien va de más. Sin `adultos_incluidos`,
+    # la tarifa cubre la capacidad completa (nadie paga extra).
+    adultos_incluidos: int | None = Field(default=None, ge=1, le=20)
+    menores_incluidos: int = Field(default=0, ge=0, le=20)
+    extra_adulto_centavos: int = Field(default=0, ge=0, le=TARIFA_MAXIMA)
+    extra_menor_centavos: int = Field(default=0, ge=0, le=TARIFA_MAXIMA)
     estado: Estado = "activa"
     venta_en_linea: bool = False  # True: se vende en plataformas y en la web; False: solo recepción
 
@@ -45,6 +51,14 @@ class _Campos(Entrada):
     @classmethod
     def _sin_repetir(cls, v: list[str]) -> list[str]:
         return list(dict.fromkeys(v))
+
+    @model_validator(mode="after")
+    def _incluidos(self):
+        if self.adultos_incluidos is None:
+            self.adultos_incluidos = self.capacidad  # sin dato: la tarifa cubre a todos
+        if self.adultos_incluidos > self.capacidad:
+            raise ValueError("Los adultos incluidos no pueden ser más que la capacidad")
+        return self
 
 
 class HabitacionNueva(_Campos):
@@ -71,6 +85,10 @@ class HabitacionSalida(Salida):
     tarifa_centavos: int
     estado: Estado
     venta_en_linea: bool
+    adultos_incluidos: int
+    menores_incluidos: int
+    extra_adulto_centavos: int
+    extra_menor_centavos: int
     version: int
     # vigente | en_papelera | eliminado_definitivo. El panel lo usa para decir,
     # donde se nombre la habitación, si está en la papelera o se eliminó.

@@ -15,7 +15,7 @@ import { useSesion } from '@/lib/sesion'
 import { aISO, deISO, rangoDeParams } from '@/lib/fechas'
 import { CartDrawer } from '@/components/cart-drawer'
 import { StatusPill } from '@/components/status-pill'
-import { fichaHabitacion, habitacionesApi, pesos } from '../habitaciones'
+import { fichaHabitacion, habitacionesApi, incluye, pesos } from '../habitaciones'
 import { reservasApi, sumarDias } from '../reservas'
 import { usePropiedadActual } from '../propiedadActual'
 import s from './FormLayout.module.css'
@@ -48,7 +48,7 @@ export default function NuevaReservaPage({ onBack, onDirtyChange }) {
   const [form, setForm] = useState(() => {
     const previo = {
       propiedad: params.get('propiedad'), habitacion: params.get('habitacion'), llegada: params.get('llegada'),
-      salida: params.get('salida'), huespedNombre: params.get('huesped'), adultos: params.get('adultos'),
+      salida: params.get('salida'), huespedNombre: params.get('huesped'), adultos: params.get('adultos'), ninos: params.get('ninos'),
     }
     return { ...base, ...Object.fromEntries(Object.entries(previo).filter(([, v]) => v)) }
   })
@@ -82,9 +82,9 @@ export default function NuevaReservaPage({ onBack, onDirtyChange }) {
   const fechasOk = form.llegada && form.salida && form.salida > form.llegada
   const cot = usePedido(
     senal => (form.habitacion && fechasOk
-      ? reservasApi.cotizar({ habitacion_id: form.habitacion, llegada: form.llegada, salida: form.salida }, senal)
+      ? reservasApi.cotizar({ habitacion_id: form.habitacion, llegada: form.llegada, salida: form.salida, adultos: form.adultos, ninos: form.ninos }, senal)
       : null),
-    [form.habitacion, form.llegada, form.salida],
+    [form.habitacion, form.llegada, form.salida, form.adultos, form.ninos],
   )
   const c = form.habitacion && fechasOk ? cot.datos : null
   // Lo que el cliente ya pagó al reservar (decisión del usuario, 2026-10-24: no
@@ -142,13 +142,17 @@ export default function NuevaReservaPage({ onBack, onDirtyChange }) {
           <CheckCircleIcon size={16} weight="bold" aria-hidden="true" />
           {submitting ? 'Guardando…' : 'Confirmar reserva'}
         </DropletButton>
-        {layer}
       </span>
     </>
   )
 
+  const deMas = c && [
+    c.adultos_extra && `${c.adultos_extra} adulto${c.adultos_extra > 1 ? 's' : ''}`,
+    c.menores_extra && `${c.menores_extra} menor${c.menores_extra > 1 ? 'es' : ''}`,
+  ].filter(Boolean).join(' y ')
   const filas = c ? [
     { label: 'Tarifa por noche', value: pesos(c.tarifa_noche_centavos) },
+    ...(c.extra_noche_centavos > 0 ? [{ label: `Incluye ${deMas} de más`, value: `+${pesos(c.extra_noche_centavos)} por noche` }] : []),
     { label: 'Noches', value: String(c.noches) },
     { label: 'Pagó al reservar', value: pesos(Math.min(montoInicial, c.total_centavos)) },
     { label: 'Queda por cobrar', value: pesos(Math.max(c.total_centavos - montoInicial, 0)) },
@@ -215,15 +219,13 @@ export default function NuevaReservaPage({ onBack, onDirtyChange }) {
                     {Array.from({ length: capacidad }, (_, i) => i + 1).map(n => <option key={n} value={n}>{n}</option>)}
                   </Select>
                 </Field>
-                <Field label="Niños">
+                <Field label="Menores">
                   <Select value={form.ninos} onChange={set('ninos')} disabled={capacidad - Number(form.adultos) <= 0}>
                     {Array.from({ length: Math.max(0, capacidad - Number(form.adultos)) + 1 }, (_, i) => i).map(n => <option key={n} value={n}>{n}</option>)}
                   </Select>
                 </Field>
               </div>
-              {habitacion && !excede && (
-                <p className={s.ayuda}>«{habitacion.nombre}» recibe hasta {habitacion.capacidad} personas entre adultos y niños.</p>
-              )}
+              {habitacion && !excede && <p className={s.ayuda}>{incluye(habitacion)}</p>}
               {excede && (
                 <p role="alert" className={s.alerta}>
                   «{habitacion.nombre}» es para {habitacion.capacidad} personas como máximo.
@@ -320,10 +322,21 @@ export default function NuevaReservaPage({ onBack, onDirtyChange }) {
               )}
             </CartDrawer>
 
+            {/* La acción final al terminar de revisar el resumen (ticket de la recepción, 2026-11-15):
+                en el teléfono es donde queda el pulgar, sin tener que abrir el panel de "Tu reserva". */}
+            <span className={`${s.confeti} ${s.confirmarAbajo}`}>
+              <DropletButton type="submit" form="nueva-reserva-form" className="w-full"
+                disabled={submitting || !fechasOk || (c && !c.disponible) || excede}>
+                <CheckCircleIcon size={16} weight="bold" aria-hidden="true" />
+                {submitting ? 'Guardando…' : 'Confirmar reserva'}
+              </DropletButton>
+              {layer}
+            </span>
+
             <div className={s.notas}>
               {[
-                { Icono: CalculatorIcon, text: 'Los montos los calcula el sistema con la tarifa de la habitación.' },
-                { Icono: CreditCardIcon, text: 'Lo que falte por cobrar se cobra después, noche por noche o de una vez, desde el detalle o en Llegadas y salidas.' },
+                { Icono: CalculatorIcon, text: 'Los montos los calcula el sistema con la tarifa de la habitación y las personas de más.' },
+                { Icono: CreditCardIcon, text: 'Al llegar se cobra al menos la primera noche; lo demás, noche por noche o de una vez, desde el detalle o en Llegadas y salidas.' },
                 { Icono: ChartLineIcon, text: 'Para mover o estirar la reserva, usa la Línea de tiempo.' },
               ].map(item => <div key={item.text} className={s.nota}><item.Icono size={15} aria-hidden="true" /><span>{item.text}</span></div>)}
             </div>

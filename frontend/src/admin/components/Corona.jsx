@@ -3,6 +3,7 @@ import { motion } from 'motion/react'
 import { liquidTarget } from '@/components/devl/liquid-cursor'
 import { useTheme } from '@/context/ThemeContext'
 import { ESTADOS_DIA, estadoDelDia } from '../estadoDia'
+import { centroDe } from '@/components/marca/flor'
 import s from './Corona.module.css'
 
 /*
@@ -58,7 +59,7 @@ export default function Corona({ habitaciones, reservas, hoy, nombrePropiedad })
           return (
             <Flor key={hab.id} indice={i} quieta={reduceMotion} pulsada={elegida === hab.id}
               x={CX + R * Math.cos(a)} y={CY - R * Math.sin(a) * 0.8}
-              color={ESTADOS_DIA[d.estado].color} centro={d.estado === 'mantenimiento' ? 'var(--muted-foreground)' : 'var(--flor-dorado)'}
+              color={ESTADOS_DIA[d.estado].color} centro={d.estado === 'mantenimiento' ? 'var(--muted-foreground)' : centroDe(ESTADOS_DIA[d.estado].color)}
               etiqueta={`${hab.nombre}: ${ESTADOS_DIA[d.estado].texto}`}
               onElegir={() => setElegida(hab.id)} />
           )

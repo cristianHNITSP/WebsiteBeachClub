@@ -36,7 +36,7 @@ from app.repositorios import tarifas as repo_tarifas
 from app.servicios import outbox
 from app.servicios.auditoria import auditar
 from app.servicios.auditoria import nueva as nueva_auditoria
-from app.servicios.tarifas import precios_por_noche, total_de
+from app.servicios.tarifas import personas_de_mas, precios_de, precios_por_noche, total_de
 
 MERIDA = ZoneInfo("America/Merida")
 OTRO_LA_CAMBIO = "Alguien más cambió esta reserva mientras la veías. Recarga para ver lo nuevo."
@@ -238,13 +238,14 @@ async def cotizar(
     llegada: date,
     salida: date,
     excluir: UUID | None,
+    adultos: int = 1,
+    menores: int = 0,
 ) -> dict:
     h = await _habitacion(sesion, alcance, habitacion_id)
     ajuste = await repo.ajuste_cobro(sesion, h.propiedad_id)
     noches = (salida - llegada).days
-    precios = precios_por_noche(
-        h.tarifa_centavos, await repo_tarifas.que_tocan(sesion, h.id, llegada, salida), llegada, salida
-    )  # con temporadas
+    precios = await precios_de(sesion, h, llegada, salida, adultos, menores)  # temporadas y personas de más
+    extra, adultos_extra, menores_extra = personas_de_mas(h, adultos, menores)
     total = sum(precios)
     anticipo = anticipo_de(total, ajuste.modalidad, ajuste.porcentaje_anticipo)
     otra = await repo.choque(sesion, habitacion_id, llegada, salida, excluir=excluir)
@@ -260,6 +261,9 @@ async def cotizar(
         "disponible": otra is None,
         "choque": _describir(otra) if otra else None,
         "precios_noche_centavos": precios,
+        "extra_noche_centavos": extra,
+        "adultos_extra": adultos_extra,
+        "menores_extra": menores_extra,
     }
 
 
@@ -296,7 +300,9 @@ async def crear(
     if reserva:
         ajuste = await repo.ajuste_cobro(sesion, h.propiedad_id)
         noches = (datos.salida - datos.llegada).days
-        total = await total_de(sesion, h, datos.llegada, datos.salida)  # cada noche con su temporada
+        total = await total_de(
+            sesion, h, datos.llegada, datos.salida, datos.adultos, datos.ninos
+        )  # temporadas y personas
         anticipo = anticipo_de(total, ajuste.modalidad, ajuste.porcentaje_anticipo)
         campos |= {
             "modalidad": ajuste.modalidad,
@@ -439,6 +445,18 @@ async def _cambiar_estado(
             "de la papelera. Al terminar la última noche, la reserva se cierra sola sin cancelarse.",
             codigo="habitacion_eliminada",
         )
+    if a == "en_curso" and r.tipo == "reserva" and r.fuente == "motor":
+        # Al llegar se cobra al menos la primera noche (decisión del hotel, 2026-11-15). Las de otras
+        # plataformas las cobra la plataforma.
+        noches = await desglose(sesion, r)
+        primera = noches[0]["monto_centavos"] if noches else 0
+        if r.pagado_centavos < primera:
+            falta = primera - r.pagado_centavos
+            raise ReglaDeNegocio(
+                f"Antes del check-in cobra al menos la primera noche: faltan ${falta / 100:,.2f}",
+                codigo="cobro_al_llegar",
+                minimo_centavos=falta,
+            )
     if a == "completada" and r.por_cobrar_centavos > 0:
         raise ReglaDeNegocio(
             f"Falta cobrar ${r.por_cobrar_centavos / 100:,.2f} antes de registrar la salida",
@@ -625,8 +643,10 @@ async def desglose(sesion: AsyncSession, r: Reserva) -> list[dict]:
     if r.tipo != "reserva" or r.noches == 0:
         return []
     temporadas = await repo_tarifas.que_tocan(sesion, r.habitacion_id, r.llegada, r.salida)
+    extra = personas_de_mas(r.habitacion, r.adultos, r.ninos)[0]
     montos = repartir(
-        r.total_centavos, precios_por_noche(r.habitacion.tarifa_centavos, temporadas, r.llegada, r.salida)
+        r.total_centavos,
+        [p + extra for p in precios_por_noche(r.habitacion.tarifa_centavos, temporadas, r.llegada, r.salida)],
     )
     restante, noches = r.pagado_centavos, []
     for i, monto in enumerate(montos):

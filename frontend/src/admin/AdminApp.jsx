@@ -42,7 +42,7 @@ const MAX_VIVAS = 4
 
 /* Páginas que reemplazan el contenido completo */
 // Orden de la barra lateral: bajar en la lista entra desde abajo, subir desde arriba.
-const ORDEN = ['dashboard', 'hoy', 'calendar', 'notifications', 'rooms', 'users', 'externas', 'auditoria', 'config', 'account']
+const ORDEN = ['calendar', 'hoy', 'dashboard', 'notifications', 'rooms', 'users', 'externas', 'auditoria', 'config', 'account']
 const FULL_PAGES = ['account', 'nueva-reserva', 'nueva-habitacion', 'editar-habitacion', 'gestionar-fotos', 'config', 'nueva-persona', 'editar-persona']
 
 /* ── Guardia de navegación: AlertDialog de shadcn (ConfirmarDescarte) ── */
@@ -88,7 +88,7 @@ const CON_ID = ['editar-habitacion', 'gestionar-fotos', 'editar-persona']
 export default function AdminApp() {
   const { '*': resto = '' } = useParams()
   const slug = resto.split('/')[0]
-  if (slug && !PAGINA[slug]) return <NoEncontrada a="/admin/tablero" texto="Ir al tablero" />
+  if (slug && !PAGINA[slug]) return <NoEncontrada a="/admin/calendario" texto="Ir a reservaciones" />
   return <PanelAdmin />
 }
 
@@ -122,7 +122,8 @@ function PanelAdmin() {
 
   // Página y habitación salen de la URL. La habitación la pide cada página a la
   // API (si ya no existe, la página lo dice); sin id, a la lista.
-  let page = PAGINA[slug] ?? 'dashboard'
+  // Sin página en la URL (/admin, recién entrando): Reservaciones, lo primero que usa la recepción.
+  let page = PAGINA[slug] ?? (permitida('calendar', sesion) ? 'calendar' : 'dashboard')
   if (CON_ID.includes(page) && !idTexto) page = REGRESO[page]
   if (deshabilitada(page)) page = 'dashboard' // módulo apagado (admin/modulos.js): la URL se corrige sola
   if (sesion && !permitida(page, sesion)) page = 'dashboard' // sin el permiso de esa página

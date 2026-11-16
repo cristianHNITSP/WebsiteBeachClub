@@ -97,3 +97,6 @@
 
 .interruptor { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
 .interruptorTitulo { font-size: var(--fs-sm); font-weight: 600; color: var(--foreground); }
+
+/* Confirmar al final del resumen (Nueva reserva): ancho completo, donde queda el pulgar. */
+.confirmarAbajo { display: block; margin-top: 16px; }

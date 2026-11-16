@@ -139,7 +139,7 @@ def _sembrar_habitaciones() -> None:
         nuevas = [
             Habitacion(
                 propiedad_id=props[clave], nombre=nombre, tipo=tipo, capacidad=personas, cama=cama,
-                tamano_m2=m2, tarifa_centavos=tarifa, venta_en_linea=en_linea,
+                tamano_m2=m2, tarifa_centavos=tarifa, venta_en_linea=en_linea, adultos_incluidos=personas,
             )
             for clave, nombre, tipo, personas, cama, m2, tarifa, en_linea in INVENTARIO_DESARROLLO
             if (props[clave], nombre) not in existentes

@@ -7,7 +7,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.alcance import Alcance
-from app.modelos import Habitacion
+from app.modelos import Habitacion, Propiedad
 from app.modelos.base import INCLUIR_ELIMINADOS
 
 
@@ -29,8 +29,10 @@ async def listar(
     total = (await sesion.execute(select(func.count()).select_from(Habitacion).where(*filtros))).scalar_one()
     consulta = (
         select(Habitacion)
+        .join(Propiedad, Propiedad.id == Habitacion.propiedad_id)
         .where(*filtros)
-        .order_by(Habitacion.nombre, Habitacion.id)
+        # Por sucursal y luego por nombre: el panel las agrupa por propiedad en todas las páginas.
+        .order_by(Propiedad.nombre, Habitacion.nombre, Habitacion.id)
         .limit(por_pagina)
         .offset((pagina - 1) * por_pagina)
     )

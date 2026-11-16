@@ -2,13 +2,11 @@ import { useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { LiquidSegments } from '@/components/devl/liquid-segments'
 import { motion, AnimatePresence } from 'framer-motion'
 import { toast } from '@/admin/toast'
-import { CaretLeftIcon, CaretRightIcon, CaretDownIcon, MagnifyingGlassIcon, PlusIcon, MinusIcon, WrenchIcon } from '@phosphor-icons/react'
+import { CaretLeftIcon, CaretRightIcon, CaretDownIcon, MagnifyingGlassIcon, PlusIcon, WrenchIcon } from '@phosphor-icons/react'
 import { Badge } from '@/components/coss/badge'
 import { Button } from '@/components/coss/button'
 import { Input } from '@/components/coss/input'
-import { Label } from '@/components/coss/label'
 import { Popover, PopoverPopup } from '@/components/coss/popover'
-import { Sheet, SheetDescription, SheetFooter, SheetHeader, SheetPanel, SheetPopup, SheetTitle } from '@/components/coss/sheet'
 import { DropletButton } from '@/components/devl/droplet-button'
 import ConfirmarRiesgo from '@/components/marca/ConfirmarRiesgo'
 import { CoronaFlores, Florecita } from '@/components/marca/Wordmark'
@@ -17,11 +15,11 @@ import { useParametros } from '@/hooks/useParametros'
 import Skeleton from '@/components/frida/Skeleton'
 import { useTheme } from '@/context/ThemeContext'
 import { aISO, deISO } from '@/lib/fechas'
-import { fichaHabitacion } from '../habitaciones'
 import { ESTADOS, FUENTES, deFuera, useReservas, conflicto, hoy, sumarDias, dias, habitacionesConocidas } from '../reservas'
 import { useSesion } from '@/lib/sesion'
 import { florDeLugar, usePropiedadActual } from '../propiedadActual'
 import DetalleReserva from './DetalleReserva'
+import NuevaReservaRapida from './NuevaReservaRapida'
 import s from './LineaTiempo.module.css'
 
 /*
@@ -71,7 +69,7 @@ const FILTROS = [
 ]
 const corto = d => d.toLocaleDateString('es-MX', { day: 'numeric', month: 'short' })
 
-export default function LineaTiempo({ onNuevaReserva, onNuevaHabitacion }) {
+export default function LineaTiempo({ onNuevaHabitacion }) {
   const { reduceMotion } = useTheme()
   // ?reserva=<id>: el detalle abierto también vive en la URL (recargar lo conserva).
   const [p, set] = useParametros({ escala: 'semana', desde: '', agrupar: 'propiedad', estado: 'todos', q: '', reserva: '' })
@@ -192,7 +190,10 @@ export default function LineaTiempo({ onNuevaReserva, onNuevaHabitacion }) {
   const clicHueco = (e, hab) => {
     const x = e.clientX - e.currentTarget.getBoundingClientRect().left
     const llegada = aISO(sumarDias(inicio, Math.floor(x / celda)))
-    setNueva({ habitacionId: hab.id, llegada, noches: 2, huesped: '', tipo: 'reserva', adultos: Math.min(2, hab.capacidad) })
+    setNueva({
+      habitacionId: hab.id, llegada, noches: 2, huesped: '', telefono: '', tipo: 'reserva', paso: 1,
+      adultos: Math.min(2, hab.capacidad), menores: 0, monto: 0, metodo: 'efectivo', referencia: '',
+    })
   }
   const nuevaSalida = nueva ? aISO(sumarDias(deISO(nueva.llegada), nueva.noches)) : ''
   const nuevaChoca = nueva ? conflicto(reservas, { id: '', habitacionId: nueva.habitacionId, llegada: nueva.llegada, salida: nuevaSalida }) : null
@@ -468,124 +469,9 @@ export default function LineaTiempo({ onNuevaReserva, onNuevaHabitacion }) {
         )
       })()}
 
-      {/* ── Nueva reserva rápida: entra desde la derecha. Una reserva SIGUE en el formulario
-          completo (forma de pago y abono), con todo lo de aquí ya puesto; el mantenimiento se
-          bloquea aquí mismo. Arriba, el estado vivo (como el Delivery Tracker de devl): las fechas
-          en grande, una frase que dice qué falta y los pasos que se van llenando. ── */}
-      <Sheet open={!!nueva} onOpenChange={o => { if (!o) setNueva(null) }}>
-        <SheetPopup closeProps={{ 'aria-label': 'Cerrar' }}>
-          {nueva && (() => {
-            const hab = habitacionDe(nueva.habitacionId)
-            const bloqueo = nueva.tipo === 'bloqueo'
-            const listo = bloqueo || nueva.huesped.trim().length >= 2
-            const llenos = listo ? 2 : 1 // pasos completos: fechas y, con nombre, el huésped
-            const fase = nuevaChoca
-              ? `Choca con ${nuevaChoca.estado === 'bloqueo' ? 'un bloqueo de mantenimiento' : `la reserva de ${nuevaChoca.huesped}`}. Reduce las noches o elige otro día.`
-              : bloqueo ? 'Esas noches quedan fuera de venta mientras dure el mantenimiento.'
-                : listo ? 'En el siguiente paso registras la forma de pago y si el cliente dejó un abono.'
-                  : 'Escribe el nombre del huésped para continuar.'
-            const entra = reduceMotion ? { opacity: 0 } : { opacity: 0, y: 6, filter: 'blur(2px)' }
-            return (
-              <form className={s.hojaForm} onSubmit={async e => {
-                e.preventDefault()
-                if (!listo || nuevaChoca) return
-                if (!bloqueo) {
-                  onNuevaReserva?.({
-                    propiedad: hab.propiedadId, habitacion: hab.id, llegada: nueva.llegada, salida: nuevaSalida,
-                    huesped: nueva.huesped.trim(), adultos: nueva.adultos,
-                  })
-                  setNueva(null)
-                  return
-                }
-                const fallo = await crear({ tipo: 'bloqueo', habitacion_id: hab.id, llegada: nueva.llegada, salida: nuevaSalida, notas: nueva.huesped.trim() || 'Mantenimiento' })
-                if (fallo) { toast.error('No se bloquearon las fechas', { description: fallo.message }); return }
-                toast.success('Fechas bloqueadas', { description: `${nueva.huesped.trim() || 'Mantenimiento'}, ${hab.name}.` })
-                setNueva(null)
-              }}>
-                <SheetHeader>
-                  <SheetTitle>{bloqueo ? 'Bloquear fechas' : 'Nueva reserva'}</SheetTitle>
-                  <SheetDescription>{hab.name}. {fichaHabitacion({ tipo: hab.type, cama: hab.cama, capacidad: hab.capacidad })}.</SheetDescription>
-                </SheetHeader>
-                <SheetPanel className={s.hojaCuerpo}>
-                  <section className={s.hojaEstado} aria-live="polite">
-                    <span className={s.hojaEtiqueta}>{bloqueo ? 'Fuera de venta' : 'Estancia'}</span>
-                    <AnimatePresence initial={false} mode="popLayout">
-                      <motion.span key={nuevaSalida} className={s.hojaCifra} initial={entra}
-                        animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }} exit={{ opacity: 0 }} transition={{ duration: 0.22 }}>
-                        {corto(deISO(nueva.llegada))} → {corto(deISO(nuevaSalida))}
-                      </motion.span>
-                    </AnimatePresence>
-                    <span className={s.hojaSub}>
-                      {nueva.noches} noche{nueva.noches !== 1 ? 's' : ''}{bloqueo ? '' : `, ${nueva.adultos} persona${nueva.adultos !== 1 ? 's' : ''}`}
-                    </span>
-                    <AnimatePresence initial={false} mode="popLayout">
-                      <motion.p key={fase} className={nuevaChoca ? s.formError : s.formAyuda} role={nuevaChoca ? 'alert' : undefined}
-                        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.18 }}>
-                        {fase}
-                      </motion.p>
-                    </AnimatePresence>
-                    {!bloqueo && (
-                      <ol className={s.etapas} aria-label="Pasos de la reserva">
-                        {['Fechas', 'Huésped', 'Pago y confirmación'].map((t, i) => (
-                          <li key={t} className={s.etapa}>
-                            <span className={s.etapaBarra}>
-                              <motion.span className={s.etapaRelleno} initial={false} transition={resorte}
-                                animate={{ scaleX: i < llenos ? 1 : i === llenos ? 0.35 : 0 }} />
-                            </span>
-                            <span aria-current={i === llenos ? 'step' : undefined} className={i <= llenos ? s.etapaActiva : s.etapaPendiente}>{t}</span>
-                          </li>
-                        ))}
-                      </ol>
-                    )}
-                  </section>
-
-                  <section className={s.formulario}>
-                    <LiquidSegments options={[{ value: 'reserva', label: 'Reserva' }, { value: 'bloqueo', label: 'Mantenimiento' }]} value={nueva.tipo}
-                      onValueChange={v => setNueva(n => ({ ...n, tipo: v }))} aria-label="Tipo" size="sm" />
-                    <div className="grid gap-2">
-                      <Label htmlFor="lt-huesped">{bloqueo ? 'Motivo' : 'Huésped'}</Label>
-                      <Input id="lt-huesped" autoFocus value={nueva.huesped} maxLength={120}
-                        placeholder={bloqueo ? 'Ej. Pintura, plomería' : 'Nombre completo'}
-                        onChange={e => setNueva(n => ({ ...n, huesped: e.target.value }))} size="lg" />
-                    </div>
-                  </section>
-
-                  <section className={s.formFila}>
-                    <div className="grid gap-2">
-                      <span className="text-sm font-medium" id="lt-noches">Noches</span>
-                      <div className={s.contador} role="group" aria-labelledby="lt-noches">
-                        <Button type="button" variant="outline" size="icon" aria-label="Menos noches" disabled={nueva.noches <= 1}
-                          onClick={() => setNueva(n => ({ ...n, noches: n.noches - 1 }))}><MinusIcon size={14} weight="bold" /></Button>
-                        <span className={s.contadorValor}>{nueva.noches}</span>
-                        <Button type="button" variant="outline" size="icon" aria-label="Más noches" disabled={nueva.noches >= 30}
-                          onClick={() => setNueva(n => ({ ...n, noches: n.noches + 1 }))}><PlusIcon size={14} weight="bold" /></Button>
-                      </div>
-                    </div>
-                    {!bloqueo && (
-                      <div className="grid gap-2">
-                        <span className="text-sm font-medium" id="lt-personas">Personas (hasta {hab.capacidad})</span>
-                        <div className={s.contador} role="group" aria-labelledby="lt-personas">
-                          <Button type="button" variant="outline" size="icon" aria-label="Menos personas" disabled={nueva.adultos <= 1}
-                            onClick={() => setNueva(n => ({ ...n, adultos: n.adultos - 1 }))}><MinusIcon size={14} weight="bold" /></Button>
-                          <span className={s.contadorValor}>{nueva.adultos}</span>
-                          <Button type="button" variant="outline" size="icon" aria-label="Más personas" disabled={nueva.adultos >= hab.capacidad}
-                            onClick={() => setNueva(n => ({ ...n, adultos: n.adultos + 1 }))}><PlusIcon size={14} weight="bold" /></Button>
-                        </div>
-                      </div>
-                    )}
-                  </section>
-                </SheetPanel>
-                <SheetFooter>
-                  <Button type="button" variant="outline" onClick={() => setNueva(null)}>Cancelar</Button>
-                  <DropletButton type="submit" disabled={!listo || !!nuevaChoca}>
-                    {bloqueo ? 'Bloquear fechas' : 'Continuar al pago'}
-                  </DropletButton>
-                </SheetFooter>
-              </form>
-            )
-          })()}
-        </SheetPopup>
-      </Sheet>
+      {/* ── Nueva reserva rápida: dos pasos (datos, pago y confirmación) sin salir del calendario ── */}
+      <NuevaReservaRapida nueva={nueva} setNueva={setNueva} hab={nueva ? habitacionDe(nueva.habitacionId) : null}
+        salida={nuevaSalida} choca={nuevaChoca} crear={crear} reduceMotion={reduceMotion} resorte={resorte} />
     </div>
   )
 }
