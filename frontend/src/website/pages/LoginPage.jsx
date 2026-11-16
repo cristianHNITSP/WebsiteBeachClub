@@ -265,9 +265,13 @@ export default function LoginPage() {
               <motion.div {...fadeUp(0.24)} className={s.campo}>
                 <div className={s.filaLabel}>
                   <Label htmlFor="login-password">Contraseña</Label>
-                  <Pista contenido="Te enviaremos un enlace a tu correo registrado" lado="top">
+                  {/* No hay envío de correos: la contraseña la restablece un gerente o el dueño desde
+                      Personal (contraseña temporal que la persona cambia al entrar). */}
+                  <Pista contenido="Te la restablece un gerente o el dueño" lado="top">
                     <button type="button" className={s.olvido}
-                      onClick={() => toast.info('Recuperar contraseña', { description: 'Función disponible en producción.' })}>
+                      onClick={() => toast.info('Pide una contraseña temporal', {
+                        description: 'Un gerente o el dueño te la pone desde Personal. Al entrar, el panel te pedirá cambiarla.',
+                      })}>
                       ¿Olvidaste tu contraseña?
                     </button>
                   </Pista>
