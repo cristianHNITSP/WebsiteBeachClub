@@ -20,6 +20,7 @@ from app.rutas.admin import (
     habitaciones,
     metricas,
     personal,
+    propiedades,
     reservas,
     sitios,
     tarifas,
@@ -69,6 +70,7 @@ def crear_app() -> FastAPI:
     app.include_router(tarifas.router)
     app.include_router(auditoria.router)
     app.include_router(personal.router)
+    app.include_router(propiedades.router)
     app.include_router(avisos.router)
     app.include_router(metricas.router)
     app.include_router(eventos.router)

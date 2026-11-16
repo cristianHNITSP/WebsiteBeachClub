@@ -10,7 +10,7 @@ Un solo tipo de cuenta (`usuarios`) para todos. Lo que cambia es el **rol**:
 
 | Rol (`clave`) | Quién | Llega a | Ejemplos de lo que puede |
 |---|---|---|---|
-| `dueno` | Dueño (2026-11-15, migración 0025) | El panel | Todo, en las dos propiedades (`propiedades.todas`): ver la auditoría (`auditoria.ver`) y es el único que da de alta o cambia a gerentes y dueños (`personal.gerentes`) |
+| `dueno` | Dueño (2026-11-15, migración 0025) | El panel | Todo, en las dos propiedades (`propiedades.todas`): ver la auditoría (`auditoria.ver`) y es el único que da de alta o cambia a gerentes y dueños (`personal.gerentes`) y que da de alta y edita propiedades (`propiedades.gestionar`, migración 0027) |
 | `gerente` | Administrador de una o de las dos propiedades | El panel | Lo de su(s) propiedad(es) asignada(s): alta de recepción y restaurante (solo en sus propiedades), precios, ajustes (incluida la modalidad de cobro, `ajustes.cobro`), sitios web (`sitios.gestionar`). **Sin** auditoría, sin ver otras propiedades y sin tocar a gerentes ni dueños |
 | `recepcion` | Recepción | El panel | Reservas, Línea de tiempo, huéspedes, reservas externas |
 | `restaurante` | Personal del restaurante | El panel | Menú, tickets, estadísticas del restaurante |

@@ -62,9 +62,11 @@ function Formulario({ persona, roles, onBack, onDirtyChange, onAlta }) {
   const nueva = !persona
   const { sesion } = useSesion()
   const propiedades = sesion?.propiedades ?? []
+  // Quien solo tiene una propiedad (un gerente de una sucursal) solo puede dar esa: va puesta.
+  const unica = propiedades.length === 1 ? propiedades[0] : null
   const inicial = {
     usuario: '', nombre: persona?.nombre ?? '', correo: persona?.correo ?? '',
-    rol: persona?.rol ?? 'recepcion', propiedades: persona?.propiedades ?? [],
+    rol: persona?.rol ?? 'recepcion', propiedades: persona?.propiedades ?? (unica ? [unica.id] : []),
   }
   const [form, setForm] = useState(inicial)
   const [guardando, setGuardando] = useState(false)
@@ -159,6 +161,8 @@ function Formulario({ persona, roles, onBack, onDirtyChange, onAlta }) {
             <legend className="text-sm font-medium">Propiedades</legend>
             {todas ? (
               <p className={s.ayuda}>Este rol ve todas las propiedades.</p>
+            ) : unica ? (
+              <p className={s.ayuda}>Trabajará en {unica.nombre} ({unica.lugar.split(',')[0]}), la propiedad que tienes asignada.</p>
             ) : (
               <>
                 {propiedades.map(p => (

@@ -95,10 +95,17 @@ PERMISOS = [
         "modulo": "usuarios",
         "descripcion": "Dar de alta y cambiar a gerentes y dueños",
     },
+    {
+        "id": 20,
+        "clave": "propiedades.gestionar",
+        "modulo": "propiedades",
+        "descripcion": "Dar de alta y editar propiedades",
+    },
 ]
 
-# Lo que solo tiene el dueño: ver todas las propiedades, la auditoría y gestionar a gerentes y dueños.
-SOLO_DUENO = ("propiedades.todas", "auditoria.ver", "personal.gerentes")
+# Lo que solo tiene el dueño: ver todas las propiedades, la auditoría, gestionar a gerentes y
+# dueños y dar de alta propiedades.
+SOLO_DUENO = ("propiedades.todas", "auditoria.ver", "personal.gerentes", "propiedades.gestionar")
 
 PERMISOS_POR_ROL = {
     "dueno": [p["clave"] for p in PERMISOS],

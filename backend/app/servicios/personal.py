@@ -81,7 +81,11 @@ async def _rol(sesion: AsyncSession, clave: str) -> Rol:
     return rol
 
 
-async def _propiedades(sesion: AsyncSession, actor: Actor, ids: list[UUID]):
+async def _propiedades(sesion: AsyncSession, actor: Actor, ids: list[UUID], rol: Rol):
+    """Las propiedades de la persona. Un gerente solo reparte las suyas (si tiene una, esa).
+    Un rol que no ve todas necesita al menos una: sin ella no vería nada."""
+    if not ids and not any(p.clave == "propiedades.todas" for p in rol.permisos):
+        raise ReglaDeNegocio("Elige al menos una propiedad", codigo="sin_propiedad")
     if not actor.todas_las_propiedades and not set(ids) <= actor.propiedades:
         raise NoEncontrado("Esa propiedad no existe")  # no se da acceso a lo que uno no tiene
     props = await repo.propiedades_por_ids(sesion, ids)
@@ -135,7 +139,7 @@ async def roles(sesion):
 async def crear(sesion: AsyncSession, actor: Actor, datos: PersonaNueva) -> Usuario:
     rol = await _rol(sesion, datos.rol)
     _solo_dueno(actor, rol)
-    props = await _propiedades(sesion, actor, datos.propiedades)
+    props = await _propiedades(sesion, actor, datos.propiedades, rol)
     correo = str(datos.correo).lower()
     u = Usuario(
         usuario=datos.usuario,
@@ -164,13 +168,12 @@ async def editar(sesion: AsyncSession, actor: Actor, usuario_id: UUID, datos: Pe
     antes = _foto(u)
     rol = await _rol(sesion, datos.rol)
     _solo_dueno(actor, u.rol, rol)
-    props = await _propiedades(sesion, actor, datos.propiedades)
+    if rol.id != u.rol_id and u.id == actor.id:
+        raise ReglaDeNegocio("No puedes cambiar tu propio rol", codigo="propio")
+    props = await _propiedades(sesion, actor, datos.propiedades, rol)
     cambia_acceso = rol.id != u.rol_id or {p.id for p in props} != {p.id for p in u.propiedades}
-    if rol.id != u.rol_id:
-        if u.id == actor.id:
-            raise ReglaDeNegocio("No puedes cambiar tu propio rol", codigo="propio")
-        if not any(p.clave == GESTIONA for p in rol.permisos):
-            await _seguira_habiendo_gestor(sesion, u)
+    if rol.id != u.rol_id and not any(p.clave == GESTIONA for p in rol.permisos):
+        await _seguira_habiendo_gestor(sesion, u)
     try:
         async with sesion.begin_nested():
             u.nombre, u.correo, u.rol_id = datos.nombre, str(datos.correo).lower(), rol.id

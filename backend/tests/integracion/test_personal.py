@@ -215,3 +215,10 @@ async def test_gerente_si_gestiona_recepcion_de_sus_propiedades(cliente, sesion)
         cliente, sesion, usuario="otra.pech", correo="otra@hotel.mx", propiedades=[str(chuburna.id)]
     )
     assert ajena.status_code == 404  # una propiedad que no es suya no existe para él
+
+
+async def test_recepcion_sin_propiedad_no_se_da_de_alta(cliente, sesion):
+    """Sin propiedad no vería nada: el gerente reparte las suyas (si tiene una, esa)."""
+    await entrar_como(cliente, sesion, rol="gerente", propiedades=["chelem"])
+    r = await alta(cliente, sesion, propiedades=[])
+    assert r.status_code == 422 and r.json()["codigo"] == "sin_propiedad"

@@ -22,6 +22,8 @@ const EVENTOS = {
   'tarifa.crear': ['Creó una tarifa', 'importante'],
   'tarifa.eliminar': ['Eliminó una tarifa', 'importante'],
   'usuario.alta': ['Dio de alta a una persona', 'importante'],
+  'propiedad.alta': ['Dio de alta una propiedad', 'importante'],
+  'propiedad.editar': ['Cambió el nombre o el lugar de una propiedad', 'importante'],
   'usuario.baja': ['Dio de baja a una persona', 'importante'],
   'usuario.reactivar': ['Reactivó a una persona', 'importante'],
   'usuario.editar': ['Cambió los permisos o datos de una persona', 'importante'],
